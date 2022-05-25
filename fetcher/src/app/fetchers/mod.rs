@@ -8,7 +8,7 @@ use reqwest::Url;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct SegmentInfo {
-    url: Url,
+    pub url: Url,
     duration: Duration,
     title: Option<String>,
 }

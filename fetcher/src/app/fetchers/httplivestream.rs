@@ -4,15 +4,14 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
 use hls_m3u8::{MediaPlaylist, MediaSegment};
-use reqwest::header::CONTENT_TYPE;
-use reqwest::{StatusCode, Url};
+use reqwest::Url;
 use tokio_stream::Stream;
 
 use crate::app::fetchers::SegmentInfo;
+use crate::utils;
 
 pub struct HttpLiveStreamingFetcher {
     source: Url,
-    client: reqwest::Client,
     last_seen_segment_number: Cell<usize>,
 }
 
@@ -20,34 +19,18 @@ impl HttpLiveStreamingFetcher {
     pub fn new(source: Url) -> Self {
         Self {
             source,
-            client: reqwest::Client::new(),
             last_seen_segment_number: Cell::new(0),
         }
     }
 
     async fn fetch_playlist(&self) -> Result<MediaPlaylist> {
-        let response = self.client.get(self.source.clone()).send().await?;
+        let (content_type, content) = utils::download(&self.source).await?;
 
-        if response.status() != StatusCode::OK {
-            bail!(
-                "Failed to get data from source: {} {}",
-                response.status(),
-                response.text().await?
-            );
+        if content_type != Some("application/vnd.apple.mpegurl; charset=UTF-8".to_string()) {
+            bail!("Invalid content-type header: {:?}", content_type);
         }
 
-        let content_type = response
-            .headers()
-            .get(CONTENT_TYPE)
-            .ok_or_else(|| anyhow!("Missing content-type header"))?;
-
-        let content_type = content_type.to_str()?;
-
-        if content_type != "application/vnd.apple.mpegurl; charset=UTF-8" {
-            bail!("Invalid content-type header: {}", content_type);
-        }
-
-        MediaPlaylist::from_str(response.text().await?.as_ref())
+        MediaPlaylist::from_str(std::str::from_utf8(&content)?)
             .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
     }
 

@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 mod app;
+pub mod utils;
+
 use app::{App, Args};
 
 #[tokio::main]
