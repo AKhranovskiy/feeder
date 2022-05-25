@@ -1,5 +1,8 @@
+use std::io::Cursor;
+
 use anyhow::Result;
 use bytes::Bytes;
+use lofty::Probe;
 use reqwest::Url;
 use tokio_stream::StreamExt;
 
@@ -20,18 +23,13 @@ impl App {
 
         let segments = HttpLiveStreamingFetcher::new(stream).fetch();
         tokio::pin!(segments);
-        let mut segments = segments.map(|info| {
-            info.map(Segment::from)
-                .map(|s| async { SegmentDownloader::process(s).await })
-        });
 
-        while let Some(segment) = segments.next().await {
-            let segment: Segment = segment?.await?;
-            log::debug!(
-                "segment {:?} {:?}",
-                segment.content_type,
-                segment.content.map(|c| c.len())
-            );
+        while let Some(info) = segments.next().await {
+            let segment: Segment = info?.into();
+            let segment = SegmentDownloader::process(segment).await?;
+            let segment = TagExtractor::process(segment).await?;
+
+            log::debug!("segment {:?}", segment.tags,);
         }
         Ok(())
     }
@@ -75,5 +73,47 @@ impl SegmentDownloader {
             content_type,
             ..segment
         })
+    }
+}
+
+struct TagExtractor;
+
+impl TagExtractor {
+    fn extract(bytes: &Bytes) -> Result<Option<SegmentTags>> {
+        let tagged_file = Probe::new(Cursor::new(bytes))
+            .guess_file_type()?
+            .read(false)?;
+
+        // TODO https://en.wikipedia.org/wiki/ID3#ID3v2
+        // TXXX WXXX
+        for tag in tagged_file.tags() {
+            for item in tag.items() {
+                log::info!("{:?} {:?}", item.key(), item.value());
+            }
+        }
+        Ok(None)
+    }
+    async fn process(segment: Segment) -> Result<Segment> {
+        let tags = segment
+            .content
+            .as_ref()
+            .and_then(|bytes| Self::extract(bytes).ok().flatten());
+
+        if let Some(tags) = tags {
+            if let Some(mut v) = segment.tags {
+                v.push(tags);
+                Ok(Segment {
+                    tags: Some(v),
+                    ..segment
+                })
+            } else {
+                Ok(Segment {
+                    tags: Some(vec![tags]),
+                    ..segment
+                })
+            }
+        } else {
+            Ok(segment)
+        }
     }
 }
