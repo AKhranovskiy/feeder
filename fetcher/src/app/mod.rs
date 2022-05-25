@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use reqwest::Url;
 use tokio_stream::StreamExt;
 
@@ -18,7 +18,7 @@ impl App {
         tokio::pin!(segments);
 
         while let Some(segment) = segments.next().await {
-            println!("segment = {segment:?}");
+            log::debug!("segment = {segment:?}");
         }
         Ok(())
     }

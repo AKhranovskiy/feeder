@@ -1,16 +1,20 @@
+use std::cell::Cell;
 use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use async_stream::try_stream;
-use hls_m3u8::MediaPlaylist;
+use hls_m3u8::{MediaPlaylist, MediaSegment};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::{StatusCode, Url};
 use tokio_stream::Stream;
 
+use crate::app::fetchers::SegmentInfo;
+
 pub struct HttpLiveStreamingFetcher {
     source: Url,
     client: reqwest::Client,
+    last_seen_segment_number: Cell<usize>,
 }
 
 impl HttpLiveStreamingFetcher {
@@ -18,6 +22,7 @@ impl HttpLiveStreamingFetcher {
         Self {
             source,
             client: reqwest::Client::new(),
+            last_seen_segment_number: Cell::new(0),
         }
     }
 
@@ -47,7 +52,7 @@ impl HttpLiveStreamingFetcher {
             .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
     }
 
-    pub fn fetch(self) -> impl Stream<Item = Result<u64>> {
+    pub fn fetch(self) -> impl Stream<Item = Result<SegmentInfo>> {
         log::trace!(target: "HttpLiveStreamingFetcher", "Fetching source={}", &self.source);
 
         // Uses the `try_stream` macro from the `async-stream` crate. Generators
@@ -57,12 +62,35 @@ impl HttpLiveStreamingFetcher {
         try_stream! {
             loop {
                 let playlist = self.fetch_playlist().await?;
-                for (_, segment) in &playlist.segments {
-                    yield segment.duration.duration().as_secs()
+                for (_, segment) in playlist.segments.iter().filter(|(_, s)| self.filter_segment(s)) {
+                    let info: SegmentInfo= segment.try_into()?;
+                    yield info
                 }
 
                 tokio::time::sleep(playlist.duration() / 2).await;
             }
         }
+    }
+
+    fn filter_segment(&self, segment: &MediaSegment) -> bool {
+        let number = segment.number();
+        if number <= self.last_seen_segment_number.get() {
+            false
+        } else {
+            self.last_seen_segment_number.set(number);
+            true
+        }
+    }
+}
+
+impl TryFrom<&MediaSegment<'_>> for SegmentInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &MediaSegment) -> Result<Self, Self::Error> {
+        Ok(SegmentInfo {
+            url: value.uri().parse()?,
+            duration: value.duration.duration(),
+            title: value.duration.title().as_ref().map(|t| t.to_string()),
+        })
     }
 }

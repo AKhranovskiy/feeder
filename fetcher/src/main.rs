@@ -15,8 +15,11 @@ async fn main() -> Result<()> {
 
 fn init_logger() -> Result<()> {
     simplelog::TermLogger::init(
-        simplelog::LevelFilter::Info,
-        simplelog::Config::default(),
+        simplelog::LevelFilter::Debug,
+        simplelog::ConfigBuilder::new()
+            .set_time_format_rfc3339()
+            .add_filter_allow("fetcher::app".to_owned())
+            .build(),
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
     )?;
