@@ -1,8 +1,7 @@
 use std::cell::Cell;
 use std::str::FromStr;
-use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
 use hls_m3u8::{MediaPlaylist, MediaSegment};
 use reqwest::header::CONTENT_TYPE;

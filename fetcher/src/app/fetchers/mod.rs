@@ -6,6 +6,7 @@ pub use httplivestream::HttpLiveStreamingFetcher;
 use reqwest::Url;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SegmentInfo {
     url: Url,
     duration: Duration,

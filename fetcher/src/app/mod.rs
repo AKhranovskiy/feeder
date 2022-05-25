@@ -3,10 +3,10 @@ use reqwest::Url;
 use tokio_stream::StreamExt;
 
 mod args;
-pub use self::args::Args;
+pub use args::Args;
 
 mod fetchers;
-use self::fetchers::HttpLiveStreamingFetcher;
+use crate::app::fetchers::HttpLiveStreamingFetcher;
 
 pub struct App;
 
