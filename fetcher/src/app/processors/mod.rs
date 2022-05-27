@@ -7,7 +7,7 @@ use super::Segment;
 
 #[async_trait]
 pub trait SegmentProcessor {
-    async fn process(segment: Segment) -> anyhow::Result<Segment>;
+    async fn process(mut segment: Segment) -> anyhow::Result<Segment>;
 }
 
 pub use download::DownloadProcessor;
