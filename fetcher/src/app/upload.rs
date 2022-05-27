@@ -4,7 +4,7 @@ use reqwest::multipart::{Form, Part};
 use reqwest::{Client, StatusCode, Url};
 
 pub async fn upload(endpoint: &Url, segment: Segment) -> anyhow::Result<()> {
-    let endpoint = endpoint.join("segment/insert").unwrap();
+    let endpoint = endpoint.join("segments/upload").unwrap();
 
     let form = Form::new()
         .text("json", serde_json::to_string(&segment)?)
