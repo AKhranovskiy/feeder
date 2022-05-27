@@ -9,6 +9,7 @@ use url::Url;
 pub struct Segment {
     pub url: Url,
     pub duration: Duration,
+    #[serde(skip)]
     pub content: Option<Bytes>,
     pub tags: Tags,
 }
