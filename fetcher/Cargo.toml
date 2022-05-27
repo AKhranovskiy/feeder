@@ -23,3 +23,4 @@ simplelog = "0.12.0"
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-stream = "0.1.8"
 uuid = { version = "1.1.0", features = ["v4"] }
+model = { version = "*", path = "../model" }

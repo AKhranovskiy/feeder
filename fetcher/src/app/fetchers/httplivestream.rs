@@ -7,8 +7,9 @@ use hls_m3u8::{MediaPlaylist, MediaSegment};
 use reqwest::Url;
 use tokio_stream::Stream;
 
-use crate::app::segment::SegmentInfo;
 use crate::utils;
+
+use super::segment_info::SegmentInfo;
 
 pub struct HttpLiveStreamingFetcher {
     source: Url,

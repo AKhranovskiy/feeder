@@ -1,16 +1,15 @@
 use anyhow::Result;
+use model::Segment;
 use reqwest::Url;
 use tokio_stream::StreamExt;
 
 use crate::app::processors::DownloadProcessor;
 use crate::app::processors::SegmentProcessor;
 use crate::app::processors::TagExtractor;
-use crate::app::segment::Segment;
 
 mod args;
 mod fetchers;
 mod processors;
-mod segment;
 
 pub use args::Args;
 use fetchers::HttpLiveStreamingFetcher;

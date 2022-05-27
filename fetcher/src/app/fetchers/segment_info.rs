@@ -1,15 +1,14 @@
-use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bytes::Bytes;
 use reqwest::Url;
 
+use model::{Segment, Tags};
+
 #[derive(Debug)]
-pub struct Segment {
+pub struct SegmentInfo {
     pub url: Url,
     pub duration: Duration,
-    pub content: Option<Bytes>,
-    pub tags: Tags,
+    pub title: Option<String>,
 }
 
 impl From<SegmentInfo> for Segment {
@@ -27,13 +26,4 @@ impl From<SegmentInfo> for Segment {
             tags,
         }
     }
-}
-
-pub type Tags = BTreeMap<String, String>;
-
-#[derive(Debug, Clone)]
-pub struct SegmentInfo {
-    pub url: Url,
-    pub duration: Duration,
-    pub title: Option<String>,
 }

@@ -3,9 +3,9 @@ use std::io::Cursor;
 use async_trait::async_trait;
 use bytes::Bytes;
 use lofty::Probe;
+use model::Tags;
 
 use super::SegmentProcessor;
-use crate::app::segment::Tags;
 use crate::app::Segment;
 
 pub struct TagExtractor;
