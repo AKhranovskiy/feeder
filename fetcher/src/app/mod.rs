@@ -21,6 +21,7 @@ pub struct App;
 
 impl App {
     pub async fn run(args: Args) -> Result<()> {
+        let endpoint = args.endpoint.parse::<Url>()?;
         let stream = args.m3u8.parse::<Url>()?;
 
         let segments = HttpLiveStreamingFetcher::new(stream).fetch();
@@ -37,7 +38,9 @@ impl App {
                 .await
                 .context("Extracting tags")?;
 
-            upload(segment).await.context("Uploading a segment")?;
+            upload(&endpoint, segment)
+                .await
+                .context("Uploading a segment")?;
         }
         Ok(())
     }

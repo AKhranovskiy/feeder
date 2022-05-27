@@ -3,10 +3,8 @@ use model::Segment;
 use reqwest::multipart::{Form, Part};
 use reqwest::{Client, StatusCode, Url};
 
-pub async fn upload(segment: Segment) -> anyhow::Result<()> {
-    let endpoint = "http://localhost:3456/api/v1/segment/insert"
-        .parse::<Url>()
-        .unwrap();
+pub async fn upload(endpoint: &Url, segment: Segment) -> anyhow::Result<()> {
+    let endpoint = endpoint.join("segment/insert").unwrap();
 
     let form = Form::new()
         .text("json", serde_json::to_string(&segment)?)
@@ -16,6 +14,7 @@ pub async fn upload(segment: Segment) -> anyhow::Result<()> {
                 .mime_str("application/octet-stream")
                 .context("Attaching content")?,
         );
+
     let response = Client::new()
         .post(endpoint)
         .multipart(form)
