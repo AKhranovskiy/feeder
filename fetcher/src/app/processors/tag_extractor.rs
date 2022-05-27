@@ -122,7 +122,10 @@ fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
                 lofty::ItemKey::Unknown(v) => Some(v.as_str()),
                 lofty::ItemKey::Writer => todo!(),
                 lofty::ItemKey::Year => todo!(),
-                _ => None,
+                _ => {
+                    log::error!("Unknown tag key: {:?} {:?}", item.key(), item.value());
+                    None
+                }
             };
             if let Some(key) = key {
                 let value = match item.value() {
