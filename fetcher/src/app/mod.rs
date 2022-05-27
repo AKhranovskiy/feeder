@@ -23,8 +23,8 @@ impl App {
         let segments = HttpLiveStreamingFetcher::new(stream).fetch();
         tokio::pin!(segments);
 
-        while let Some(info) = segments.next().await {
-            let segment: Segment = info?.into();
+        while let Some(segment) = segments.next().await {
+            let segment: Segment = segment?;
             let segment = DownloadProcessor::process(segment).await?;
             let segment = TagExtractor::process(segment).await?;
 

@@ -4,6 +4,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
 use hls_m3u8::{MediaPlaylist, MediaSegment};
+use model::Segment;
 use reqwest::Url;
 use tokio_stream::Stream;
 
@@ -35,7 +36,7 @@ impl HttpLiveStreamingFetcher {
             .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
     }
 
-    pub fn fetch(self) -> impl Stream<Item = Result<SegmentInfo>> {
+    pub fn fetch(self) -> impl Stream<Item = Result<Segment>> {
         log::trace!(target: "HttpLiveStreamingFetcher", "Fetching source={}", &self.source);
 
         // Uses the `try_stream` macro from the `async-stream` crate. Generators
@@ -47,7 +48,7 @@ impl HttpLiveStreamingFetcher {
                 let playlist = self.fetch_playlist().await?;
                 for (_, segment) in playlist.segments.iter().filter(|(_, s)| self.filter_segment(s)) {
                     let info: SegmentInfo= segment.try_into()?;
-                    yield info
+                    yield info.into()
                 }
 
                 tokio::time::sleep(playlist.duration() / 2).await;
