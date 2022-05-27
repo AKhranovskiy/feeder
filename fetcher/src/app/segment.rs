@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -8,7 +9,7 @@ pub struct Segment {
     pub info: SegmentInfo,
     pub content: Option<Bytes>,
     pub content_type: Option<String>,
-    pub tags: Option<Vec<SegmentTags>>,
+    pub tags: Tags,
 }
 
 impl From<SegmentInfo> for Segment {
@@ -17,18 +18,12 @@ impl From<SegmentInfo> for Segment {
             info,
             content: None,
             content_type: None,
-            tags: None,
+            tags: BTreeMap::new(),
         }
     }
 }
 
-#[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
-pub struct SegmentTags {
-    title: String,
-    artist: String,
-    other: String,
-}
+pub type Tags = BTreeMap<String, String>;
 
 #[derive(Debug, Clone)]
 pub struct SegmentInfo {
