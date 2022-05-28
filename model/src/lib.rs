@@ -1,21 +1,9 @@
-use std::collections::BTreeMap;
-use std::time::Duration;
+mod segment;
 
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use url::Url;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Segment {
-    pub url: Url,
-    pub duration: Duration,
-    pub content: Bytes,
-    pub tags: Tags,
-}
-
-pub type Tags = BTreeMap<String, String>;
-
+pub use segment::{Segment, Tags};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SegmentMatchResponse {
     pub id: Uuid,
