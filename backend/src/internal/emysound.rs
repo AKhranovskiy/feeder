@@ -3,6 +3,8 @@ use model::{ContentKind, Segment, SegmentInsertResponse, SegmentMatchResponse};
 use url::Url;
 use uuid::Uuid;
 
+use super::content_kind_guesser::guess_content_kind;
+
 const MIN_CONFIDENCE: f32 = 0.2f32;
 const EMYSOUND_API: &str = "http://localhost:3340/api/v1.1/";
 
@@ -30,7 +32,15 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
             .context("EmySound::query")
             .and_then(to_results)
             .map(best_results)
-            .map(to_responses)?;
+            .map(to_responses)
+            .map(|v| {
+                v.iter()
+                    .map(|s| SegmentMatchResponse {
+                        kind: guess_content_kind(&segment.tags),
+                        ..s.clone()
+                    })
+                    .collect()
+            })?;
 
     Ok(if matches.is_empty() {
         None
@@ -43,7 +53,8 @@ pub async fn insert_segment(segment: &Segment) -> anyhow::Result<SegmentInsertRe
     let id = Uuid::new_v4();
     let artist = segment.artist();
     let title = segment.title();
-    // TODO content kind
+    let kind = guess_content_kind(&segment.tags);
+    println!("CONTENT KIND: {kind:?}");
 
     let filename = segment.url.path().to_string();
     let content = segment.content.clone();
@@ -62,7 +73,7 @@ pub async fn insert_segment(segment: &Segment) -> anyhow::Result<SegmentInsertRe
         id,
         artist,
         title,
-        kind: ContentKind::Unknown,
+        kind,
     })
 }
 
