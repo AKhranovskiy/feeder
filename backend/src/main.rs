@@ -4,6 +4,7 @@
 extern crate rocket;
 
 use api::FeederEvent;
+use rocket::fs::{relative, FileServer};
 use rocket::tokio::sync::broadcast::channel;
 use rocket::Config;
 use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
@@ -33,4 +34,5 @@ fn rocket() -> _ {
         .attach(cors)
         .manage(channel::<FeederEvent>(10).0)
         .mount("/api/v1", api::routes())
+        .mount("/", FileServer::from(relative!("static")))
 }
