@@ -1,6 +1,7 @@
 use anyhow::Context;
 use anyhow::Result;
 use model::Segment;
+use model::SegmentUploadResponse;
 use reqwest::Url;
 use tokio_stream::StreamExt;
 
@@ -38,9 +39,28 @@ impl App {
                 .await
                 .context("Extracting tags")?;
 
-            upload(&endpoint, segment)
+            match upload(&endpoint, segment)
                 .await
-                .context("Uploading a segment")?;
+                .context("Uploading a segment")?
+            {
+                SegmentUploadResponse::Matched(matches) => {
+                    log::info!("Matches:");
+                    for m in &matches {
+                        log::info!(
+                            "\t{}% {} / {} / {} / {}",
+                            m.score as u16 * 100 / 255,
+                            m.id,
+                            m.kind,
+                            m.artist,
+                            m.title
+                        );
+                    }
+                }
+                SegmentUploadResponse::Inserted(r) => {
+                    log::info!("New segment inserted:");
+                    log::info!("\t{} / {} / {} / {}", r.id, r.kind, r.artist, r.title)
+                }
+            }
         }
         Ok(())
     }

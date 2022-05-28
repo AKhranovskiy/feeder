@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bytes::Bytes;
 use reqwest::Url;
 
 use model::{Segment, Tags};
@@ -22,7 +23,7 @@ impl From<SegmentInfo> for Segment {
         Self {
             url: info.url,
             duration: info.duration,
-            content: None,
+            content: Bytes::new(),
             tags,
         }
     }

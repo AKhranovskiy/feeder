@@ -1,30 +1,34 @@
 use anyhow::{bail, Context};
-use model::Segment;
-use reqwest::multipart::{Form, Part};
-use reqwest::{Client, StatusCode, Url};
+use bytes::Buf;
+use model::{Segment, SegmentUploadResponse};
+use reqwest::header::ACCEPT;
+use reqwest::{header::CONTENT_TYPE, Client, StatusCode, Url};
+use rmp_serde::Serializer;
+use serde::Serialize;
 
-pub async fn upload(endpoint: &Url, segment: Segment) -> anyhow::Result<()> {
-    let endpoint = endpoint.join("segments/upload").unwrap();
+const MSGPACK_MIME: &str = "application/msgpack";
 
-    let form = Form::new()
-        .text("json", serde_json::to_string(&segment)?)
-        .part(
-            "content",
-            Part::stream(segment.content.unwrap_or_default())
-                .mime_str("application/octet-stream")
-                .context("Attaching content")?,
-        );
+pub async fn upload(endpoint: &Url, segment: Segment) -> anyhow::Result<SegmentUploadResponse> {
+    let endpoint = endpoint.join("segments/upload")?;
+
+    let mut payload = Vec::new();
+    segment.serialize(&mut Serializer::new(&mut payload))?;
 
     let response = Client::new()
         .post(endpoint)
-        .multipart(form)
+        .header(ACCEPT, MSGPACK_MIME)
+        .header(CONTENT_TYPE, MSGPACK_MIME)
+        .body(payload)
         .send()
         .await
         .context("Sending reqwest")?;
 
-    if response.status() == StatusCode::OK {
-        Ok(())
-    } else {
-        bail!("{} {}", response.status(), response.text().await?);
+    match response.status() {
+        StatusCode::OK | StatusCode::CREATED => {
+            Ok(rmp_serde::from_read(response.bytes().await?.reader())?)
+        }
+        _ => {
+            bail!("{} {}", response.status(), response.text().await?);
+        }
     }
 }

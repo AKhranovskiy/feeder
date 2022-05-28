@@ -1,25 +1,53 @@
 #![feature(decl_macro)]
 
-use rocket::form::Form;
-use rocket::form::Strict;
-use rocket::fs::TempFile;
-use rocket::http::Status;
-use rocket::Config;
-
 #[macro_use]
 extern crate rocket;
 
-#[derive(FromForm)]
-struct SegmentsUpload<'r> {
-    json: &'r str,
-    content: TempFile<'r>,
-}
+use rocket::http::Status;
+use rocket::response::status;
+use rocket::serde::msgpack::MsgPack;
+use rocket::Config;
 
-#[post("/api/v1/segments/upload", data = "<upload>")]
-async fn segments_upload(upload: Form<Strict<SegmentsUpload<'_>>>) -> Status {
-    println!("json: {:?}", upload.json);
-    println!("content: {}", upload.content.len());
-    Status::Ok
+use model::{Segment, SegmentInsertResponse, SegmentMatchResponse, SegmentUploadResponse};
+use uuid::Uuid;
+
+#[post("/segments/upload", format = "msgpack", data = "<segment>")]
+async fn segments_upload(
+    segment: MsgPack<Segment>,
+) -> status::Custom<MsgPack<SegmentUploadResponse>> {
+    if segment.content.len() % 2 == 0 {
+        status::Custom(
+            Status::Created,
+            SegmentUploadResponse::Inserted(SegmentInsertResponse {
+                id: Uuid::new_v4(),
+                artist: "Artist".to_string(),
+                title: "Title".to_string(),
+                kind: "Music".to_string(),
+            })
+            .into(),
+        )
+    } else {
+        status::Custom(
+            Status::Ok,
+            SegmentUploadResponse::Matched(vec![
+                SegmentMatchResponse {
+                    id: Uuid::new_v4(),
+                    score: 128,
+                    artist: "Artist".to_string(),
+                    title: "Title".to_string(),
+                    kind: "Music".to_string(),
+                },
+                SegmentMatchResponse {
+                    id: Uuid::new_v4(),
+                    score: 250,
+                    artist: "Artist".to_string(),
+                    title: "Title".to_string(),
+                    kind: "Music".to_string(),
+                },
+            ])
+            .into(),
+        )
+    }
 }
 
 #[launch]
@@ -31,5 +59,5 @@ fn rocket() -> _ {
 
     rocket::build()
         .configure(config)
-        .mount("/", routes![segments_upload])
+        .mount("/api/v1", routes![segments_upload])
 }

@@ -13,9 +13,6 @@ impl SegmentProcessor for DownloadProcessor {
         if let Some(v) = content_type {
             segment.tags.insert("FileType".to_string(), v);
         }
-        Ok(Segment {
-            content: Some(content),
-            ..segment
-        })
+        Ok(Segment { content, ..segment })
     }
 }
