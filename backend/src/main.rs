@@ -3,7 +3,10 @@
 #[macro_use]
 extern crate rocket;
 
+use api::FeederEvent;
+use rocket::tokio::sync::broadcast::channel;
 use rocket::Config;
+use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
 
 mod api;
 
@@ -14,7 +17,20 @@ fn rocket() -> _ {
         ..Config::debug_default()
     };
 
+    let allowed_origins = AllowedOrigins::all();
+
+    let cors = CorsOptions {
+        allowed_origins,
+        allowed_headers: AllowedHeaders::some(&["Authorization", "Accept"]),
+        allow_credentials: false,
+        ..Default::default()
+    }
+    .to_cors()
+    .unwrap();
+
     rocket::build()
         .configure(config)
+        .attach(cors)
+        .manage(channel::<FeederEvent>(10).0)
         .mount("/api/v1", api::routes())
 }

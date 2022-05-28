@@ -16,7 +16,7 @@ impl From<SegmentInfo> for Segment {
     fn from(info: SegmentInfo) -> Self {
         let mut tags = Tags::new();
         if let Some(title) = info.title {
-            tags.insert("PlaylistTitle".to_string(), title);
+            tags.insert("Comment".to_string(), title);
         }
         tags.insert("AudioFileURL".to_string(), info.url.to_string());
 

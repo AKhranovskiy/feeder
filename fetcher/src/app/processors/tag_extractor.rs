@@ -31,6 +31,7 @@ fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
             // log::debug!("{:?} {:?}", item.key(), item.value());
             let key: Option<&str> = match item.key() {
                 lofty::ItemKey::AlbumTitle => Some("AlbumTitle"),
+                lofty::ItemKey::Comment => Some("Comment"),
                 lofty::ItemKey::TrackArtist => Some("TrackArtist"),
                 lofty::ItemKey::TrackTitle => Some("TrackTitle"),
                 lofty::ItemKey::Unknown(v) => Some(v.as_str()),

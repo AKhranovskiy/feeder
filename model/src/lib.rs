@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Segment {
     pub url: Url,
     pub duration: Duration,
@@ -16,7 +16,7 @@ pub struct Segment {
 
 pub type Tags = BTreeMap<String, String>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SegmentMatchResponse {
     pub id: Uuid,
     pub score: u8,
@@ -25,7 +25,7 @@ pub struct SegmentMatchResponse {
     pub kind: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SegmentInsertResponse {
     pub id: Uuid,
     pub artist: String,
@@ -33,7 +33,7 @@ pub struct SegmentInsertResponse {
     pub kind: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SegmentUploadResponse {
     Matched(Vec<SegmentMatchResponse>),
     Inserted(SegmentInsertResponse),
