@@ -12,7 +12,14 @@ uuid = { version = "1.1.0", features = ["v4"] }
 rocket_cors = "0.6.0-alpha1"
 serde = { version = "1.0.137", features = ["derive"] }
 simplelog = "0.12.0"
+anyhow = { version = "1.0.57", features = ["backtrace"] }
+bytes = { version = "1.1.0", features = ["serde"] }
+url = { version = "2.2.2", features = ["serde"] }
 
 [dependencies.model]
 version = "*"
 path = "../model"
+
+[dependencies.emysound]
+version = "*"
+path = "../emysound"

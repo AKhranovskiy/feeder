@@ -34,6 +34,7 @@ fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
                 lofty::ItemKey::Comment => Some("Comment"),
                 lofty::ItemKey::TrackArtist => Some("TrackArtist"),
                 lofty::ItemKey::TrackTitle => Some("TrackTitle"),
+                lofty::ItemKey::OriginalFileName => Some("FileName"),
                 lofty::ItemKey::Unknown(v) => Some(v.as_str()),
                 _ => {
                     log::error!(

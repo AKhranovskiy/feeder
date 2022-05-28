@@ -25,7 +25,7 @@ function subscribe(uri) {
             const event = JSON.parse(ev.data)["Match"];
             console.log("decoded data", JSON.stringify(event));
 
-            addEvent(`${(new Date()).toISOString()} matched segment: ${event.score} ${event.id} ${event.kind} ${event.artist} ${event.title}`)
+            addEvent(`${(new Date()).toISOString()} matched segment: ${(event.score * 100 / 255).toFixed()} ${event.id} ${event.kind} ${event.artist} ${event.title}`)
         });
 
         events.addEventListener("open", () => {

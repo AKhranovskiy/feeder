@@ -22,7 +22,7 @@ pub struct SegmentMatchResponse {
     pub score: u8,
     pub artist: String,
     pub title: String,
-    pub kind: String,
+    pub kind: ContentKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,11 +30,19 @@ pub struct SegmentInsertResponse {
     pub id: Uuid,
     pub artist: String,
     pub title: String,
-    pub kind: String,
+    pub kind: ContentKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SegmentUploadResponse {
     Matched(Vec<SegmentMatchResponse>),
     Inserted(SegmentInsertResponse),
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ContentKind {
+    Unknown,
+    Advertisement,
+    Music,
+    Talk,
 }

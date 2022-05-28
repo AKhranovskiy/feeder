@@ -47,7 +47,7 @@ impl App {
                     log::info!("Matches:");
                     for m in &matches {
                         log::info!(
-                            "\t{}% {} / {} / {} / {}",
+                            "\t{}% {} / {:?} / {} / {}",
                             m.score as u16 * 100 / 255,
                             m.id,
                             m.kind,
@@ -58,7 +58,7 @@ impl App {
                 }
                 SegmentUploadResponse::Inserted(r) => {
                     log::info!("New segment inserted:");
-                    log::info!("\t{} / {} / {} / {}", r.id, r.kind, r.artist, r.title)
+                    log::info!("\t{} / {:?} / {} / {}", r.id, r.kind, r.artist, r.title)
                 }
             }
         }

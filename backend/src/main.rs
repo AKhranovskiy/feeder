@@ -10,6 +10,7 @@ use rocket::Config;
 use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
 
 mod api;
+pub mod internal;
 
 #[launch]
 fn rocket() -> _ {
