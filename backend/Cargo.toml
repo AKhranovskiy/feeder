@@ -22,6 +22,7 @@ mongodb = { version = "2.2.1", features = [
     "bson-uuid-0_8",
 ] }
 rocket_db_pools = { version = "0.1.0-rc.2", features = ["mongodb"] }
+chrono = { version = "0.4.19", features = ["serde"] }
 
 [dependencies.model]
 version = "*"

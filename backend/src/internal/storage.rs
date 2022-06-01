@@ -28,7 +28,7 @@ impl From<&SegmentMatchResponse> for MatchDocument {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct AudioDocument {
+pub struct AudioDocument {
     id: Uuid,
     date_time: DateTime,
     kind: ContentKind,

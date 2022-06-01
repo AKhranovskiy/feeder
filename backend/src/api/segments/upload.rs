@@ -6,6 +6,7 @@ use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 use rocket_db_pools::Connection;
 
+use crate::api::segments::to_internal_server_error;
 use crate::api::FeederEvent;
 use crate::internal::emysound::{find_matches, insert_segment};
 use crate::internal::storage::{self, Storage};
@@ -50,8 +51,4 @@ pub async fn upload(
         Status::Created,
         SegmentUploadResponse::Inserted(response).into(),
     ))
-}
-
-fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
-    status::Custom(Status::InternalServerError, error.to_string())
 }

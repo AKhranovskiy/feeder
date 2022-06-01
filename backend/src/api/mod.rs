@@ -6,5 +6,5 @@ use rocket::Route;
 pub use events::FeederEvent;
 
 pub fn routes() -> Vec<Route> {
-    routes![segments::upload::upload, events::events]
+    routes![events::events, segments::segments, segments::upload::upload,]
 }
