@@ -16,7 +16,7 @@ fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
 }
 
 /// List of all audio segments, ordered by insertion date descending, with attached matches.
-#[get("/segments")]
+#[get("/segments", format = "msgpack")]
 pub async fn segments(
     storage: Connection<Storage>,
 ) -> Result<status::Custom<MsgPack<Vec<AudioDocument>>>, status::Custom<String>> {
