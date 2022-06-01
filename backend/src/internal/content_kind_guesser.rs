@@ -42,7 +42,7 @@ impl ContentKindGuesser for IHeartGuesser {
         {
             IHeartRadioInfo::try_from(value.as_str())
                 .map(|info| info.guess_kind())
-                .map_err(|e| println!("ERR {e:#}"))
+                .map_err(|e| log::error!("IHeartGuesser failed: {e:#}"))
                 .ok()
         } else {
             None
@@ -77,13 +77,13 @@ impl TryFrom<&str> for IHeartRadioInfo {
 
         let caps = RE
             .captures(value)
-            .ok_or_else(|| anyhow!("Failed to match"))?;
+            .ok_or_else(|| anyhow!("Failed to match iHeartRadio info"))?;
 
         Ok(Self {
             song_spot: caps[1]
                 .chars()
                 .next()
-                .ok_or_else(|| anyhow!("Failed to parse song_spot"))?,
+                .ok_or_else(|| anyhow!("Failed to parse iHeartRadio::song_spot"))?,
             media_base_id: caps[2].parse::<i64>()?,
             itunes_track_id: caps[3].parse::<i64>()?,
             amg_track_id: caps[4].parse::<i64>()?,

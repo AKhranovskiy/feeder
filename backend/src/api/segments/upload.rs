@@ -1,7 +1,6 @@
 use anyhow::Context;
 use bytes::Bytes;
 use model::{ContentKind, Segment, SegmentMatchResponse, SegmentUploadResponse, Tags};
-
 use mongodb::bson::{DateTime, Uuid};
 use rocket::http::Status;
 use rocket::response::status;
@@ -63,6 +62,8 @@ pub async fn upload(
     storage: Connection<Storage>,
     events: &State<Sender<FeederEvent>>,
 ) -> Result<status::Custom<MsgPack<SegmentUploadResponse>>, status::Custom<String>> {
+    log::info!("Uploaded segment: {} {}", segment.artist(), segment.title());
+
     if let Some(matches) = find_matches(&segment)
         .await
         .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?
