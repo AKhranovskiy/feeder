@@ -10,6 +10,7 @@ use uuid::Uuid;
 pub fn guess_content_kind(tags: &Tags) -> ContentKind {
     AdContextGuesser::guess(tags)
         .or_else(|| IHeartGuesser::guess(tags))
+        // #EXTINF:10,title="text=\"Spot Block End\" amgTrackId=\"9876543\"",artist=" ",url="length=\"00:00:00\""
         .unwrap_or(ContentKind::Unknown)
 }
 

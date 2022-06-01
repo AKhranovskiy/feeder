@@ -3,8 +3,6 @@
 #[macro_use]
 extern crate rocket;
 
-use api::FeederEvent;
-use internal::Storage;
 use rocket::fs::{relative, FileServer};
 use rocket::tokio::sync::broadcast::channel;
 use rocket::Config;
@@ -14,8 +12,16 @@ use rocket_db_pools::Database;
 mod api;
 pub mod internal;
 
+use api::FeederEvent;
+use internal::storage::Storage;
+
 #[launch]
 fn rocket() -> _ {
+    let config = Config {
+        port: 3456,
+        ..Config::default()
+    };
+    // TODO: Set port in figment.
     let figment = Config::figment().merge((
         "databases.storage",
         rocket_db_pools::Config {
@@ -26,10 +32,6 @@ fn rocket() -> _ {
             idle_timeout: None,
         },
     ));
-    let config = Config {
-        port: 3456,
-        ..Config::default()
-    };
 
     let allowed_origins = AllowedOrigins::all();
 
