@@ -1,8 +1,9 @@
 use std::io::Cursor;
 
+use anyhow::Context;
 use async_trait::async_trait;
 use bytes::Bytes;
-use lofty::Probe;
+use lofty::{ItemKey, ItemValue, Probe};
 use model::Tags;
 
 use super::SegmentProcessor;
@@ -21,21 +22,22 @@ impl SegmentProcessor for TagExtractor {
 
 fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
     let tagged_file = Probe::new(Cursor::new(bytes))
-        .guess_file_type()?
-        .read(false)?;
+        .guess_file_type()
+        .context("guess file type")?
+        .read(false)
+        .context("read file")?;
 
     // TODO https://en.wikipedia.org/wiki/ID3
     let mut tags = Tags::new();
     for tag in tagged_file.tags() {
         for item in tag.items() {
-            // log::debug!("{:?} {:?}", item.key(), item.value());
             let key: Option<&str> = match item.key() {
-                lofty::ItemKey::AlbumTitle => Some("AlbumTitle"),
-                lofty::ItemKey::Comment => Some("Comment"),
-                lofty::ItemKey::TrackArtist => Some("TrackArtist"),
-                lofty::ItemKey::TrackTitle => Some("TrackTitle"),
-                lofty::ItemKey::OriginalFileName => Some("FileName"),
-                lofty::ItemKey::Unknown(v) => Some(v.as_str()),
+                ItemKey::AlbumTitle => Some("AlbumTitle"),
+                ItemKey::Comment => Some("Comment"),
+                ItemKey::TrackArtist => Some("TrackArtist"),
+                ItemKey::TrackTitle => Some("TrackTitle"),
+                ItemKey::OriginalFileName => Some("FileName"),
+                ItemKey::Unknown(v) => Some(v.as_str()),
                 _ => {
                     log::error!(
                         "Unsupported tag: key={:?}, value={:?}",
@@ -47,10 +49,10 @@ fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
             };
             if let Some(key) = key {
                 let value = match item.value() {
-                    lofty::ItemValue::Text(v) => v.clone(),
-                    lofty::ItemValue::Locator(v) => v.clone(),
-                    lofty::ItemValue::Binary(v) => std::str::from_utf8(v)?.to_owned(),
+                    ItemValue::Text(v) | ItemValue::Locator(v) => v.clone(),
+                    ItemValue::Binary(v) => std::str::from_utf8(v)?.to_owned(),
                 };
+                log::debug!("Tag: key={:?}, value={:?}", key, value);
                 tags.insert(key.to_owned(), value);
             }
         }

@@ -74,7 +74,11 @@ impl TryFrom<&MediaSegment<'_>> for SegmentInfo {
         Ok(SegmentInfo {
             url: value.uri().parse()?,
             duration: value.duration.duration(),
-            title: value.duration.title().as_ref().map(|t| t.to_string()),
+            title: value
+                .duration
+                .title()
+                .as_ref()
+                .map(std::string::ToString::to_string),
         })
     }
 }

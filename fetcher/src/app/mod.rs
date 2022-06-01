@@ -1,5 +1,6 @@
 use anyhow::Context;
 use anyhow::Result;
+use futures::TryFutureExt;
 use model::Segment;
 use model::SegmentUploadResponse;
 use reqwest::Url;
@@ -31,37 +32,46 @@ impl App {
         while let Some(segment) = segments.next().await {
             let segment: Segment = segment?;
 
-            let segment = DownloadProcessor::process(segment)
+            match Self::process_segment(segment)
+                .and_then(|segment| upload(&endpoint, segment))
                 .await
-                .context("Downloading content")?;
-
-            let segment = TagExtractor::process(segment)
-                .await
-                .context("Extracting tags")?;
-
-            match upload(&endpoint, segment)
-                .await
-                .context("Uploading a segment")?
             {
-                SegmentUploadResponse::Matched(matches) => {
-                    log::info!("Matches:");
-                    for m in &matches {
-                        log::info!(
-                            "\t{}% {} / {:?} / {} / {}",
-                            m.score as u16 * 100 / 255,
-                            m.id,
-                            m.kind,
-                            m.artist,
-                            m.title
-                        );
+                Ok(response) => match response {
+                    SegmentUploadResponse::Matched(matches) => {
+                        log::info!("Matched:");
+                        for m in &matches {
+                            log::info!(
+                                "\t{}% {} / {:?} / {} / {}",
+                                u16::from(m.score) * 100 / 255,
+                                m.id,
+                                m.kind,
+                                m.artist,
+                                m.title
+                            );
+                        }
                     }
+                    SegmentUploadResponse::Inserted(r) => {
+                        log::info!("New: {} / {:?} / {} / {}", r.id, r.kind, r.artist, r.title);
+                    }
+                },
+
+                Err(e) => {
+                    log::error!("{e:#}");
                 }
-                SegmentUploadResponse::Inserted(r) => {
-                    log::info!("New segment inserted:");
-                    log::info!("\t{} / {:?} / {} / {}", r.id, r.kind, r.artist, r.title)
-                }
-            }
+            };
         }
         Ok(())
+    }
+
+    async fn process_segment(segment: Segment) -> Result<Segment> {
+        let segment = DownloadProcessor::process(segment)
+            .await
+            .context("Downloading content")?;
+
+        let segment = TagExtractor::process(segment)
+            .await
+            .context("Extracting tags")?;
+
+        Ok(segment)
     }
 }

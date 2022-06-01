@@ -18,7 +18,7 @@ pub async fn download(url: &Url) -> anyhow::Result<(Option<String>, Bytes)> {
         .headers()
         .get(CONTENT_TYPE)
         .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_owned());
+        .map(std::string::ToString::to_string);
 
     let result = response
         .bytes()
