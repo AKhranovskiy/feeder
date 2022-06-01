@@ -1,0 +1,5 @@
+[default]
+port = 3456
+
+[default.databases.storage]
+url = "mongodb://localhost:27017"

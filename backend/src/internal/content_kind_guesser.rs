@@ -40,8 +40,6 @@ impl ContentKindGuesser for IHeartGuesser {
             .or_else(|| tags.get(&"TXXX".to_string()))
             .or_else(|| tags.get(&"Comment".to_string()))
         {
-            println!("IHeartGuesser::guess {value}");
-
             IHeartRadioInfo::try_from(value.as_str())
                 .map(|info| info.guess_kind())
                 .map_err(|e| println!("ERR {e:#}"))

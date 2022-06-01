@@ -26,21 +26,21 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
             .collect::<Vec<SegmentMatchResponse>>()
     };
 
-    let matches: Vec<SegmentMatchResponse> =
-        emysound::query(endpoint, filename, content, MIN_CONFIDENCE)
+    let matches: Vec<SegmentMatchResponse> = emysound::query(endpoint, filename, content, MIN_CONFIDENCE)
             .await
             .context("EmySound::query")
             .and_then(to_results)
             .map(best_results)
             .map(to_responses)
-            .map(|v| {
-                v.iter()
-                    .map(|s| SegmentMatchResponse {
-                        kind: guess_content_kind(&segment.tags),
-                        ..s.clone()
-                    })
-                    .collect()
-            })?;
+            // .map(|v| {
+            //     v.iter()
+            //         .map(|s| SegmentMatchResponse {
+            //             kind: guess_content_kind(&segment.tags),
+            //             ..s.clone()
+            //         })
+            //         .collect()
+            // })
+            ?;
 
     Ok(if matches.is_empty() {
         None
@@ -54,7 +54,6 @@ pub async fn insert_segment(segment: &Segment) -> anyhow::Result<SegmentInsertRe
     let artist = segment.artist();
     let title = segment.title();
     let kind = guess_content_kind(&segment.tags);
-    println!("CONTENT KIND: {kind:?}");
 
     let filename = segment.url.path().to_string();
     let content = segment.content.clone();
