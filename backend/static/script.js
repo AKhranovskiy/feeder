@@ -72,7 +72,7 @@ function showSegments(segments) {
         row.querySelector(".content-kind").textContent = segment.kind;
         row.querySelector(".artist").textContent = segment.artist;
         row.querySelector(".title").textContent = segment.title;
-        row.querySelector(".audio audio").src = "/api/v1/segment/" + segment.id;
+        row.querySelector(".audio a").href = `/api/v1/segment/${segment.id}/audio`;
         row.querySelector(".matches").textContent = segment.number_of_matches;
         segmentsTableBody.appendChild(row)
     }
@@ -80,7 +80,7 @@ function showSegments(segments) {
 
 function init() {
     subscribe("/api/v1/events")
-    load_segments("/api/v1/segments?json")
+    load_segments("/api/v1/segments/json")
 }
 
 init()

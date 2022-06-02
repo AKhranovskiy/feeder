@@ -62,7 +62,7 @@ impl From<&AudioDocument> for AudioDocumentLightweight {
     }
 }
 
-#[get("/segments?json", format = "json")]
+#[get("/segments/json", format = "json")]
 pub async fn segments_json(
     storage: Connection<Storage>,
 ) -> Result<status::Custom<Json<Vec<AudioDocumentLightweight>>>, status::Custom<String>> {
