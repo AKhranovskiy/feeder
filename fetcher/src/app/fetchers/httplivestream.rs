@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
+use hls_m3u8::tags::VariantStream::{ExtXIFrame, ExtXStreamInf};
 use hls_m3u8::{MasterPlaylist, MediaPlaylist, MediaSegment};
 use model::Segment;
 use reqwest::Url;
@@ -34,12 +35,13 @@ impl HttpLiveStreamingFetcher {
 
         let content = std::str::from_utf8(&content)?;
         let uri = match MasterPlaylist::try_from(content) {
+            // TODO handle all streams, choose the lowest quality.
             Ok(master_playlist) => master_playlist.variant_streams.first().map(|p| match p {
-                hls_m3u8::tags::VariantStream::ExtXIFrame {
+                ExtXIFrame {
                     uri,
                     stream_data: _,
-                } => Url::parse(uri),
-                hls_m3u8::tags::VariantStream::ExtXStreamInf {
+                }
+                | ExtXStreamInf {
                     uri,
                     frame_rate: _,
                     audio: _,
@@ -48,7 +50,7 @@ impl HttpLiveStreamingFetcher {
                     stream_data: _,
                 } => Url::parse(uri),
             }),
-            Err(_) => todo!(),
+            Err(_) => None,
         };
         if let Some(Ok(uri)) = uri {
             let (content_type, content) = utils::download(&uri).await?;
