@@ -4,6 +4,8 @@ use futures::TryFutureExt;
 use model::Segment;
 use model::SegmentUploadResponse;
 use reqwest::Url;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::Retry;
 use tokio_stream::StreamExt;
 
 use crate::app::processors::DownloadProcessor;
@@ -23,6 +25,15 @@ pub struct App;
 
 impl App {
     pub async fn run(args: Args) -> Result<()> {
+        let retry_strategy = ExponentialBackoff::from_millis(1000)
+            .map(jitter) // add jitter to delays
+            .take(3); // limit to 3 retries
+
+        Retry::spawn(retry_strategy, || Self::handle_hls(&args)).await?;
+        Ok(())
+    }
+
+    async fn handle_hls(args: &Args) -> Result<()> {
         let endpoint = args.endpoint.parse::<Url>()?;
         let stream = args.m3u8.parse::<Url>()?;
 
