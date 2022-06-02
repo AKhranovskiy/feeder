@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
 use async_stream::try_stream;
-use hls_m3u8::{MediaPlaylist, MediaSegment};
+use hls_m3u8::{MasterPlaylist, MediaPlaylist, MediaSegment};
 use model::Segment;
 use reqwest::Url;
 use tokio_stream::Stream;
@@ -32,8 +32,37 @@ impl HttpLiveStreamingFetcher {
             bail!("Invalid content-type header: {:?}", content_type);
         }
 
-        MediaPlaylist::from_str(std::str::from_utf8(&content)?)
-            .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
+        let content = std::str::from_utf8(&content)?;
+        let uri = match MasterPlaylist::try_from(content) {
+            Ok(master_playlist) => master_playlist.variant_streams.first().map(|p| match p {
+                hls_m3u8::tags::VariantStream::ExtXIFrame {
+                    uri,
+                    stream_data: _,
+                } => Url::parse(uri),
+                hls_m3u8::tags::VariantStream::ExtXStreamInf {
+                    uri,
+                    frame_rate: _,
+                    audio: _,
+                    subtitles: _,
+                    closed_captions: _,
+                    stream_data: _,
+                } => Url::parse(uri),
+            }),
+            Err(_) => todo!(),
+        };
+        if let Some(Ok(uri)) = uri {
+            let (content_type, content) = utils::download(&uri).await?;
+
+            if content_type != Some("application/vnd.apple.mpegurl; charset=UTF-8".to_string()) {
+                bail!("Invalid content-type header: {:?}", content_type);
+            }
+            let content = std::str::from_utf8(&content)?;
+            MediaPlaylist::from_str(content)
+                .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
+        } else {
+            MediaPlaylist::from_str(content)
+                .map_err(|e| anyhow!("Failed to parse playlist: {:#}", e))
+        }
     }
 
     pub fn fetch(self) -> impl Stream<Item = Result<Segment>> {
