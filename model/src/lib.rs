@@ -29,8 +29,34 @@ pub enum SegmentUploadResponse {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ContentKind {
-    Unknown,
     Advertisement,
     Music,
     Talk,
+    Unknown,
+}
+
+impl TryFrom<&str> for ContentKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "Advertisement" => Ok(ContentKind::Advertisement),
+            "Music" => Ok(ContentKind::Music),
+            "Talk" => Ok(ContentKind::Talk),
+            "Unknown" => Ok(ContentKind::Unknown),
+            _ => anyhow::bail!("Unknown content kind: {value}"),
+        }
+    }
+}
+
+impl ToString for ContentKind {
+    fn to_string(&self) -> String {
+        match self {
+            ContentKind::Advertisement => "Advertisement",
+            ContentKind::Music => "Music",
+            ContentKind::Talk => "Talk",
+            ContentKind::Unknown => "Unknown",
+        }
+        .to_owned()
+    }
 }

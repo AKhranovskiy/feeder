@@ -10,6 +10,7 @@ pub fn routes() -> Vec<Route> {
     routes![
         events::events,
         segment::segment_audio,
+        segments::kind::kind,
         segments::segments,
         segments::segments_json,
         segments::upload::upload,

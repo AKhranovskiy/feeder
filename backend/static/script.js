@@ -60,16 +60,15 @@ function showSegments(segments) {
     const segmentsTableBody = document.getElementById("segments-table-body");
     const segmentsTableRow = document.getElementById("segments-table-row");
 
-    let rows = segmentsTableBody.getElementsByTagName("tr");
-    for (let row of rows) {
-        segmentsTableBody.removeChild(row);
-    }
+    segmentsTableBody.querySelectorAll("tr").forEach(function (e) { e.remove() })
 
     for (const segment of segments) {
         var row = segmentsTableRow.content.cloneNode(true);
         row.querySelector("tr").classList.add(segment.kind);
         row.querySelector(".datetime").textContent = segment.date_time;
-        row.querySelector(".content-kind").textContent = segment.kind;
+        row.querySelector(".content-kind a").onclick = function (ev) { load_segments(`/api/v1/segments/kind/${segment.kind}?skip=0&limit=10`) };
+        row.querySelector(".content-kind a").href = "#"
+        row.querySelector(".content-kind a").textContent = segment.kind;
         row.querySelector(".artist").textContent = segment.artist;
         row.querySelector(".title").textContent = segment.title;
         row.querySelector(".audio a").href = `/api/v1/segment/${segment.id}/audio`;

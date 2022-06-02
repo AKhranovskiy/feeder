@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::internal::storage::{AudioDocument, Storage};
 
+pub mod kind;
 pub mod upload;
 
 fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
