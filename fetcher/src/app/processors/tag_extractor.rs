@@ -52,7 +52,7 @@ fn extract(bytes: &Bytes) -> anyhow::Result<Tags> {
                     ItemValue::Text(v) | ItemValue::Locator(v) => v.clone(),
                     ItemValue::Binary(v) => std::str::from_utf8(v)?.to_owned(),
                 };
-                log::debug!("Tag: key={:?}, value={:?}", key, value);
+                // log::debug!("Tag: key={:?}, value={:?}", key, value);
                 tags.insert(key.to_owned(), value);
             }
         }
