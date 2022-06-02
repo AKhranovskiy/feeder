@@ -11,7 +11,31 @@
 
 <body>
     <main>
-        <div>
+        <div class="segments">
+            <table style="width: 100vw">
+                <thead>
+                    <th>Date time</th>
+                    <th>Content Kind</th>
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Audio</th>
+                    <th># of Matches</th>
+                </thead>
+                <tbody id="segments-table-body">
+                    <template id="segments-table-row">
+                        <tr>
+                            <td class="datetime"></td>
+                            <td class="content-kind"></td>
+                            <td class="artist"></td>
+                            <td class="title"></td>
+                            <td class="audio"><audio></audio></td>
+                            <td class="matches"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <div class="events">
             <ol reversed id="events">
                 <template id="event">
                     <li class="event-item"></li>
@@ -22,3 +46,4 @@
 </body>
 
 </html>
+

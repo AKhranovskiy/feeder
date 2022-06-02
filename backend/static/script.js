@@ -46,8 +46,41 @@ function subscribe(uri) {
     connect(uri);
 }
 
+function load_segments(uri) {
+    fetch(uri)
+        .then(res => res.json())
+        .then((segments) => {
+            console.log('Segments: ', segments);
+            showSegments(segments)
+        })
+        .catch(err => console.error(err));
+}
+
+function showSegments(segments) {
+    const segmentsTableBody = document.getElementById("segments-table-body");
+    const segmentsTableRow = document.getElementById("segments-table-row");
+
+    let rows = segmentsTableBody.getElementsByTagName("tr");
+    for (let row of rows) {
+        segmentsTableBody.removeChild(row);
+    }
+
+    for (const segment of segments) {
+        var row = segmentsTableRow.content.cloneNode(true);
+        row.querySelector("tr").classList.add(segment.kind);
+        row.querySelector(".datetime").textContent = segment.date_time;
+        row.querySelector(".content-kind").textContent = segment.kind;
+        row.querySelector(".artist").textContent = segment.artist;
+        row.querySelector(".title").textContent = segment.title;
+        row.querySelector(".audio audio").src = "/api/v1/segment/" + segment.id;
+        row.querySelector(".matches").textContent = segment.number_of_matches;
+        segmentsTableBody.appendChild(row)
+    }
+}
+
 function init() {
     subscribe("/api/v1/events")
+    load_segments("/api/v1/segments?json")
 }
 
 init()

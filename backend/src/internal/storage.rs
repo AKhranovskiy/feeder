@@ -29,13 +29,13 @@ impl From<&SegmentMatchResponse> for MatchDocument {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioDocument {
-    id: Uuid,
-    date_time: DateTime,
-    kind: ContentKind,
-    artist: String,
-    title: String,
-    content: Bytes,
-    tags: Tags,
+    pub id: Uuid,
+    pub date_time: DateTime,
+    pub kind: ContentKind,
+    pub artist: String,
+    pub title: String,
+    pub content: Bytes,
+    pub tags: Tags,
 }
 
 impl AudioDocument {

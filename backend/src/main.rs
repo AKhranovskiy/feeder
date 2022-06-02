@@ -15,11 +15,6 @@ pub mod internal;
 use api::FeederEvent;
 use internal::storage::Storage;
 
-#[get("/segments", format = "plain")]
-async fn get_segments<'r>() -> &'r str {
-    "Segment list"
-}
-
 #[launch]
 fn rocket() -> _ {
     let config = Config {
@@ -56,6 +51,5 @@ fn rocket() -> _ {
         .attach(Storage::init())
         .manage(channel::<FeederEvent>(10).0)
         .mount("/api/v1", api::routes())
-        .mount("/", routes![get_segments])
         .mount("/", FileServer::from(relative!("static")))
 }

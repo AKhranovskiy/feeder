@@ -1,0 +1,40 @@
+main {
+    display: grid;
+    grid-template-rows: 70% 30%;
+    width: 100vw;
+    gap: 10px;
+
+}
+
+#segments {
+    overflow: auto;
+    width: 100vw;
+}
+
+#segments > table {
+    width: 100vw;
+}
+
+.matches {
+    text-align: center;
+}
+.Music {
+    background-color: aqua;
+}
+
+.Advertisement {
+    background-color: lightsalmon;
+}
+
+.Talk {
+    background-color: gainsboro;
+}
+
+.Unknown {
+    background-color:  deeppink;
+}
+
+#events {
+    overflow: hidden;
+    border-top: 5px solid black;
+}
