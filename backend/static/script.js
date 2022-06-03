@@ -4,7 +4,7 @@ let eventItemTemplate = document.getElementById("event")
 function addEvent(event) {
     var node = eventItemTemplate.content.cloneNode(true);
     node.querySelector("li").textContent = event;
-    eventList.appendChild(node);
+    eventList.prepend(node);
 }
 
 // Subscribe to the event source at `uri` with exponential backoff reconnect.
