@@ -17,11 +17,6 @@ use internal::storage::Storage;
 
 #[launch]
 fn rocket() -> _ {
-    let config = Config {
-        port: 3456,
-        ..Config::default()
-    };
-    // TODO: Set port in figment.
     let figment = Config::figment().merge((
         "databases.storage",
         rocket_db_pools::Config {
@@ -45,7 +40,6 @@ fn rocket() -> _ {
     .unwrap();
 
     rocket::build()
-        .configure(config)
         .configure(figment)
         .attach(cors)
         .attach(Storage::init())

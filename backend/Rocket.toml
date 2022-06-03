@@ -1,4 +1,7 @@
-[default]
+[debug]
+port = 8000
+
+[release]
 port = 3456
 
 [default.databases.storage]
