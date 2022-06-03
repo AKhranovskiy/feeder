@@ -71,7 +71,8 @@ function showSegments(segments) {
         row.querySelector(".content-kind a").textContent = segment.kind;
         row.querySelector(".artist").textContent = segment.artist;
         row.querySelector(".title").textContent = segment.title;
-        row.querySelector(".audio a").href = `/api/v1/segment/${segment.id}/audio`;
+        row.querySelector(".audio audio").src = `/api/v1/segment/${segment.id}/audio`;
+        row.querySelector(".audio audio a").href = `/api/v1/segment/${segment.id}/audio`;
         row.querySelector(".matches").textContent = segment.number_of_matches;
         segmentsTableBody.appendChild(row)
     }

@@ -1,3 +1,4 @@
+pub mod codec;
 mod content_kind_guesser;
 pub mod emysound;
 pub mod storage;

@@ -3,6 +3,7 @@ use mongodb::bson::{doc, Uuid};
 use rocket::http::ContentType;
 use rocket_db_pools::Connection;
 
+use crate::internal::codec::prepare_for_browser;
 use crate::internal::storage::{AudioDocument, Storage};
 
 #[get("/segment/<id>/audio")]
@@ -17,7 +18,17 @@ pub async fn segment_audio(
         .find_one(doc!["id": id], None)
         .await
         .ok()?
-        .map(|doc| (get_content_type(&doc.tags), doc.content.to_vec()))
+        .map(|doc| {
+            let content_type = get_content_type(&doc.tags);
+            let content = match prepare_for_browser(&content_type, &doc.content) {
+                Ok(bytes) => bytes.to_vec(),
+                Err(e) => {
+                    log::error!("Failed remux aac: {e:#}");
+                    doc.content.to_vec()
+                }
+            };
+            (content_type, content)
+        })
 }
 
 fn get_content_type(tags: &Tags) -> ContentType {

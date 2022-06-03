@@ -7,11 +7,12 @@ main {
 }
 
 #segments {
-    overflow: auto;
+    overflow: hidden;
     width: 100vw;
 }
 
 #segments > table {
+    overflow: hidden;
     width: 100vw;
 }
 
