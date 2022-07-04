@@ -25,7 +25,7 @@ pub struct App;
 
 impl App {
     pub async fn run(args: Args) -> Result<()> {
-        let retry_strategy = ExponentialBackoff::from_millis(1000)
+        let retry_strategy = ExponentialBackoff::from_millis(1)
             .map(jitter) // add jitter to delays
             .take(3); // limit to 3 retries
 

@@ -3,8 +3,6 @@ use model::{ContentKind, Segment, SegmentInsertResponse, SegmentMatchResponse};
 use url::Url;
 use uuid::Uuid;
 
-use super::content_kind_guesser::guess_content_kind;
-
 const MIN_CONFIDENCE: f32 = 0.2f32;
 const EMYSOUND_API: &str = "http://localhost:3340/api/v1.1/";
 
@@ -26,21 +24,13 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
             .collect::<Vec<SegmentMatchResponse>>()
     };
 
-    let matches: Vec<SegmentMatchResponse> = emysound::query(endpoint, filename, content, MIN_CONFIDENCE)
+    let matches: Vec<SegmentMatchResponse> =
+        emysound::query(endpoint, filename, content, MIN_CONFIDENCE)
             .await
             .context("EmySound::query")
             .and_then(to_results)
             .map(best_results)
-            .map(to_responses)
-            // .map(|v| {
-            //     v.iter()
-            //         .map(|s| SegmentMatchResponse {
-            //             kind: guess_content_kind(&segment.tags),
-            //             ..s.clone()
-            //         })
-            //         .collect()
-            // })
-            ?;
+            .map(to_responses)?;
 
     Ok(if matches.is_empty() {
         None
@@ -49,11 +39,13 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
     })
 }
 
-pub async fn insert_segment(segment: &Segment) -> anyhow::Result<SegmentInsertResponse> {
+pub async fn insert_segment(
+    segment: &Segment,
+    kind: ContentKind,
+) -> anyhow::Result<SegmentInsertResponse> {
     let id = Uuid::new_v4();
     let artist = segment.artist();
     let title = segment.title();
-    let kind = guess_content_kind(&segment.tags);
 
     let filename = segment.url.path().to_string();
     let content = segment.content.clone();

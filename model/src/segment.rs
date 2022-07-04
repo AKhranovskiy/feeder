@@ -10,6 +10,7 @@ pub struct Segment {
     pub url: Url,
     pub duration: Duration,
     pub content: Bytes,
+    pub content_type: String,
     pub tags: Tags,
 }
 

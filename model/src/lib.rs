@@ -1,5 +1,6 @@
 mod segment;
 
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -59,4 +60,14 @@ impl ToString for ContentKind {
         }
         .to_owned()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MetadataWithAudio {
+    pub id: uuid::Uuid,
+    pub kind: ContentKind,
+    pub artist: String,
+    pub title: String,
+    pub r#type: String,
+    pub content: Bytes,
 }

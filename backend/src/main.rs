@@ -10,10 +10,12 @@ use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
 
 mod api;
+mod frontend;
 pub mod internal;
 
 use api::FeederEvent;
 use internal::storage::Storage;
+use rocket_dyn_templates::Template;
 
 #[launch]
 fn rocket() -> _ {
@@ -43,7 +45,9 @@ fn rocket() -> _ {
         .configure(figment)
         .attach(cors)
         .attach(Storage::init())
+        .attach(Template::fairing())
         .manage(channel::<FeederEvent>(10).0)
+        .mount("/", frontend::routes())
         .mount("/api/v1", api::routes())
-        .mount("/", FileServer::from(relative!("static")))
+        .mount("/static", FileServer::from(relative!("static")))
 }

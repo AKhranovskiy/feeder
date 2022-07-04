@@ -8,11 +8,12 @@ pub struct DownloadProcessor;
 
 #[async_trait]
 impl SegmentProcessor for DownloadProcessor {
-    async fn process(mut segment: Segment) -> anyhow::Result<Segment> {
+    async fn process(segment: Segment) -> anyhow::Result<Segment> {
         let (content_type, content) = utils::download(&segment.url).await?;
-        if let Some(v) = content_type {
-            segment.tags.insert("FileType".to_string(), v);
-        }
-        Ok(Segment { content, ..segment })
+        Ok(Segment {
+            content,
+            content_type: content_type.unwrap_or_default(),
+            ..segment
+        })
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Context;
 use bytes::Bytes;
-use model::{ContentKind, Segment, SegmentInsertResponse, SegmentMatchResponse, Tags};
+use model::{ContentKind, Segment, SegmentMatchResponse, Tags};
 use mongodb::bson::{DateTime, Uuid};
 use rocket_db_pools::mongodb::Client;
 use rocket_db_pools::{Connection, Database};
@@ -30,26 +30,8 @@ impl From<&SegmentMatchResponse> for MatchDocument {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioDocument {
     pub id: Uuid,
-    pub date_time: DateTime,
-    pub kind: ContentKind,
-    pub artist: String,
-    pub title: String,
     pub content: Bytes,
-    pub tags: Tags,
-}
-
-impl AudioDocument {
-    fn new(segment: &Segment, id: Uuid, kind: ContentKind) -> Self {
-        Self {
-            id,
-            date_time: DateTime::now(),
-            kind,
-            artist: segment.artist(),
-            title: segment.title(),
-            content: segment.content.clone(),
-            tags: segment.tags.clone(),
-        }
-    }
+    pub r#type: String,
 }
 
 pub async fn insert_matches(
@@ -64,22 +46,57 @@ pub async fn insert_matches(
         .map(|_| ())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MetadataDocument {
+    pub id: Uuid,
+    pub date_time: DateTime,
+    pub kind: ContentKind,
+    pub artist: String,
+    pub title: String,
+    pub tags: Tags,
+}
+
+impl MetadataDocument {
+    fn new(segment: &Segment, id: Uuid, kind: ContentKind) -> Self {
+        Self {
+            id,
+            date_time: DateTime::now(),
+            kind,
+            artist: segment.artist(),
+            title: segment.title(),
+            tags: segment.tags.clone(),
+        }
+    }
+}
+
 pub async fn insert_audio(
     conn: &Connection<Storage>,
     segment: &Segment,
-    response: &SegmentInsertResponse,
+    id: uuid::Uuid,
+    kind: ContentKind,
 ) -> anyhow::Result<()> {
+    let id = Uuid::from_bytes(id.into_bytes());
+
     conn.database("feeder")
         .collection("audio")
         .insert_one(
-            AudioDocument::new(
-                segment,
-                Uuid::from_bytes(response.id.into_bytes()),
-                response.kind,
-            ),
+            AudioDocument {
+                id,
+                content: segment.content.clone(),
+                r#type: segment.content_type.clone(),
+            },
             None,
         )
         .await
-        .context("Registering new segment")
-        .map(|_| ())
+        .context("Insert audio data")
+        .map(|_| ())?;
+
+    conn.database("feeder")
+        .collection("metadata")
+        .insert_one(MetadataDocument::new(segment, id, kind), None)
+        .await
+        .context("Insert metadata")
+        .map(|_| ())?;
+
+    Ok(())
 }

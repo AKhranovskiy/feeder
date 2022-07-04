@@ -8,7 +8,7 @@ use rocket::http::ContentType;
 
 pub fn prepare_for_browser(content_type: &ContentType, content: &Bytes) -> anyhow::Result<Vec<u8>> {
     if content_type.is_aac() {
-        remux_aac(&content).map(|bytes| bytes.to_vec())
+        remux_aac(content).map(|bytes| bytes.to_vec())
     } else {
         Ok(content.to_vec())
     }

@@ -1,24 +1,26 @@
 main {
     display: grid;
-    grid-template-rows: 70% 30%;
-    width: 100vw;
+    /* grid-template-rows: 70% 30%; */
     gap: 10px;
 
 }
 
-#segments {
-    overflow: hidden;
-    width: 100vw;
+main>table {
+    margin: auto;
 }
 
-#segments > table {
-    overflow: hidden;
-    width: 100vw;
+tr {
+    border-bottom: 1px solid #ddd;
+}
+
+td {
+    padding: 0em 1em;
 }
 
 .matches {
     text-align: center;
 }
+
 .Music {
     background-color: aqua;
 }
@@ -32,7 +34,7 @@ main {
 }
 
 .Unknown {
-    background-color:  deeppink;
+    background-color: deeppink;
 }
 
 #events {

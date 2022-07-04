@@ -13,10 +13,10 @@ pub struct TagExtractor;
 
 #[async_trait]
 impl SegmentProcessor for TagExtractor {
-    async fn process(mut segment: Segment) -> anyhow::Result<Segment> {
-        let mut tags = extract(&segment.content)?;
-        segment.tags.append(&mut tags);
-        Ok(segment)
+    async fn process(segment: Segment) -> anyhow::Result<Segment> {
+        let mut tags = segment.tags.clone();
+        tags.append(&mut extract(&segment.content)?);
+        Ok(Segment { tags, ..segment })
     }
 }
 

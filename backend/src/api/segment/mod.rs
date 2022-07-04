@@ -1,4 +1,6 @@
-use model::Tags;
+pub mod metadata;
+pub mod update;
+
 use mongodb::bson::{doc, Uuid};
 use rocket::http::ContentType;
 use rocket_db_pools::Connection;
@@ -19,7 +21,8 @@ pub async fn segment_audio(
         .await
         .ok()?
         .map(|doc| {
-            let content_type = get_content_type(&doc.tags);
+            let content_type =
+                ContentType::parse_flexible(&doc.r#type).unwrap_or(ContentType::Binary);
             let content = match prepare_for_browser(&content_type, &doc.content) {
                 Ok(bytes) => bytes.to_vec(),
                 Err(e) => {
@@ -29,10 +32,4 @@ pub async fn segment_audio(
             };
             (content_type, content)
         })
-}
-
-fn get_content_type(tags: &Tags) -> ContentType {
-    tags.get(&"FileType".to_string())
-        .and_then(|file_type| ContentType::parse_flexible(file_type))
-        .unwrap_or(ContentType::Binary)
 }

@@ -1,0 +1,21 @@
+<table>
+    <thead>
+        <th>Date time</th>
+        <th>Audio</th>
+        <th>Content Kind</th>
+        <th>Artist</th>
+        <th>Title</th>
+    </thead>
+    <tbody id="segments-table-body">
+        <template id="segments-table-row">
+            <tr>
+                <td class="datetime"></td>
+                <td class="audio"><audio controls /></td>
+                <td class="content-kind"><a></a></td>
+                <td class="artist"></td>
+                <td class="title"></td>
+                <td class="view"><a target="_blank"><img src="static/view.png"></a></td>
+            </tr>
+        </template>
+    </tbody>
+</table>

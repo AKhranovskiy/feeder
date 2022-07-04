@@ -9,13 +9,48 @@ use serde::{Deserialize, Serialize};
 #[serde(crate = "rocket::serde")]
 pub enum FeederEvent {
     NewSegment(SegmentInsertResponse),
-    Match(SegmentMatchResponse),
+    MatchedSegment(SegmentMatchResponse),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EventFilter {
+    All,
+    New,
+    Match,
+}
+
+impl FeederEvent {
+    fn allowed(&self, filter: EventFilter) -> bool {
+        match (self, filter) {
+            (_, EventFilter::All) => true,
+            (FeederEvent::NewSegment(_), EventFilter::New) => true,
+            (FeederEvent::NewSegment(_), EventFilter::Match) => false,
+            (FeederEvent::MatchedSegment(_), EventFilter::New) => false,
+            (FeederEvent::MatchedSegment(_), EventFilter::Match) => true,
+        }
+    }
+}
+
+impl From<Option<&str>> for EventFilter {
+    fn from(value: Option<&str>) -> Self {
+        match value {
+            Some("new") => Self::New,
+            Some("match") => Self::Match,
+            _ => Self::All,
+        }
+    }
 }
 
 /// Returns an infinite stream of server-sent events. Each event is a message
 /// pulled from a broadcast queue sent by the `post` handler.
-#[get("/events")]
-pub async fn events(events: &State<Sender<FeederEvent>>, mut end: Shutdown) -> EventStream![] {
+#[get("/events?<filter>")]
+pub async fn events(
+    filter: Option<&str>,
+    events: &State<Sender<FeederEvent>>,
+    mut end: Shutdown,
+) -> EventStream![] {
+    let filter = EventFilter::from(filter);
+
     let mut rx = events.subscribe();
     EventStream! {
         loop {
@@ -28,11 +63,9 @@ pub async fn events(events: &State<Sender<FeederEvent>>, mut end: Shutdown) -> E
                 _ = &mut end => break,
             };
 
-
-            yield Event::json(&ev).event(match ev {
-                FeederEvent::NewSegment(_) => "new-segment",
-                FeederEvent::Match(_) => "match"
-            });
+            if ev.allowed(filter) {
+                yield Event::json(&ev)
+            }
         }
     }
 }
@@ -45,6 +78,6 @@ impl From<SegmentInsertResponse> for FeederEvent {
 
 impl From<SegmentMatchResponse> for FeederEvent {
     fn from(value: SegmentMatchResponse) -> Self {
-        FeederEvent::Match(value)
+        FeederEvent::MatchedSegment(value)
     }
 }

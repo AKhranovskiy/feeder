@@ -16,6 +16,7 @@ pub fn guess_content_kind(tags: &Tags) -> ContentKind {
         }
     }
     // #EXTINF:10,title="text=\"Spot Block End\" amgTrackId=\"9876543\"",artist=" ",url="length=\"00:00:00\""
+    // Iheart Promo Project
 }
 
 trait ContentKindGuesser {
@@ -49,6 +50,15 @@ impl ContentKindGuesser for IHeartGuesser {
                 .map(|info| info.guess_kind())
                 .map_err(|e| log::error!("IHeartGuesser failed: {e:#}"))
                 .ok()
+                .or_else(|| {
+                    tags.get(&"TrackTitle".to_string()).map(|title| {
+                        if title.contains("Iheart Promo Project") {
+                            ContentKind::Advertisement
+                        } else {
+                            ContentKind::Unknown
+                        }
+                    })
+                })
         } else {
             None
         }

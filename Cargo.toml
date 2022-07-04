@@ -1,3 +1,11 @@
 [workspace]
 
-members = ["frontend", "backend", "fetcher", "model", "emysound"]
+members = [
+    "frontend",
+    "backend",
+    "fetcher",
+    "model",
+    "emysound",
+    "trainer",
+    "mfcc",
+]

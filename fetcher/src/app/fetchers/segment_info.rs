@@ -18,12 +18,12 @@ impl From<SegmentInfo> for Segment {
         if let Some(title) = info.title {
             tags.insert("Comment".to_string(), title);
         }
-        tags.insert("AudioFileURL".to_string(), info.url.to_string());
 
         Self {
             url: info.url,
             duration: info.duration,
             content: Bytes::new(),
+            content_type: String::default(),
             tags,
         }
     }
