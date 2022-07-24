@@ -8,4 +8,5 @@ members = [
     "emysound",
     "trainer",
     "mfcc",
+    "mfccs-image-generator"
 ]

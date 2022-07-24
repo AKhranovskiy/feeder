@@ -1,2 +1,2 @@
 [env]
-FFMPEG_PATH = "..\\ffmpeg\\windows"
+FFMPEG_PATH = "../ffmpeg/linux"

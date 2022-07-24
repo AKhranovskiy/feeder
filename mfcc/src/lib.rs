@@ -65,8 +65,8 @@ fn mfccs_delta(input: &MFCCs) -> MFCCs {
     MFCCs::from_shape_vec(input.dim(), delta).unwrap()
 }
 
-const PLOT_FRAME_WIDTH: u32 = 4;
-const PLOT_FRAME_HEIGHT: u32 = 24;
+const PLOT_FRAME_WIDTH: u32 = 2;
+const PLOT_FRAME_HEIGHT: u32 = 10;
 
 pub fn plot(data: &MFCCs, filename: &str) {
     let (min, max) = match data.iter().minmax_by_key(|&v| OrderedFloat(*v)) {
@@ -104,7 +104,7 @@ pub fn plot(data: &MFCCs, filename: &str) {
         let col_index = height - index / width - 1;
         let value = data[[row_index, col_index]];
 
-        let (r, g, b, _) = grad.at(value.into()).rgba_u8();
+        let (r, g, b, _) = grad.at(value.into()).to_linear_rgba_u8();
         let color = RGBColor(r, g, b);
 
         area.fill(&color).expect("failed to fill area");

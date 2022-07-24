@@ -1,3 +1,5 @@
 target/
 Cargo.lock
 *.bmp
+*.bin
+*.7z
