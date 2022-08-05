@@ -15,6 +15,7 @@ rand = "0.8.5"
 clap = { version = "3.2.16", features = ["derive"] }
 num_cpus = "1.13.1"
 kdam = "0.2.2"
+bytes = "1.2.0"
 
 [dependencies.model]
 version = "*"
