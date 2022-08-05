@@ -1,9 +1,10 @@
+use std::os::unix::prelude::OsStrExt;
 use std::path::Path;
 
 use anyhow::anyhow;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::utils::stat::random_indices;
+use crate::utils::random_bucket_indices;
 
 pub const IMAGE_TENSOR_SHAPE: [i64; 3] = [1, 39, 171];
 
@@ -11,7 +12,7 @@ pub fn load_data(
     path: &Path,
     samples: &Option<usize>,
 ) -> anyhow::Result<(tch::Tensor, tch::Tensor)> {
-    let files = std::fs::read_dir(path)?
+    let mut files = std::fs::read_dir(path)?
         .filter_map(|e| {
             if let Ok(entry) = e && entry.path().is_file() { Some(entry.path()) } else { None}
         })
@@ -19,7 +20,31 @@ pub fn load_data(
 
     println!("Total files: {}", files.len());
 
-    let indices = random_indices(files.len(), samples.unwrap_or(files.len()));
+    files.sort_unstable();
+
+    let file_groups = files
+        .as_slice()
+        .group_by(|a, b| match (a.file_name(), b.file_name()) {
+            (Some(a), Some(b)) => a.as_bytes()[0..4] == b.as_bytes()[0..4],
+            _ => false,
+        })
+        .collect::<Vec<_>>();
+
+    #[allow(clippy::string_from_utf8_as_bytes)]
+    for &fg in &file_groups {
+        println!(
+            "Label {}, count: {}",
+            std::str::from_utf8(&fg[0].file_name().unwrap().as_bytes()[0..4]).unwrap(),
+            fg.len()
+        );
+    }
+
+    // Indices must be shuffled so train/test split takes all classes.
+    // TODO - Separate train/test files before selecting to guarantee presence of all classes in both sets.
+    let indices = random_bucket_indices(
+        &file_groups.iter().map(|x| x.len()).collect::<Vec<_>>(),
+        samples.unwrap_or(files.len()),
+    );
 
     let files = indices
         .par_iter()

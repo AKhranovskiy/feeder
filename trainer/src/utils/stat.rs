@@ -1,9 +1,3 @@
-pub fn random_indices(max: usize, n: usize) -> Vec<usize> {
-    let mut rng = rand::thread_rng();
-    let range = rand::distributions::Uniform::new(0, max);
-    rand::Rng::sample_iter(&mut rng, range).take(n).collect()
-}
-
 pub struct RunningAverage {
     sum: f64,
     count: usize,
