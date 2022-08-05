@@ -3,7 +3,7 @@ use std::time::Instant;
 use kdam::term::Colorizer;
 use kdam::tqdm;
 use tch::nn::ModuleT;
-use tch::vision::dataset::augmentation;
+use tch::vision::dataset::{augmentation, Dataset};
 use trainer::utils::data::{load_data, prepare_dataset};
 use trainer::utils::Stats;
 
@@ -17,6 +17,8 @@ pub fn train(network: &Network, config: TrainingConfig) -> anyhow::Result<(Stats
     let (images, labels) = load_data(&config.data_directory, &config.samples)?;
 
     let dataset = prepare_dataset(images, labels, config.test_fraction);
+
+    show_class_statistic(&dataset);
 
     let (vs, loaded) = network.create_varstore(&config.input_weights_filename);
 
@@ -106,4 +108,31 @@ pub fn train(network: &Network, config: TrainingConfig) -> anyhow::Result<(Stats
     println!();
 
     Ok((timings, accuracy))
+}
+
+fn show_class_statistic(ds: &Dataset) {
+    let count = |x: i16, v: &Vec<i16>| -> (usize, f64) {
+        let cnt = v.iter().filter(|&x_| x_ == &x).count();
+        (cnt, cnt as f64 * 100.0 / v.len() as f64)
+    };
+
+    let train_classes = Vec::<i16>::from(&ds.train_labels);
+    let train_ads = count(0, &train_classes);
+    let train_music = count(1, &train_classes);
+    let train_talks = count(2, &train_classes);
+
+    println!(
+        "Train set: ads {}/{:.02}, music {}/{:.02}, talks {}/{:.02}",
+        train_ads.0, train_ads.1, train_music.0, train_music.1, train_talks.0, train_talks.1
+    );
+
+    let test_classes = Vec::<i16>::from(&ds.test_labels);
+    let test_ads = count(0, &test_classes);
+    let test_music = count(1, &test_classes);
+    let test_talks = count(2, &test_classes);
+
+    println!(
+        "Test set: ads {}/{:.02}, music {}/{:.02}, talks {}/{:.02}",
+        test_ads.0, test_ads.1, test_music.0, test_music.1, test_talks.0, test_talks.1
+    );
 }

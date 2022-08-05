@@ -117,24 +117,6 @@ fn main() -> anyhow::Result<()> {
         "  {:0.2}%",
         classes.iter().filter(|&x| x == &2).count() as f64 * 100.0 / classes.len() as f64
     );
-    // println!(
-    //     "Ads {}/{} = {:.02}%",
-    //     classes.iter().filter(|&x| x == &0).count(),
-    //     classes.len(),
-    //     classes.iter().filter(|&x| x == &0).count() as f64 * 100.0 / classes.len() as f64
-    // );
-    // println!(
-    //     "Music {}/{} = {:.02}%",
-    //     classes.iter().filter(|&x| x == &1).count(),
-    //     classes.len(),
-    //     classes.iter().filter(|&x| x == &1).count() as f64 * 100.0 / classes.len() as f64
-    // );
-    // println!(
-    //     "Talk {}/{} = {:.02}%",
-    //     classes.iter().filter(|&x| x == &2).count(),
-    //     classes.len(),
-    //     classes.iter().filter(|&x| x == &2).count() as f64 * 100.0 / classes.len() as f64
-    // );
 
     println!(
         "Elapsed: {:.02}s. Chunk time: min/max/avg={:0.2}s/{:.02}s/{:.02}s",
