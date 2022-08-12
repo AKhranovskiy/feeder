@@ -3,27 +3,26 @@ name = "fetcher"
 version = "0.2.0"
 edition = "2021"
 description = "Fetch audio data from the remote source"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.57", features = ["backtrace"] }
+anyhow = "1.0.61"
 async-stream = "0.3.3"
-async-trait = "0.1.53"
-bytes = { version = "1.1.0", features = ["serde"] }
-chrono = "0.4.19"
-clap = { version = "3.1.18", features = ["derive"] }
+async-trait = "0.1.57"
+bytes = { version = "1.2.1", features = ["serde"] }
+chrono = "0.4.21"
+clap = { version = "3.2.17", features = ["derive"] }
 futures = "0.3.21"
 hls_m3u8 = { version = "0.4.1", features = ["chrono"] }
 lazy_static = "1.4.0"
-lofty = "0.6.3"
+lofty = "0.8.0"
 log = "0.4.17"
 model = { version = "*", path = "../model" }
-reqwest = "0.11.10"
+reqwest = "0.11.11"
 rmp-serde = "1.1.0"
-serde = "1.0.137"
+serde = "1.0.143"
 simplelog = "0.12.0"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.20.1", features = ["full"] }
 tokio-retry = "0.3.0"
-tokio-stream = "0.1.8"
-uuid = { version = "1.1.0", features = ["v4"] }
+tokio-stream = "0.1.9"
+uuid = { version = "1.1.2", features = ["v4"] }

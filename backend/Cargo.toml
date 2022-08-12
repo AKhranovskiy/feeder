@@ -2,35 +2,33 @@
 name = "backend"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = "0.4.17"
-rocket = { version = "0.5.0-rc.2", features = ["msgpack", "uuid", "json"] }
-uuid = { version = "1.1.0", features = ["v4"] }
-# rocket_cors = "0.6.0-alpha1"
-serde = { version = "1.0.137", features = ["derive"] }
-simplelog = "0.12.0"
-anyhow = { version = "1.0.57", features = ["backtrace"] }
-bytes = { version = "1.1.0", features = ["serde"] }
-url = { version = "2.2.2", features = ["serde"] }
+anyhow = "1.0.61"
+bytes = { version = "1.2.1", features = ["serde"] }
+chrono = { version = "0.4.21", features = ["serde"] }
+futures = "0.3.21"
 lazy_static = "1.4.0"
-regex = "1.5.6"
-mongodb = { version = "2.2.1", features = [
+log = "0.4.17"
+mongodb = { version = "2.3.0", features = [
     "snappy-compression",
     "bson-uuid-0_8",
     "bson-chrono-0_4",
 ] }
+regex = "1.6.0"
+rocket = { version = "0.5.0-rc.2", features = ["msgpack", "uuid", "json"] }
 rocket_db_pools = { version = "0.1.0-rc.2", features = ["mongodb"] }
-chrono = { version = "0.4.19", features = ["serde"] }
 rocket_dyn_templates = { version = "0.1.0-rc.2", features = ["tera"] }
-futures = "0.3.21"
-
-[dependencies.model]
-version = "*"
-path = "../model"
+# rocket_cors = "0.6.0-alpha1"
+serde = { version = "1.0.143", features = ["derive"] }
+url = { version = "2.2.2", features = ["serde"] }
+uuid = { version = "1.1.2", features = ["v4"] }
 
 [dependencies.emysound]
 version = "*"
 path = "../emysound"
+
+[dependencies.model]
+version = "*"
+path = "../model"
