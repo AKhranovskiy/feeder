@@ -13,6 +13,7 @@ use ndarray::s;
 use tch::IndexOp;
 use trainer::networks::Network;
 use trainer::utils::data::IMAGE_TENSOR_SHAPE;
+use trainer::utils::Stats;
 
 use crate::classify::classify;
 
@@ -76,47 +77,9 @@ fn main() -> anyhow::Result<()> {
 
     let (probabilities, timings) = classify(&args.network, &config, &images)?;
 
-    let (_, classes) = probabilities.max_dim(1, false);
-    let classes = Vec::<u8>::from(&classes);
-
-    print!("ADVER ");
-    for class in &classes {
-        if class == &0 {
-            print!("#")
-        } else {
-            print!(" ")
-        }
-    }
-    println!(
-        "  {:0.2}%",
-        classes.iter().filter(|&x| x == &0).count() as f64 * 100.0 / classes.len() as f64
-    );
-
-    print!("MUSIC ");
-    for class in &classes {
-        if class == &1 {
-            print!("#")
-        } else {
-            print!(" ")
-        }
-    }
-    println!(
-        "  {:0.2}%",
-        classes.iter().filter(|&x| x == &1).count() as f64 * 100.0 / classes.len() as f64
-    );
-
-    print!("TALK  ");
-    for class in &classes {
-        if class == &2 {
-            print!("#")
-        } else {
-            print!(" ")
-        }
-    }
-    println!(
-        "  {:0.2}%",
-        classes.iter().filter(|&x| x == &2).count() as f64 * 100.0 / classes.len() as f64
-    );
+    print_score("Simple Max    ", &simple_max_score(&probabilities));
+    print_score("Moving Average", &moving_avg_score(&probabilities));
+    print_score("Timed Average ", &avg_timed_score(&probabilities));
 
     println!(
         "Elapsed: {:.02}s. Chunk time: min/max/avg={:0.2}s/{:.02}s/{:.02}s",
@@ -143,4 +106,106 @@ fn calculate_mfccs(data: &mfcc::RawAudioData) -> anyhow::Result<Vec<mfcc::MFCCs>
         mels.push(mfccs);
     }
     Ok(mels)
+}
+
+fn print_score(label: &str, classes: &[u8]) {
+    println!(
+        "{label} {} ({})",
+        classes
+            .iter()
+            .map(|x| match x {
+                0 => 'A',
+                1 => 'M',
+                2 => 'T',
+                _ => ' ',
+            })
+            .collect::<String>(),
+        classes.len()
+    )
+}
+fn simple_max_score(probabilities: &tch::Tensor) -> Vec<u8> {
+    let (_, classes) = probabilities.max_dim(1, false);
+    Vec::<u8>::from(&classes)
+}
+
+fn moving_avg_score(probabilities: &tch::Tensor) -> Vec<u8> {
+    Vec::<Vec<f32>>::from(probabilities)
+        .windows(4)
+        .map(|w| {
+            let a = scalar_mul(&w[0], 0.25);
+            let b = scalar_mul(&w[1], 0.5);
+            let c = scalar_mul(&w[2], 0.75);
+            let d = scalar_mul(&w[3], 1.0);
+
+            let sum = [a, b, c, d]
+                .into_iter()
+                .reduce(|accum, v| vector_sum(&accum, &v))
+                .unwrap_or_default();
+
+            max_index(&sum).unwrap_or(u8::MAX as usize) as u8
+        })
+        .collect()
+}
+
+fn scalar_mul(v: &[f32], scalar: f32) -> Vec<f32> {
+    v.iter().map(|x| x * scalar).collect()
+}
+
+fn vector_sum(a: &[f32], b: &[f32]) -> Vec<f32> {
+    assert_eq!(a.len(), b.len());
+    a.iter().zip(b.iter()).map(|(x, y)| x + y).collect()
+}
+
+fn avg_timed_score(probabilities: &tch::Tensor) -> Vec<u8> {
+    let probabilities = Vec::<Vec<f32>>::from(probabilities);
+
+    let n = probabilities.len();
+    assert!(n > 0);
+
+    (0..n + 3)
+        .map(|sec| {
+            let a = sec.checked_sub(3).unwrap_or_default();
+            let b = sec.min(n - 1);
+
+            let stats = (a..=b).map(|idx| &probabilities[idx]).fold(
+                (Stats::new(), Stats::new(), Stats::new()),
+                |accum, values| {
+                    (
+                        accum.0.push(values[0] as f64),
+                        accum.1.push(values[1] as f64),
+                        accum.2.push(values[2] as f64),
+                    )
+                },
+            );
+            max_index(&[
+                stats.0.avg().unwrap_or_default(),
+                stats.1.avg().unwrap_or_default(),
+                stats.2.avg().unwrap_or_default(),
+            ])
+            .unwrap_or(u8::MAX as usize) as u8
+        })
+        .collect()
+}
+
+fn max_index<T>(v: &[T]) -> Option<usize>
+where
+    T: PartialOrd + Copy,
+{
+    let mut max_value = None;
+    let mut max_index = None;
+    for (idx, &value) in v.iter().enumerate() {
+        match max_value {
+            None => {
+                max_value = Some(value);
+                max_index = Some(idx);
+            }
+            Some(max) => {
+                if value > max {
+                    max_value = Some(value);
+                    max_index = Some(idx);
+                }
+            }
+        }
+    }
+    max_index
 }
