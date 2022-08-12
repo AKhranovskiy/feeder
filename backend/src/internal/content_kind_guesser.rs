@@ -89,10 +89,10 @@ impl TryFrom<&str> for IHeartRadioInfo {
         lazy_static! {
             static ref RE: Regex = Regex::new(r#"song_spot="(\w)" MediaBaseId="(-?\d+)" itunesTrackId="(-?\d+)" amgTrackId="(-?\d+)" amgArtistId="(-?\d+)" TAID="(-?\d+)" TPID="(-?\d+)" cartcutId="(-?\d+)" amgArtworkURL="(.*?)" length="(\d\d:\d\d:\d\d)" unsID="(-?\d+)" spotInstanceId="(.+?)""#).unwrap();
         }
-
+        let unescaped = &value.replace(&r#"\""#, r#"""#);
         let caps = RE
-            .captures(value)
-            .ok_or_else(|| anyhow!("Failed to match iHeartRadio info"))?;
+            .captures(unescaped)
+            .ok_or_else(|| anyhow!("Failed to match iHeartRadio info\n{value}"))?;
 
         Ok(Self {
             song_spot: caps[1]
