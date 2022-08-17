@@ -1,4 +1,5 @@
 #![feature(decl_macro)]
+#![feature(fs_try_exists)]
 
 #[macro_use]
 extern crate rocket;

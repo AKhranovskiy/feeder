@@ -1,3 +1,6 @@
+// Rocket's FromForm generates code with a warning. It could be already fixed in the latest version of Rocket.
+#![allow(clippy::unnecessary_lazy_evaluations)]
+
 use model::ContentKind;
 use mongodb::bson::{doc, Uuid};
 use rocket::form::Form;

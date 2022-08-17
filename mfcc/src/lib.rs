@@ -126,8 +126,6 @@ pub fn ffmpeg_decode(bytes: Bytes) -> Result<RawAudioData> {
         )
         .spawn()?;
 
-    // println!("Feeding content, len: {}", bytes.len());
-
     let mut stdin = proc
         .stdin
         .take()
@@ -137,11 +135,7 @@ pub fn ffmpeg_decode(bytes: Bytes) -> Result<RawAudioData> {
         stdin.write_all(&bytes).expect("Failed to write content");
     });
 
-    // println!("Collecting output...");
-
     let output = proc.wait_with_output()?.stdout;
-
-    // println!("Converting output...");
 
     let data = cast_slice::<u8, i16>(output.as_ref())
         .into_par_iter()

@@ -18,7 +18,7 @@
                 <span id="artist">{{ data.artist }}</span> <br>
 
                 <label for="title">Title: </label>
-                <span id="artist">{{ data.artist }}</span> <br>
+                <span id="artist">{{ data.title }}</span> <br>
 
                 <audio controls src="/api/v1/segment/{{ data.id }}/audio/"></audio> <br>
 
@@ -35,7 +35,7 @@
                 <label for="tags">Tags: </label>
                 <div>
                     {% for key, value in data.tags %}
-                    {{ key }}: {{ value }} <br>
+                    <b>{{ key }}</b>: {{ value }} <br>
                     {% endfor %}
                 </div>
 

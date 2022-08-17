@@ -2,71 +2,75 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
+
 use model::{ContentKind, Tags};
 use regex::Regex;
-use url::Url;
-use uuid::Uuid;
 
-pub fn guess_content_kind(tags: &Tags) -> ContentKind {
-    match AdContextGuesser::guess(tags).or_else(|| IHeartGuesser::guess(tags)) {
-        Some(kind) => kind,
-        None => {
-            log::error!("Failed to guess content kind, tags={:?}", tags);
-            ContentKind::Unknown
-        }
-    }
-    // #EXTINF:10,title="text=\"Spot Block End\" amgTrackId=\"9876543\"",artist=" ",url="length=\"00:00:00\""
-    // Iheart Promo Project
-}
+use super::get_tag;
 
-trait ContentKindGuesser {
-    fn guess(tags: &Tags) -> Option<ContentKind>;
-}
+pub struct IHeartRadioGuesser;
 
-struct AdContextGuesser;
-
-impl ContentKindGuesser for AdContextGuesser {
-    fn guess(tags: &Tags) -> Option<ContentKind> {
-        tags.get(&"Comment".to_string()).and_then(|comment| {
-            if comment.contains("adContext=") {
-                Some(ContentKind::Advertisement)
-            } else {
-                None
-            }
-        })
-    }
-}
-
-struct IHeartGuesser;
-
-impl ContentKindGuesser for IHeartGuesser {
-    fn guess(tags: &Tags) -> Option<ContentKind> {
-        if let Some(value) = tags
-            .get(&"WXXX".to_string())
-            .or_else(|| tags.get(&"TXXX".to_string()))
-            .or_else(|| tags.get(&"Comment".to_string()))
+impl super::ContentKindGuesser for IHeartRadioGuesser {
+    fn guess(&self, tags: &model::Tags) -> Option<ContentKind> {
+        if is_promo_project(tags) {
+            Some(ContentKind::Advertisement)
+        } else if let Some(value) = get_tag(tags, "WXXX")
+            .or_else(|| get_tag(tags, "TXXX"))
+            .or_else(|| get_tag(tags, "Comment"))
         {
-            IHeartRadioInfo::try_from(value.as_str())
+            IHeartRadioInfo::try_from(value)
                 .map(|info| info.guess_kind())
-                .map_err(|e| log::error!("IHeartGuesser failed: {e:#}"))
-                .ok()
-                .or_else(|| {
-                    tags.get(&"TrackTitle".to_string()).map(|title| {
-                        if title.contains("Iheart Promo Project") {
-                            ContentKind::Advertisement
-                        } else {
-                            ContentKind::Unknown
-                        }
-                    })
+                .map_err(|e| {
+                    log::error!("IHeartRadioGuesser failed: Unrecongnised format, {e:#}\n{tags:#?}")
                 })
+                .ok()
         } else {
             None
         }
     }
 }
 
+fn is_promo_project(tags: &Tags) -> bool {
+    get_tag(tags, "TrackTitle").map_or(false, |title| {
+        title.contains("Iheart Promo Project")
+            || title.contains("Ihm Promo Product")
+            || title.starts_with("iHR ")
+    })
+}
+
+#[derive(Debug)]
+enum SpotInstanceId {
+    Uuid(uuid::Uuid),
+    Id(i64),
+}
+
+impl SpotInstanceId {
+    fn is_valid(&self) -> bool {
+        match self {
+            SpotInstanceId::Uuid(_) => true,
+            SpotInstanceId::Id(id) => id > &0,
+        }
+    }
+}
+
+impl TryFrom<&str> for SpotInstanceId {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if let Ok(uuid) = uuid::Uuid::parse_str(value) {
+            Ok(SpotInstanceId::Uuid(uuid))
+        } else if let Ok(id) = value.parse::<i64>() {
+            Ok(SpotInstanceId::Id(id))
+        } else {
+            Err(anyhow!("Invalid SpotInstanceId: {}", value))
+        }
+    }
+}
+
 #[derive(Debug)]
 struct IHeartRadioInfo {
+    artist: Option<String>,
+    title: Option<String>,
     song_spot: char,
     media_base_id: i64,
     itunes_track_id: i64,
@@ -75,11 +79,11 @@ struct IHeartRadioInfo {
     ta_id: i64,
     tp_id: i64,
     cartcut_id: i64,
-    amg_artwork_url: Option<Url>,
+    amg_artwork_url: Option<reqwest::Url>,
     length: Duration,
     #[allow(dead_code)]
     uns_id: i64,
-    spot_instance_id: Option<Uuid>,
+    spot_instance_id: Option<SpotInstanceId>,
 }
 
 impl TryFrom<&str> for IHeartRadioInfo {
@@ -88,13 +92,25 @@ impl TryFrom<&str> for IHeartRadioInfo {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         lazy_static! {
             static ref RE: Regex = Regex::new(r#"song_spot="(\w)" MediaBaseId="(-?\d+)" itunesTrackId="(-?\d+)" amgTrackId="(-?\d+)" amgArtistId="(-?\d+)" TAID="(-?\d+)" TPID="(-?\d+)" cartcutId="(-?\d+)" amgArtworkURL="(.*?)" length="(\d\d:\d\d:\d\d)" unsID="(-?\d+)" spotInstanceId="(.+?)""#).unwrap();
+            static ref RE_ARTIST: Regex = Regex::new(r#"artist="([^"]+)"#).unwrap();
+            static ref RE_TITLE: Regex = Regex::new(r#"title="([^"]+)"#).unwrap();
         }
         let unescaped = &value.replace(&r#"\""#, r#"""#);
+        let unescaped = &unescaped.replace(&r#"\\"#, r#""#);
+
         let caps = RE
             .captures(unescaped)
             .ok_or_else(|| anyhow!("Failed to match iHeartRadio info\n{value}"))?;
 
         Ok(Self {
+            artist: RE_ARTIST
+                .captures(unescaped)
+                .and_then(|cap| cap.get(0))
+                .map(|s| s.as_str().to_owned()),
+            title: RE_TITLE
+                .captures(unescaped)
+                .and_then(|cap| cap.get(0))
+                .map(|s| s.as_str().to_owned()),
             song_spot: caps[1]
                 .chars()
                 .next()
@@ -109,7 +125,7 @@ impl TryFrom<&str> for IHeartRadioInfo {
             amg_artwork_url: caps[9].to_owned().parse().ok(),
             length: parse_length(&caps[10])?,
             uns_id: caps[11].parse::<i64>()?,
-            spot_instance_id: Uuid::try_parse(&caps[12]).ok(),
+            spot_instance_id: SpotInstanceId::try_from(&caps[12]).ok(),
         })
     }
 }
@@ -149,7 +165,10 @@ impl IHeartRadioInfo {
             && self.ta_id == 0
             && self.tp_id == 0
             && self.amg_artwork_url.is_none()
-            && self.spot_instance_id.is_none()
+            && self
+                .spot_instance_id
+                .as_ref()
+                .map_or(false, |id| !id.is_valid())
             && self.length == Duration::ZERO
     }
 
@@ -164,7 +183,26 @@ impl IHeartRadioInfo {
             && self.tp_id == 0
             && self.cartcut_id == 0
             && self.amg_artwork_url.is_none()
-            && self.spot_instance_id.is_some()
+            && self.spot_instance_id.as_ref().map_or(false, SpotInstanceId::is_valid) ||
+// title=\"9000778 Main Ac 3\",artist=\"9000778 Main Ac 3\",url=\"song_spot=\\\"T\\\" MediaBaseId=\\\"0\\\" itunesTrackId=\\\"0\\\" amgTrackId=\\\"-1\\\" amgArtistId=\\\"0\\\" TAID=\\\"0\\\" TPID=\\\"0\\\" cartcutId=\\\"9000778001\\\" amgArtworkURL=\\\"null\\\" length=\\\"00:00:29\\\" unsID=\\\"-1\\\" spotInstanceId=\\\"97638027\\\""
+            self.artist.as_ref()
+                .zip(self.title.as_ref())
+                .map_or(false, |(artist, title)| {!artist.is_empty() && artist == title})
+                && self.song_spot == 'T'
+                && self.media_base_id == 0
+                && self.itunes_track_id == 0
+                && self.amg_track_id == -1
+                && self.amg_artist_id == 0
+                && self.ta_id == 0
+                && self.tp_id == 0
+                && self.length >= Duration::from_secs(10)
+                && self.cartcut_id > 0
+                && self
+                    .spot_instance_id.as_ref()
+                    .map_or(false, |id| match id {
+                        SpotInstanceId::Uuid(_) => true,
+                        SpotInstanceId::Id(id) => id > &0,
+                    })
     }
 
     fn guess_kind(&self) -> ContentKind {

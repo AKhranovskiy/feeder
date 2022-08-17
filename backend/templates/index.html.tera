@@ -17,7 +17,7 @@
 {% block script %}
 <script src="/static/script.js"></script>
 <script type="text/javascript">
-    populate_metadata("/api/v1/segments/json", 0, 25);
+    populate_metadata("/api/v1/segments/json", 0, 200);
 </script>
 {% endblock script %}
 

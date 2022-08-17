@@ -1,11 +1,12 @@
+#[derive(Default)]
 pub struct RunningAverage {
     sum: f64,
     count: usize,
 }
 
 impl RunningAverage {
-    pub fn new() -> RunningAverage {
-        RunningAverage { sum: 0.0, count: 0 }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn push(self, value: f64) -> RunningAverage {

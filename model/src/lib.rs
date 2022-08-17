@@ -26,6 +26,7 @@ pub struct SegmentInsertResponse {
 pub enum SegmentUploadResponse {
     Matched(Vec<SegmentMatchResponse>),
     Inserted(SegmentInsertResponse),
+    Ignored,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

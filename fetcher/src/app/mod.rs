@@ -42,6 +42,7 @@ impl App {
 
         while let Some(segment) = segments.next().await {
             let segment: Segment = segment?;
+            let tags = segment.tags.clone();
 
             match Self::process_segment(segment)
                 .and_then(|segment| upload(&endpoint, segment))
@@ -63,6 +64,9 @@ impl App {
                     }
                     SegmentUploadResponse::Inserted(r) => {
                         log::info!("New: {} / {:?} / {} / {}", r.id, r.kind, r.artist, r.title);
+                    }
+                    SegmentUploadResponse::Ignored => {
+                        log::info!("Ignored: {tags:?}");
                     }
                 },
 

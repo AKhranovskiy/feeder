@@ -1,3 +1,4 @@
+pub mod analyse;
 pub mod metadata;
 pub mod update;
 

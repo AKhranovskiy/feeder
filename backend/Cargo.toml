@@ -24,11 +24,23 @@ rocket_dyn_templates = { version = "0.1.0-rc.2", features = ["tera"] }
 serde = { version = "1.0.143", features = ["derive"] }
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.1.2", features = ["v4"] }
+lofty = "0.8.0"
+reqwest = "0.11.11"
+tch = "0.8.0"
+ndarray = "0.15.6"
 
 [dependencies.emysound]
 version = "*"
 path = "../emysound"
 
+[dependencies.mfcc]
+version = "*"
+path = "../mfcc"
+
 [dependencies.model]
 version = "*"
 path = "../model"
+
+[dependencies.trainer]
+version = "*"
+path = "../trainer"

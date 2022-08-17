@@ -25,6 +25,7 @@ pub async fn upload(
         .await
         .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?
     {
+        // TODO - Compare segment's info to matches info.
         storage::insert_matches(&storage, &matches)
             .await
             .map_err(to_internal_server_error)?;
@@ -47,20 +48,27 @@ pub async fn upload(
 
     let kind = guess_content_kind(&segment.tags);
 
-    let response = insert_segment(&segment, kind)
-        .await
-        .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?;
+    if kind != ContentKind::Unknown {
+        let response = insert_segment(&segment, kind)
+            .await
+            .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?;
 
-    storage::insert_audio(&storage, &segment, response.id, kind)
-        .await
-        .map_err(to_internal_server_error)?;
+        storage::insert_audio(&storage, &segment, response.id, kind)
+            .await
+            .map_err(to_internal_server_error)?;
 
-    let _res = events.send(response.clone().into());
+        let _res = events.send(response.clone().into());
 
-    Ok(status::Custom(
-        Status::Created,
-        SegmentUploadResponse::Inserted(response).into(),
-    ))
+        Ok(status::Custom(
+            Status::Created,
+            SegmentUploadResponse::Inserted(response).into(),
+        ))
+    } else {
+        Ok(status::Custom(
+            Status::Ok,
+            SegmentUploadResponse::Ignored.into(),
+        ))
+    }
 }
 
 async fn retrieve_content_kind(storage: &Connection<Storage>, id: &uuid::Uuid) -> ContentKind {
