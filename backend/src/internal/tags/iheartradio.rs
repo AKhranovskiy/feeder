@@ -18,8 +18,10 @@ impl super::ContentKindGuesser for IHeartRadioGuesser {
             .or_else(|| get_tag(tags, "TXXX"))
             .or_else(|| get_tag(tags, "Comment"))
         {
+            let artist = get_tag(tags, "TrackArtist");
+            let title = get_tag(tags, "TrackTitle");
             IHeartRadioInfo::try_from(value)
-                .map(|info| info.guess_kind())
+                .map(|info| info.guess_kind(artist, title))
                 .map_err(|e| {
                     log::error!("IHeartRadioGuesser failed: Unrecongnised format, {e:#}\n{tags:#?}")
                 })
@@ -95,8 +97,8 @@ impl TryFrom<&str> for IHeartRadioInfo {
             static ref RE_ARTIST: Regex = Regex::new(r#"artist="([^"]+)"#).unwrap();
             static ref RE_TITLE: Regex = Regex::new(r#"title="([^"]+)"#).unwrap();
         }
-        let unescaped = &value.replace(&r#"\""#, r#"""#);
-        let unescaped = &unescaped.replace(&r#"\\"#, r#""#);
+        let unescaped = &value.replace(&"\\\"", "\"");
+        let unescaped = &unescaped.replace(&"\\", "");
 
         let caps = RE
             .captures(unescaped)
@@ -105,11 +107,11 @@ impl TryFrom<&str> for IHeartRadioInfo {
         Ok(Self {
             artist: RE_ARTIST
                 .captures(unescaped)
-                .and_then(|cap| cap.get(0))
+                .and_then(|cap| cap.get(1))
                 .map(|s| s.as_str().to_owned()),
             title: RE_TITLE
                 .captures(unescaped)
-                .and_then(|cap| cap.get(0))
+                .and_then(|cap| cap.get(1))
                 .map(|s| s.as_str().to_owned()),
             song_spot: caps[1]
                 .chars()
@@ -199,13 +201,18 @@ impl IHeartRadioInfo {
                 && self.cartcut_id > 0
                 && self
                     .spot_instance_id.as_ref()
-                    .map_or(false, |id| match id {
-                        SpotInstanceId::Uuid(_) => true,
-                        SpotInstanceId::Id(id) => id > &0,
-                    })
+                    .map_or(false, SpotInstanceId::is_valid)
     }
 
-    fn guess_kind(&self) -> ContentKind {
+    fn guess_kind(&self, artist: Option<&str>, title: Option<&str>) -> ContentKind {
+        if let (Some(artist1), Some(title1), Some(artist2), Some(title2)) =
+            (artist, title, &self.artist, &self.title) &&
+             !artist1.is_empty() && artist1 != artist2 && !title1.is_empty() && title1 != title2 {
+                // Values of TrackArtist/TrackTitle do not match the artist/title values from the comment tag.
+                // Skip it now, I will do something better later.
+                return ContentKind::Unknown;
+            }
+
         if self.is_advertisment() {
             ContentKind::Advertisement
         } else if self.is_music() {
@@ -229,6 +236,6 @@ mod tests {
     #[test]
     fn test_iheart_kind() {
         let info = IHeartRadioInfo::try_from(MUSIC).unwrap();
-        assert_eq!(ContentKind::Music, info.guess_kind());
+        assert_eq!(ContentKind::Music, info.guess_kind(None, None));
     }
 }

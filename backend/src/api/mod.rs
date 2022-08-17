@@ -16,6 +16,7 @@ pub fn routes() -> Vec<Route> {
         segment::metadata::metadata,
         segment::segment_audio,
         segment::update::update,
+        segments::reasses::reasses_content_kind,
         segments::segments_json,
         segments::segments_msgpack,
         segments::upload::upload,

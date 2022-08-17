@@ -17,6 +17,7 @@ use self::query_options::QueryOptions;
 use super::MetadataResponse;
 
 mod query_options;
+pub mod reasses;
 pub mod upload;
 
 fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
