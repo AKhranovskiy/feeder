@@ -52,13 +52,3 @@ Some segments are marked as Talk/Unknown while they seems to be Music. They have
 4a11cbba-d146-454a-92db-5e04da558600 / Talk / Stevie Nicks / EDGE OF SEVENTEEN {Just Like The White Winged Dove}
 a8845a46-357e-454e-952c-c38f9b14607b / Unknown / Stevie Nicks / EDGE OF SEVENTEEN {Just Like The White Winged Dove}
 0f16ad90-257d-4d4e-be77-1e41d28e9ef4 / Talk / Stevie Nicks / EDGE OF SEVENTEEN {Just Like The White Winged Dove}
-
-TODO
-{"Comment": "title=\"9000778 Main Ac 3\",artist=\"9000778 Main Ac 3\",url=\"song_spot=\\\"T\\\" MediaBaseId=\\\"0\\\" itunesTrackId=\\\"0\\\" amgTrackId=\\\"-1\\\" amgArtistId=\\\"0\\\" TAID=\\\"0\\\" TPID=\\\"0\\\" cartcutId=\\\"9000778001\\\" amgArtworkURL=\\\"null\\\" length=\\\"00:00:29\\\" unsID=\\\"-1\\\" spotInstanceId=\\\"97638027\\\"\""}
-Advertisement
-title == artist,
-song_spot = T
-length == 30s
-cartcutId > 0
-artwork=null
-spotInstanceId > 0
