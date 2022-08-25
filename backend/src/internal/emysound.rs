@@ -39,7 +39,7 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
     })
 }
 
-pub async fn insert_segment(
+pub async fn add_fingerprints(
     segment: &Segment,
     kind: ContentKind,
 ) -> anyhow::Result<SegmentInsertResponse> {
@@ -134,4 +134,10 @@ fn best_results(results: Vec<QueryResult>) -> Vec<QueryResult> {
         })
         .cloned()
         .collect()
+}
+
+pub async fn delete_segment(id: &str) -> anyhow::Result<()> {
+    let endpoint = Url::parse(EMYSOUND_API)?;
+    let id = uuid::Uuid::parse_str(id)?;
+    emysound::delete(endpoint, id).await
 }

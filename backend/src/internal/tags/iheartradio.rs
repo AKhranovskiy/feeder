@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 
 use model::{ContentKind, Tags};
@@ -14,29 +15,47 @@ impl super::ContentKindGuesser for IHeartRadioGuesser {
     fn guess(&self, tags: &model::Tags) -> Option<ContentKind> {
         if is_promo_project(tags) {
             Some(ContentKind::Advertisement)
-        } else if let Some(value) = get_tag(tags, "WXXX")
-            .or_else(|| get_tag(tags, "TXXX"))
-            .or_else(|| get_tag(tags, "Comment"))
-        {
+        } else {
             let artist = get_tag(tags, "TrackArtist");
             let title = get_tag(tags, "TrackTitle");
-            IHeartRadioInfo::try_from(value)
-                .map(|info| info.guess_kind(artist, title))
-                .map_err(|e| {
-                    log::error!("IHeartRadioGuesser failed: Unrecongnised format, {e:#}\n{tags:#?}")
-                })
-                .ok()
-        } else {
-            None
+
+            let kinds = ["Comment", "TXXX", "URL", "WXXX"]
+                .into_iter()
+                .inspect(|s| log::debug!("Getting tag {s}"))
+                .flat_map(|name| get_tag(tags, name))
+                .flat_map(|tag| IHeartRadioInfo::try_from(tag).ok())
+                .flat_map(|info| info.guess_kind(artist, title))
+                .unique()
+                .collect_vec();
+
+            match kinds.len() {
+                0 => None,
+                1 => kinds.first().cloned(),
+                _ => {
+                    log::error!("IHeartRadioGuesser detected multiple kinds: {kinds:?}");
+                    None
+                }
+            }
         }
     }
 }
 
 fn is_promo_project(tags: &Tags) -> bool {
+    const PROMO_PREFIXES: &[&str] = &[
+        "Iheart Promo Project",
+        "Ihm Promo Product",
+        "iHR ",
+        "IHTU ",
+        "ISWI ",
+        "ISWI_",
+        "OTPC ",
+        "STFB ",
+        "INSW-",
+        "Podcast Promo ",
+    ];
+
     get_tag(tags, "TrackTitle").map_or(false, |title| {
-        title.contains("Iheart Promo Project")
-            || title.contains("Ihm Promo Product")
-            || title.starts_with("iHR ")
+        PROMO_PREFIXES.iter().any(|p| title.starts_with(p))
     })
 }
 
@@ -185,11 +204,11 @@ impl IHeartRadioInfo {
             && self.tp_id == 0
             && self.cartcut_id == 0
             && self.amg_artwork_url.is_none()
-            && self.spot_instance_id.as_ref().map_or(false, SpotInstanceId::is_valid) ||
+            && self.spot_instance_id.as_ref().map_or(false, SpotInstanceId::is_valid)
 // title=\"9000778 Main Ac 3\",artist=\"9000778 Main Ac 3\",url=\"song_spot=\\\"T\\\" MediaBaseId=\\\"0\\\" itunesTrackId=\\\"0\\\" amgTrackId=\\\"-1\\\" amgArtistId=\\\"0\\\" TAID=\\\"0\\\" TPID=\\\"0\\\" cartcutId=\\\"9000778001\\\" amgArtworkURL=\\\"null\\\" length=\\\"00:00:29\\\" unsID=\\\"-1\\\" spotInstanceId=\\\"97638027\\\""
-            self.artist.as_ref()
-                .zip(self.title.as_ref())
-                .map_or(false, |(artist, title)| {!artist.is_empty() && artist == title})
+ //title="Grocery Outlet",artist="Agency",url="song_spot=\"T\" MediaBaseId=\"0\" itunesTrackId=\"0\" amgTrackId=\"-1\" amgArtistId=\"0\" TAID=\"0\" TPID=\"0\" cartcutId=\"7808299001\" amgArtworkURL=\"null\" length=\"00:00:29\" unsID=\"-1\" spotInstanceId=\"94695128\""
+            || self.artist.as_ref().map_or(false, |s| !s.is_empty())
+                && self.title.as_ref().map_or(false, |s| !s.is_empty())
                 && self.song_spot == 'T'
                 && self.media_base_id == 0
                 && self.itunes_track_id == 0
@@ -197,30 +216,32 @@ impl IHeartRadioInfo {
                 && self.amg_artist_id == 0
                 && self.ta_id == 0
                 && self.tp_id == 0
-                && self.length >= Duration::from_secs(10)
+                && self.length < Duration::from_secs(65)
                 && self.cartcut_id > 0
                 && self
                     .spot_instance_id.as_ref()
                     .map_or(false, SpotInstanceId::is_valid)
     }
 
-    fn guess_kind(&self, artist: Option<&str>, title: Option<&str>) -> ContentKind {
+    fn guess_kind(&self, artist: Option<&str>, title: Option<&str>) -> Option<ContentKind> {
+        log::debug!("GUESSING {self:?}");
+
         if let (Some(artist1), Some(title1), Some(artist2), Some(title2)) =
             (artist, title, &self.artist, &self.title) &&
              !artist1.is_empty() && artist1 != artist2 && !title1.is_empty() && title1 != title2 {
                 // Values of TrackArtist/TrackTitle do not match the artist/title values from the comment tag.
                 // Skip it now, I will do something better later.
-                return ContentKind::Unknown;
+                return None;
             }
 
         if self.is_advertisment() {
-            ContentKind::Advertisement
+            Some(ContentKind::Advertisement)
         } else if self.is_music() {
-            ContentKind::Music
+            Some(ContentKind::Music)
         } else if self.is_talk() {
-            ContentKind::Talk
+            Some(ContentKind::Talk)
         } else {
-            ContentKind::Unknown
+            None
         }
     }
 }
@@ -232,10 +253,20 @@ mod tests {
     use super::IHeartRadioInfo;
 
     const MUSIC: &str = r#"song_spot="F" MediaBaseId="0" itunesTrackId="0" amgTrackId="-1" amgArtistId="0" TAID="0" TPID="44166046" cartcutId="0" amgArtworkURL="http://image.iheart.com/ihr-ingestion-pipeline-production-sbmg/incoming/prod/DDEX/A10301A0003197934N_20170622015918436/resources/A10301A0003197934N_T-1020218987_Image.jpg" length="00:03:32" unsID="-1" spotInstanceId="54d8c36d-b3d0-45f3-8bce-4ff376766e1e""#;
+    const ADS: &str = r#"title="Stater Brothers",artist="Stater Brothers",url="song_spot=\"T\" MediaBaseId=\"0\" itunesTrackId=\"0\" amgTrackId=\"-1\" amgArtistId=\"0\" TAID=\"0\" TPID=\"0\" cartcutId=\"7808277001\" amgArtworkURL=\"null\" length=\"00:00:15\" unsID=\"-1\" spotInstanceId=\"95883442\"""#;
 
     #[test]
-    fn test_iheart_kind() {
+    fn test_iheart_guesser_music() {
         let info = IHeartRadioInfo::try_from(MUSIC).unwrap();
-        assert_eq!(ContentKind::Music, info.guess_kind(None, None));
+        assert_eq!(ContentKind::Music, info.guess_kind(None, None).unwrap());
+    }
+
+    #[test]
+    fn test_iheart_guesser_ads() {
+        let info = IHeartRadioInfo::try_from(ADS).unwrap();
+        assert_eq!(
+            ContentKind::Advertisement,
+            info.guess_kind(None, None).unwrap()
+        );
     }
 }

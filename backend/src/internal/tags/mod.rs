@@ -12,15 +12,22 @@ const CONTENT_KIND_GUESSERS: &[&dyn ContentKindGuesser] = &[
     &AdContext,
     &RegularTrack,
     &Ttwn,
+    &SpotBlock,
     &iheartradio::IHeartRadioGuesser,
 ];
 
 // TODO - What to do if several guessers return a kind?
 pub fn guess_content_kind(tags: &Tags) -> ContentKind {
-    CONTENT_KIND_GUESSERS
+    let kind = CONTENT_KIND_GUESSERS
         .iter()
         .fold(None, |kind, guesser| kind.or_else(|| guesser.guess(tags)))
-        .unwrap_or(ContentKind::Unknown)
+        .unwrap_or(ContentKind::Unknown);
+
+    if kind == ContentKind::Unknown {
+        log::error!("Failed to guess content kind:\n{tags:#?}\n");
+    }
+
+    kind
 }
 
 struct AdContext;
@@ -70,5 +77,25 @@ impl ContentKindGuesser for Ttwn {
         } else {
             None
         }
+    }
+}
+
+struct SpotBlock;
+impl ContentKindGuesser for SpotBlock {
+    fn guess(&self, tags: &Tags) -> Option<ContentKind> {
+        let comment = get_tag(tags, "Comment").unwrap_or_default();
+        let artist = get_tag(tags, "TrackArtist").unwrap_or_default();
+        let title = get_tag(tags, "TrackTitle").unwrap_or_default();
+
+        if comment.contains(r#"text=\"Spot Block\" amgTrackId="#) {
+            // TODO - check also length. it is less than 1 minute for ads and more than 3 mins for songs.
+            if title.contains(r#"text="Spot Block" amgTrackId="#) {
+                return Some(ContentKind::Advertisement);
+            } else if !artist.is_empty() && !title.is_empty() {
+                return Some(ContentKind::Music);
+            }
+        }
+
+        None
     }
 }

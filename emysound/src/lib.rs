@@ -114,6 +114,30 @@ pub async fn query(
     }
 }
 
+pub async fn delete(endpoint: Url, id: uuid::Uuid) -> anyhow::Result<()> {
+    log::trace!(target: "emysound::delete", "endpoint={endpoint}, id={id}");
+
+    let url = endpoint.join("Tracks/")?.join(&id.to_string())?;
+
+    println!("DELETE {url}");
+
+    let res = Client::new()
+        .delete(url)
+        .basic_auth("ADMIN", Some(""))
+        .send()
+        .await
+        .context("Sending query to EmySound")?;
+
+    match res.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::NOT_FOUND => Err(anyhow!("File not found, id={id}")),
+        StatusCode::INTERNAL_SERVER_ERROR => {
+            Err(anyhow!("Internal server error: {}", res.text().await?))
+        }
+        _ => Err(anyhow!("Unexpected status code: {}", res.status())),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryResult {

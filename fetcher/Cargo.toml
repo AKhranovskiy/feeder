@@ -6,13 +6,13 @@ description = "Fetch audio data from the remote source"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.61"
+anyhow = "1.0.62"
 async-stream = "0.3.3"
 async-trait = "0.1.57"
 bytes = { version = "1.2.1", features = ["serde"] }
-chrono = "0.4.21"
+chrono = "0.4.22"
 clap = { version = "3.2.17", features = ["derive"] }
-futures = "0.3.21"
+futures = "0.3.23"
 hls_m3u8 = { version = "0.4.1", features = ["chrono"] }
 lazy_static = "1.4.0"
 lofty = "0.8.0"

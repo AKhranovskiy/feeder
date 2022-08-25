@@ -1,4 +1,5 @@
 pub mod analyse;
+pub mod delete;
 pub mod metadata;
 pub mod update;
 
@@ -9,6 +10,7 @@ use rocket_db_pools::Connection;
 use crate::internal::codec::prepare_for_browser;
 use crate::internal::storage::{AudioDocument, Storage};
 
+// TODO - move to audio module.
 #[get("/segment/<id>/audio")]
 pub async fn segment_audio(
     id: &str,

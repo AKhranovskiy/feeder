@@ -38,10 +38,11 @@
                     <td>
                         {% if fingerprints %}
                         {% for values in fingerprints %}
-                        <a href="/view/{{values.id}}" target="_blank">{{values.score * 100 | round }}%
-                            {{values.content_kind}} ::
-                            {{values.artist}} /
-                            {{values.title}}</a>
+                        <a href="/view/{{values.id}}" target="_blank">
+                          {{values.score * 100 | round }}%
+                          {{values.content_kind}}
+                          :: {{values.artist}}
+                          / {{values.title}}</a>
                         {% endfor %}
                         {% endif %}
                     </td>

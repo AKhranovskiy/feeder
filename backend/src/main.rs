@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate rocket;
 
+use frontend::extend_tera;
 use rocket::fs::{relative, FileServer};
 use rocket::tokio::sync::broadcast::channel;
 // use rocket_cors::{AllowedHeaders, AllowedOrigins, CorsOptions};
@@ -34,7 +35,8 @@ fn rocket() -> _ {
     rocket::build()
         // .attach(cors)
         .attach(Storage::init())
-        .attach(Template::fairing())
+        // .attach(Template::fairing())
+        .attach(Template::custom(|engines| extend_tera(&mut engines.tera)))
         .manage(channel::<FeederEvent>(10).0)
         .mount("/", frontend::routes())
         .mount("/api/v1", api::routes())

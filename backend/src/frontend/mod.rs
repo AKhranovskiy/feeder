@@ -1,6 +1,7 @@
 // Rocket's FromForm generates code with a warning. It could be already fixed in the latest version of Rocket.
 #![allow(clippy::unnecessary_lazy_evaluations)]
 
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use bytes::Bytes;
@@ -9,13 +10,15 @@ use rocket::form::Form;
 use rocket::fs::TempFile;
 use rocket::Route;
 use rocket_db_pools::Connection;
+use rocket_dyn_templates::tera;
 use rocket_dyn_templates::{context, Template};
 
 use crate::api::segment::analyse::{analyse_impl, download};
+use crate::api::segments::search::{search_raw, SearchQuery, SearchResult};
 use crate::internal::storage::{MetadataDocument, Storage};
 
 pub fn routes() -> Vec<Route> {
-    routes![index, analyse_get, analyse_post, view]
+    routes![index, analyse_get, analyse_post, view, search]
 }
 
 #[get("/")]
@@ -99,4 +102,46 @@ async fn view(id: &str, storage: Connection<Storage>) -> Option<Template> {
         .ok()??;
 
     Some(Template::render("view", context! { data: doc}))
+}
+
+#[get("/search?<skip>&<limit>&<query..>")]
+async fn search(
+    storage: Connection<Storage>,
+    query: SearchQuery<'_>,
+    skip: Option<u64>,
+    limit: Option<i64>,
+) -> Template {
+    let result = search_raw(storage, query.clone(), skip, limit)
+        .await
+        .or_else(|e| {
+            log::error!("Search failed, query={query:#?}: {e:#?}");
+            anyhow::Ok(SearchResult::error(e.to_string()))
+        })
+        .expect("Error must be converted to SearchResult");
+    Template::render("search", context! { result: result })
+}
+
+pub fn extend_tera(tera: &mut tera::Tera) {
+    tera.register_function("contains", contains)
+}
+
+fn contains(args: &HashMap<String, tera::Value>) -> tera::Result<tera::Value> {
+    let err = || {
+        Err(tera::Error::msg(format!(
+            "Invalid arguments, expected `values=[string], value=string`, given: {args:?}"
+        )))
+    };
+
+    match (args.get("values"), args.get("value")) {
+        (Some(values), Some(value)) => match (
+            tera::from_value::<Vec<String>>(values.clone()),
+            tera::from_value::<String>(value.clone()),
+        ) {
+            (Ok(values), Ok(value)) => {
+                Ok(values.iter().any(|v| v.eq_ignore_ascii_case(&value)).into())
+            }
+            _ => err(),
+        },
+        _ => err(),
+    }
 }

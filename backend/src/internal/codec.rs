@@ -18,13 +18,14 @@ fn remux_aac(bytes: &Bytes) -> anyhow::Result<Bytes> {
     let ffmpeg_path = std::env::var("FFMPEG_PATH")?;
     log::info!("FFMPEG_PATH: {}", ffmpeg_path);
 
+    let args = "-i pipe: -vn -c copy -map_metadata 0 -movflags +faststart -f adts pipe:";
+    log::debug!("FFMPEG ARGS: {args}");
+
     let proc = Command::new("ffmpeg")
         .env("PATH", ffmpeg_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .args([
-            "-i", "pipe:", "-vn", "-acodec", "copy", "-f", "adts", "pipe:",
-        ])
+        .args(args.split_ascii_whitespace())
         .spawn()?;
 
     proc.stdin

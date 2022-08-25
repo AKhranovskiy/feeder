@@ -73,7 +73,7 @@ pub async fn reasses_content_kind(
                             break;
                         }
 
-                        if new_kind != doc.kind && update{
+                        if new_kind != doc.kind {
                             updated += 1;
                         }
 

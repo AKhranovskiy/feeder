@@ -5,9 +5,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.61"
+anyhow = "1.0.62"
 aubio = "0.2.1"
-bytemuck = "1.11.0"
+bytemuck = "1.12.1"
 bytes = "1.2.1"
 colorgrad = "0.6.1"
 itertools = "0.10.3"

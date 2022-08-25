@@ -29,7 +29,7 @@ pub enum SegmentUploadResponse {
     Ignored,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ContentKind {
     Advertisement,
     Music,

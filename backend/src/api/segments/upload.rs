@@ -9,7 +9,7 @@ use rocket_db_pools::Connection;
 
 use crate::api::segments::to_internal_server_error;
 use crate::api::FeederEvent;
-use crate::internal::emysound::{find_matches, insert_segment};
+use crate::internal::emysound::{add_fingerprints, find_matches};
 use crate::internal::guess_content_kind;
 use crate::internal::storage::{self, MetadataDocument, Storage};
 
@@ -48,27 +48,27 @@ pub async fn upload(
 
     let kind = guess_content_kind(&segment.tags);
 
-    if kind != ContentKind::Unknown {
-        let response = insert_segment(&segment, kind)
-            .await
-            .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?;
+    // if kind != ContentKind::Unknown {
+    let response = add_fingerprints(&segment, kind)
+        .await
+        .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?;
 
-        storage::insert_audio(&storage, &segment, response.id, kind)
-            .await
-            .map_err(to_internal_server_error)?;
+    storage::add_segment(&storage, &segment, response.id, kind)
+        .await
+        .map_err(to_internal_server_error)?;
 
-        let _res = events.send(response.clone().into());
+    let _ = events.send(response.clone().into());
 
-        Ok(status::Custom(
-            Status::Created,
-            SegmentUploadResponse::Inserted(response).into(),
-        ))
-    } else {
-        Ok(status::Custom(
-            Status::Ok,
-            SegmentUploadResponse::Ignored.into(),
-        ))
-    }
+    Ok(status::Custom(
+        Status::Created,
+        SegmentUploadResponse::Inserted(response).into(),
+    ))
+    // } else {
+    //     Ok(status::Custom(
+    //         Status::Ok,
+    //         SegmentUploadResponse::Ignored.into(),
+    //     ))
+    // }
 }
 
 async fn retrieve_content_kind(storage: &Connection<Storage>, id: &uuid::Uuid) -> ContentKind {

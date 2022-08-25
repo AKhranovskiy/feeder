@@ -12,6 +12,7 @@ use serde::Serialize;
 use model::{ContentKind, Segment, Tags};
 
 use crate::internal::storage::MetadataDocument;
+use crate::internal::{from_bson_uuid, to_bson_uuid};
 
 use super::emysound::find_matches;
 use super::prediction::Prediction;
@@ -113,14 +114,6 @@ async fn lookup_fingerprints(
         .await?;
 
     Ok(metadata)
-}
-
-fn to_bson_uuid(uuid: uuid::Uuid) -> mongodb::bson::Uuid {
-    mongodb::bson::Uuid::from_bytes(uuid.into_bytes())
-}
-
-fn from_bson_uuid(uuid: mongodb::bson::Uuid) -> uuid::Uuid {
-    uuid::Uuid::from_bytes(uuid.bytes())
 }
 
 async fn classify(content: &Bytes) -> anyhow::Result<Vec<Prediction>> {

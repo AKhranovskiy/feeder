@@ -41,3 +41,35 @@ td {
     overflow: hidden;
     border-top: 5px solid black;
 }
+
+tr[data-selected="true"] {
+    background-color: rgb(240, 240, 240);
+}
+
+tr[data-selected="true"] td:first-child::before {
+    content: "▶\00a0";
+}
+
+tr[data-selected="false"] td:first-child::before {
+    content: "\00a0\00a0\00a0\00a0";
+}
+
+.playbutton[data-play-state] {
+    font-size: xx-large;
+    width: 3ch;
+    height: 3ch;
+    border-radius: 50%;
+    border-width: 0px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: conic-gradient(grey calc(var(--percent) * 1%), white calc(var(--percent) * 1%));
+}
+
+.playbutton[data-play-state="stop"]::before {
+    content: "▶";
+}
+
+.playbutton[data-play-state="play"]::before {
+    content: "⏹";
+}

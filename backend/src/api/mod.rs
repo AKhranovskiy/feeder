@@ -1,7 +1,7 @@
 mod events;
 mod metadata_response;
 pub mod segment;
-mod segments;
+pub mod segments;
 
 use rocket::Route;
 
@@ -13,10 +13,13 @@ pub fn routes() -> Vec<Route> {
         events::events,
         segment::analyse::analyse_file,
         segment::analyse::analyse_url,
+        segment::delete::delete,
         segment::metadata::metadata,
         segment::segment_audio,
         segment::update::update,
+        segments::delete::delete,
         segments::reasses::reasses_content_kind,
+        segments::search::search_json,
         segments::segments_json,
         segments::segments_msgpack,
         segments::upload::upload,

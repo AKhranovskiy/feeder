@@ -16,8 +16,10 @@ use self::query_options::QueryOptions;
 
 use super::MetadataResponse;
 
+pub mod delete;
 mod query_options;
 pub mod reasses;
+pub mod search;
 pub mod upload;
 
 fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
@@ -25,6 +27,7 @@ fn to_internal_server_error(error: anyhow::Error) -> status::Custom<String> {
     status::Custom(Status::InternalServerError, error.to_string())
 }
 
+// TODO - move to metadata module.
 #[get("/segments/json?<opts..>", format = "json")]
 pub async fn segments_json(
     storage: Connection<Storage>,
@@ -55,6 +58,7 @@ pub async fn segments_json(
     Ok(status::Custom(Status::Ok, Json(docs)))
 }
 
+// TODO - move to metadata module.
 #[get("/segments/msgpack?<opts..>", format = "msgpack")]
 pub async fn segments_msgpack(
     storage: Connection<Storage>,

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Storage(Client);
 
 #[derive(Debug, Serialize, Deserialize)]
-struct MatchDocument {
+pub struct MatchDocument {
     id: Uuid,
     date_time: DateTime,
     score: u8,
@@ -69,7 +69,7 @@ impl MetadataDocument {
     }
 }
 
-pub async fn insert_audio(
+pub async fn add_segment(
     conn: &Connection<Storage>,
     segment: &Segment,
     id: uuid::Uuid,

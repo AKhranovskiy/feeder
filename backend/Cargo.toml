@@ -5,29 +5,30 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.61"
+anyhow = "1.0.62"
 bytes = { version = "1.2.1", features = ["serde"] }
-chrono = { version = "0.4.21", features = ["serde"] }
-futures = "0.3.21"
+chrono = { version = "0.4.22", features = ["serde"] }
+futures = "0.3.23"
 lazy_static = "1.4.0"
+lofty = "0.8.0"
 log = "0.4.17"
 mongodb = { version = "2.3.0", features = [
     "snappy-compression",
     "bson-uuid-0_8",
     "bson-chrono-0_4",
 ] }
+ndarray = "0.15.6"
 regex = "1.6.0"
+reqwest = "0.11.11"
 rocket = { version = "0.5.0-rc.2", features = ["msgpack", "uuid", "json"] }
 rocket_db_pools = { version = "0.1.0-rc.2", features = ["mongodb"] }
 rocket_dyn_templates = { version = "0.1.0-rc.2", features = ["tera"] }
 # rocket_cors = "0.6.0-alpha1"
 serde = { version = "1.0.143", features = ["derive"] }
+tch = "0.8.0"
 url = { version = "2.2.2", features = ["serde"] }
 uuid = { version = "1.1.2", features = ["v4"] }
-lofty = "0.8.0"
-reqwest = "0.11.11"
-tch = "0.8.0"
-ndarray = "0.15.6"
+itertools = "0.10.3"
 
 [dependencies.emysound]
 version = "*"
