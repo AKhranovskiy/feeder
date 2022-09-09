@@ -1,0 +1,11 @@
+[package]
+name = "tags"
+version = "0.2.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.64"
+lofty = "0.8.0"
+log = "0.4.17"
+serde = { version = "1.0.144", features = ["derive"] }

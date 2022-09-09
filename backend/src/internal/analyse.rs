@@ -2,11 +2,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::Context;
-use bytes::Bytes;
 use futures::future::try_join3;
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::doc;
-use rocket_db_pools::Connection;
 use serde::Serialize;
 
 use model::{ContentKind, Segment, Tags};
@@ -16,31 +14,28 @@ use crate::internal::{from_bson_uuid, to_bson_uuid};
 
 use super::emysound::find_matches;
 use super::prediction::Prediction;
-use super::storage::Storage;
-use super::tags::extract_tags;
 use super::{classification, guess_content_kind};
 
 pub async fn analyse(
-    storage: Connection<Storage>,
-    content: &Bytes,
+    storage: &mongodb::Client,
+    content: &[u8],
+    comment: &str,
 ) -> anyhow::Result<(Tags, ContentKind, Vec<FingerprintMatch>, Vec<Prediction>)> {
     let ((tags, content_kind_from_tags), fingerpints, predictions) = try_join3(
-        analyse_tags(content),
+        analyse_tags(content, comment),
         lookup_fingerprints(storage, content),
         classify(content),
     )
     .await
-    .map_err(|e| {
-        log::error!("{e:#?}");
-        e
-    })?;
+    .context("Segment analyse")?;
 
     Ok((tags, content_kind_from_tags, fingerpints, predictions))
 }
 
-async fn analyse_tags(content: &Bytes) -> anyhow::Result<(Tags, ContentKind)> {
-    log::info!("Analyse tags");
-    let tags = extract_tags(content)?;
+async fn analyse_tags(content: &[u8], comment: &str) -> anyhow::Result<(Tags, ContentKind)> {
+    let tags = Tags::try_from(content)
+        .context("Tag analyse")?
+        .with_comment(comment);
     let kind = guess_content_kind(&tags);
     Ok((tags, kind))
 }
@@ -56,22 +51,20 @@ pub struct FingerprintMatch {
 }
 
 async fn lookup_fingerprints(
-    storage: Connection<Storage>,
-    content: &Bytes,
+    storage: &mongodb::Client,
+    content: &[u8],
 ) -> anyhow::Result<Vec<FingerprintMatch>> {
-    log::info!("Lookup fingerprints");
     // TODO - find_matches should take a filename and content only. Even filename can be made up.
     let matches = find_matches(&Segment {
-        url: url::Url::parse("https://localhost").unwrap(),
+        url: String::default(),
         duration: Duration::from_secs(0),
-        content: content.clone(),
+        content: content.to_vec(),
         content_type: "audio/mpeg".to_owned(),
-        tags: Tags::new(),
+        tags: Tags::default(),
     })
-    .await?
+    .await
+    .context("Fingerprints lookup")?
     .unwrap_or_default();
-
-    log::info!("{:?}", matches);
 
     let ids = matches
         .iter()
@@ -90,33 +83,28 @@ async fn lookup_fingerprints(
         .await
         .context("Retrieving metadata")?
         .map(|doc| {
-            doc.map(|doc| FingerprintMatch {
-                id: from_bson_uuid(doc.id),
-                artist: doc
-                    .tags
-                    .get(&"TrackArtist".to_owned())
-                    .cloned()
-                    .unwrap_or_default(),
-                title: doc
-                    .tags
-                    .get(&"TrackTitle".to_owned())
-                    .cloned()
-                    .unwrap_or_default(),
-
-                content_kind: doc.kind,
-                score: scores
-                    .get(&from_bson_uuid(doc.id))
-                    .cloned()
-                    .unwrap_or_default(),
+            doc.map(|doc| {
+                let tags = Tags::from(doc.tags.clone());
+                FingerprintMatch {
+                    id: from_bson_uuid(doc.id),
+                    artist: tags.track_artist_or_empty(),
+                    title: tags.track_title_or_empty(),
+                    content_kind: doc.kind,
+                    score: scores
+                        .get(&from_bson_uuid(doc.id))
+                        .cloned()
+                        .unwrap_or_default(),
+                }
             })
         })
         .try_collect::<Vec<_>>()
-        .await?;
+        .await
+        .context("Collecting fingerpints")?;
 
     Ok(metadata)
 }
 
-async fn classify(content: &Bytes) -> anyhow::Result<Vec<Prediction>> {
-    log::info!("Classify");
+async fn classify(content: &[u8]) -> anyhow::Result<Vec<Prediction>> {
     classification::classify(content, classification::AveragePerSecondScore)
+        .context("Segment classification")
 }

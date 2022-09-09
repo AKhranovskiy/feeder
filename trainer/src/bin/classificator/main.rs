@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use bytes::Bytes;
 use clap::Parser;
 use config::ClassificationConfig;
 use mfcc::ffmpeg_decode;
@@ -63,7 +62,7 @@ fn main() -> anyhow::Result<()> {
     let mut buffer = Vec::new();
     File::open(&config.audio_file)?.read_to_end(&mut buffer)?;
 
-    let raw_data: mfcc::RawAudioData = ffmpeg_decode(Bytes::from(buffer))?;
+    let raw_data: mfcc::RawAudioData = ffmpeg_decode(&buffer)?;
     let mfccs = calculate_mfccs(&raw_data)?;
 
     println!("Prepared {} images.", mfccs.len());

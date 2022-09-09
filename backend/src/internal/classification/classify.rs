@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context};
-use bytes::Bytes;
 use mfcc::{ffmpeg_decode, SAMPLE_RATE};
 use ndarray::s;
 use tch::nn::{ModuleT, SequentialT};
@@ -16,8 +15,8 @@ use crate::internal::prediction::Prediction;
 
 use super::score::Score;
 use super::INPUT_CHUNK_DURATION_SEC;
-pub fn classify<S: Score>(data: &Bytes, score: S) -> anyhow::Result<Vec<Prediction>> {
-    let raw_data: mfcc::RawAudioData = ffmpeg_decode(data.clone())?;
+pub fn classify<S: Score>(data: &[u8], score: S) -> anyhow::Result<Vec<Prediction>> {
+    let raw_data: mfcc::RawAudioData = ffmpeg_decode(data)?;
 
     if raw_data.len() < SAMPLE_RATE as usize * INPUT_CHUNK_DURATION_SEC {
         bail!("Audio data is too short, expected at least {INPUT_CHUNK_DURATION_SEC} seconds, given={:01}", raw_data.len() as f32 / SAMPLE_RATE as f32);
@@ -26,7 +25,6 @@ pub fn classify<S: Score>(data: &Bytes, score: S) -> anyhow::Result<Vec<Predicti
 
     let images = Tensor::zeros(&[mfccs.len() as i64, 1, 39, 171], tch::kind::FLOAT_CPU);
     for (idx, m) in mfccs.iter().enumerate() {
-        log::info!("Copying {idx}, {:?}", m.shape());
         // Require standard memory layout to guarantee the correct slice.
         let image =
             Tensor::try_from(m.as_standard_layout()).context("Converting ndarray to Tensor")?;

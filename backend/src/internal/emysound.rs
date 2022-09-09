@@ -1,16 +1,11 @@
 use anyhow::{anyhow, Context};
 use model::{ContentKind, Segment, SegmentInsertResponse, SegmentMatchResponse};
-use url::Url;
 use uuid::Uuid;
 
 const MIN_CONFIDENCE: f32 = 0.2f32;
 const EMYSOUND_API: &str = "http://localhost:3340/api/v1.1/";
 
 pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<SegmentMatchResponse>>> {
-    let endpoint = Url::parse(EMYSOUND_API)?;
-    let filename = segment.url.path().to_string();
-    let content = segment.content.clone();
-
     let to_results = |results: Vec<emysound::QueryResult>| {
         results
             .iter()
@@ -25,7 +20,7 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
     };
 
     let matches: Vec<SegmentMatchResponse> =
-        emysound::query(endpoint, filename, content, MIN_CONFIDENCE)
+        emysound::query(EMYSOUND_API, "media.file", &segment.content, MIN_CONFIDENCE)
             .await
             .context("EmySound::query")
             .and_then(to_results)
@@ -44,19 +39,26 @@ pub async fn add_fingerprints(
     kind: ContentKind,
 ) -> anyhow::Result<SegmentInsertResponse> {
     let id = Uuid::new_v4();
-    let artist = segment.artist();
-    let title = segment.title();
 
-    let filename = segment.url.path().to_string();
-    let content = segment.content.clone();
+    let artist = segment
+        .tags
+        .track_artist()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+
+    let title = segment
+        .tags
+        .track_title()
+        .map(ToString::to_string)
+        .unwrap_or_default();
 
     emysound::insert(
         EMYSOUND_API.parse()?,
         id,
         artist.clone(),
         title.clone(),
-        filename,
-        content,
+        segment.url.clone(),
+        &segment.content,
     )
     .await
     .context("EmySound::insert")
@@ -137,7 +139,6 @@ fn best_results(results: Vec<QueryResult>) -> Vec<QueryResult> {
 }
 
 pub async fn delete_segment(id: &str) -> anyhow::Result<()> {
-    let endpoint = Url::parse(EMYSOUND_API)?;
     let id = uuid::Uuid::parse_str(id)?;
-    emysound::delete(endpoint, id).await
+    emysound::delete(EMYSOUND_API, id).await
 }

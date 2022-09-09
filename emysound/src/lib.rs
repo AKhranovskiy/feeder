@@ -1,5 +1,4 @@
 use anyhow::{anyhow, ensure, Context, Result};
-use bytes::Bytes;
 use reqwest::header::{HeaderMap, ACCEPT};
 use reqwest::multipart::{Form, Part};
 use reqwest::{Client, StatusCode, Url};
@@ -12,7 +11,7 @@ pub async fn insert(
     artist: String,
     title: String,
     filename: String,
-    content: Bytes,
+    content: &[u8],
 ) -> Result<()> {
     log::trace!(
         target: "emysound::insert",
@@ -33,7 +32,7 @@ pub async fn insert(
         .text("MediaType", "Audio")
         .part(
             "file",
-            Part::stream(content)
+            Part::stream(content.to_vec())
                 .file_name(filename)
                 .mime_str("application/octet-stream")
                 .context("Attaching content")?,
@@ -60,9 +59,9 @@ pub async fn insert(
 }
 
 pub async fn query(
-    endpoint: Url,
-    filename: String,
-    content: Bytes,
+    endpoint: &str,
+    filename: &str,
+    content: &[u8],
     min_confidence: f32,
 ) -> Result<Vec<QueryResult>> {
     log::trace!(
@@ -83,13 +82,13 @@ pub async fn query(
 
     let form = Form::new().part(
         "file",
-        Part::stream(content)
-            .file_name(filename)
+        Part::stream(content.to_vec())
+            .file_name(filename.to_string())
             .mime_str("application/octet-stream")
             .context("Attaching content")?,
     );
 
-    let url = endpoint.join("Query")?;
+    let url = Url::parse(endpoint)?.join("Query")?;
 
     let res = Client::new()
         .post(url)
@@ -114,10 +113,12 @@ pub async fn query(
     }
 }
 
-pub async fn delete(endpoint: Url, id: uuid::Uuid) -> anyhow::Result<()> {
+pub async fn delete(endpoint: &str, id: uuid::Uuid) -> anyhow::Result<()> {
     log::trace!(target: "emysound::delete", "endpoint={endpoint}, id={id}");
 
-    let url = endpoint.join("Tracks/")?.join(&id.to_string())?;
+    let url = Url::parse(endpoint)?
+        .join("Tracks/")?
+        .join(&id.to_string())?;
 
     println!("DELETE {url}");
 

@@ -14,7 +14,15 @@ pub fn load_data(
 ) -> anyhow::Result<(tch::Tensor, tch::Tensor)> {
     let mut files = std::fs::read_dir(path)?
         .filter_map(|e| {
-            if let Ok(entry) = e && entry.path().is_file() { Some(entry.path()) } else { None}
+            if let Ok(entry) = e {
+                if entry.path().is_file() {
+                    Some(entry.path())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
         .collect::<Vec<_>>();
 
@@ -69,7 +77,7 @@ pub fn load_data(
 }
 
 fn read_bin(path: &Path) -> anyhow::Result<tch::Tensor> {
-    std::fs::read(&path)
+    std::fs::read(path)
         .map_err(|e| anyhow!("Error reading bin {}: {:#?}", path.display(), e))
         .and_then(|bin| {
             bincode::deserialize::<mfcc::MFCCs>(&bin)

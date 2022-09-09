@@ -1,75 +1,132 @@
 main {
-    display: grid;
-    /* grid-template-rows: 70% 30%; */
-    gap: 10px;
-
+  display: grid;
+  /* grid-template-rows: 70% 30%; */
+  gap: 10px;
 }
 
 main>table {
-    margin: auto;
+  margin: auto;
 }
 
 tr {
-    border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
 }
 
 td {
-    padding: 0em 1em;
+  padding: 0 1em;
 }
 
 .matches {
-    text-align: center;
+  text-align: center;
 }
 
-.Music {
-    background-color: aqua;
+.music {
+  background-color: aqua;
 }
 
-.Advertisement {
-    background-color: lightsalmon;
+.advertisement {
+  background-color: lightsalmon;
 }
 
-.Talk {
-    background-color: gainsboro;
+.talk {
+  background-color: gainsboro;
 }
 
-.Unknown {
-    background-color: deeppink;
+.unknown {
+  background-color: deeppink;
 }
 
 #events {
-    overflow: hidden;
-    border-top: 5px solid black;
+  overflow: hidden;
+  border-top: 5px solid black;
 }
 
 tr[data-selected="true"] {
-    background-color: rgb(240, 240, 240);
+  background-color: rgb(240 240 240);
 }
 
 tr[data-selected="true"] td:first-child::before {
-    content: "▶\00a0";
+  content: "▶\00a0";
 }
 
 tr[data-selected="false"] td:first-child::before {
-    content: "\00a0\00a0\00a0\00a0";
+  content: "\00a0\00a0\00a0\00a0";
 }
 
 .playbutton[data-play-state] {
-    font-size: xx-large;
-    width: 3ch;
-    height: 3ch;
-    border-radius: 50%;
-    border-width: 0px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: conic-gradient(grey calc(var(--percent) * 1%), white calc(var(--percent) * 1%));
+  font-size: xx-large;
+  width: 3ch;
+  height: 3ch;
+  border-radius: 50%;
+  border-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: conic-gradient(grey calc(var(--percent) * 1%), white calc(var(--percent) * 1%));
 }
 
 .playbutton[data-play-state="stop"]::before {
-    content: "▶";
+  content: "▶";
 }
 
 .playbutton[data-play-state="play"]::before {
-    content: "⏹";
+  content: "⏹";
+}
+
+div.player {
+  width: 50vw;
+  height: 30px;
+}
+
+div.player .playbutton {
+	display: inline-block;
+	margin: auto;
+	height: 100%;
+}
+
+div.player .visualisation {
+  display:inline-block;
+  position: relative;
+  width: 80%;
+  height: 100%;
+}
+
+div.player .visualisation > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+div.player .visualisation canvas.bars {
+  z-index: 1;
+}
+
+div.player .visualisation canvas.active-bar {
+  z-index: 2;
+}
+
+div.player .visualisation canvas.play-position {
+  z-index: 3;
+}
+
+div.player .visualisation div.active-zone {
+  z-index: 4;
+}
+
+div.player .visualisation div.tooltip {
+  z-index: 5;
+  position: absolute;
+  display: inline-block;
+  left: 0;
+  top: 20px;
+  width: 350px;
+  padding: 0 5px;
+  height: 40px;
+  background-color: lightgrey;
+  border-radius: 5px;
+  visibility: hidden;
+  opacity: 0;
+  transition: visibility 0.1s linear,opacity 0.1s linear;
 }

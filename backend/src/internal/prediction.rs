@@ -9,6 +9,29 @@ pub struct Prediction {
 }
 
 impl Prediction {
+    pub fn get(&self, kind: &ContentKind) -> f32 {
+        match kind {
+            ContentKind::Advertisement => self.advertisement,
+            ContentKind::Music => self.music,
+            ContentKind::Talk => self.talk,
+            ContentKind::Unknown => 1.0f32,
+        }
+    }
+
+    pub fn max(&self) -> (ContentKind, f32) {
+        [
+            (ContentKind::Advertisement, self.advertisement),
+            (ContentKind::Music, self.music),
+            (ContentKind::Talk, self.talk),
+        ]
+        .iter()
+        .max_by_key(|(_, v)| (v * 100f32).round() as u32)
+        .cloned()
+        .unwrap_or((ContentKind::Unknown, 1.0f32))
+    }
+}
+
+impl Prediction {
     pub fn new(advertisement: f32, music: f32, talk: f32) -> Self {
         Self {
             advertisement,
@@ -35,18 +58,29 @@ impl From<ContentKind> for Prediction {
     }
 }
 
-const PREDICTION_THRESHOLD: f32 = 0.65;
-
 impl From<&Prediction> for ContentKind {
     fn from(prediction: &Prediction) -> Self {
-        if prediction.advertisement >= PREDICTION_THRESHOLD {
-            ContentKind::Advertisement
-        } else if prediction.music >= PREDICTION_THRESHOLD {
-            ContentKind::Music
-        } else if prediction.talk >= PREDICTION_THRESHOLD {
-            ContentKind::Talk
-        } else {
-            ContentKind::Unknown
-        }
+        [
+            (ContentKind::Advertisement, prediction.advertisement),
+            (ContentKind::Music, prediction.music),
+            (ContentKind::Talk, prediction.talk),
+        ]
+        .iter()
+        .max_by_key(|(_, v)| (v * 100f32).round() as u32)
+        .map(|(kind, _)| *kind)
+        .unwrap_or_else(|| ContentKind::Unknown)
+        // TODO - normal mapping would accounf for threshold.
+        // However, there is no reliable classification yet, so give whatever is maximum,
+        //
+        // const PREDICTION_THRESHOLD: f32 = 0.65;
+        // if prediction.advertisement >= PREDICTION_THRESHOLD {
+        //     ContentKind::Advertisement
+        // } else if prediction.music >= PREDICTION_THRESHOLD {
+        //     ContentKind::Music
+        // } else if prediction.talk >= PREDICTION_THRESHOLD {
+        //     ContentKind::Talk
+        // } else {
+        //     ContentKind::Unknown
+        // }
     }
 }

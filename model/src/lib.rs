@@ -1,6 +1,6 @@
 mod segment;
 
-use bytes::Bytes;
+use bson::Bson;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -63,6 +63,12 @@ impl ToString for ContentKind {
     }
 }
 
+impl From<ContentKind> for Bson {
+    fn from(kind: ContentKind) -> Self {
+        kind.to_string().into()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MetadataWithAudio {
     pub id: uuid::Uuid,
@@ -70,5 +76,5 @@ pub struct MetadataWithAudio {
     pub artist: String,
     pub title: String,
     pub r#type: String,
-    pub content: Bytes,
+    pub content: Vec<u8>,
 }

@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use anyhow::Context;
-use bytes::Bytes;
-use model::{ContentKind, Segment, SegmentMatchResponse, Tags};
+use model::{ContentKind, Segment, SegmentMatchResponse};
 use mongodb::bson::{DateTime, Uuid};
 use rocket_db_pools::mongodb::Client;
 use rocket_db_pools::{Connection, Database};
@@ -30,7 +31,7 @@ impl From<&SegmentMatchResponse> for MatchDocument {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioDocument {
     pub id: Uuid,
-    pub content: Bytes,
+    pub content: Vec<u8>,
     pub r#type: String,
 }
 
@@ -53,7 +54,9 @@ pub struct MetadataDocument {
     pub kind: ContentKind,
     pub artist: String,
     pub title: String,
-    pub tags: Tags,
+    // Must be BTreeMap because it is stored in DB.
+    // Changing type would require wiping all records.
+    pub tags: BTreeMap<String, String>,
 }
 
 impl MetadataDocument {
@@ -62,9 +65,9 @@ impl MetadataDocument {
             id,
             date_time: DateTime::now(),
             kind,
-            artist: segment.artist(),
-            title: segment.title(),
-            tags: segment.tags.clone(),
+            artist: segment.tags.track_artist_or_empty(),
+            title: segment.tags.track_title_or_empty(),
+            tags: segment.tags.clone().into(),
         }
     }
 }

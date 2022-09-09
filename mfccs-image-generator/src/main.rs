@@ -3,7 +3,7 @@ use std::io::Write;
 use std::time::Instant;
 
 use anyhow::{bail, Context};
-use bytes::{Buf, Bytes};
+use bytes::Buf;
 use mfcc::{calculate_mel_coefficients_with_deltas, ffmpeg_decode, RawAudioData};
 use model::{ContentKind, MetadataWithAudio};
 use ndarray::s;
@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
         let op_timer = Instant::now();
         let data2 = data
             .par_iter()
-            .map(|d| ffmpeg_decode(d.content.clone()))
+            .map(|d| ffmpeg_decode(&d.content))
             .collect::<Result<Vec<_>, _>>()?;
         println!("Decoded, elapsed {}ms", op_timer.elapsed().as_millis());
 
@@ -115,7 +115,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 struct AudioData {
-    content: Bytes,
+    content: Vec<u8>,
     kind: ContentKind,
     title: String,
 }
@@ -132,12 +132,7 @@ impl From<MetadataWithAudio> for AudioData {
                 value.title,
                 value.id
             )
-            .replace('/', "")
-            .replace('\\', "")
-            .replace('\"', "")
-            .replace('\'', "")
-            .replace('.', "")
-            .replace('&', ""),
+            .replace(['/', '\\', '"', '\'', '.', '&'], ""),
         }
     }
 }

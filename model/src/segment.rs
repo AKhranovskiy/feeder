@@ -1,33 +1,32 @@
-use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Segment {
-    pub url: Url,
+    pub url: String,
     pub duration: Duration,
-    pub content: Bytes,
+    pub content: Vec<u8>,
     pub content_type: String,
     pub tags: Tags,
 }
 
-pub type Tags = BTreeMap<String, String>;
+pub use tags::Tags;
 
 impl Segment {
+    #[deprecated]
     pub fn artist(&self) -> String {
-        self.tags
-            .get(&"TrackArtist".to_string())
-            .or_else(|| self.tags.get(&"AlbumArtist".to_string()))
-            .cloned()
+        None.or_else(|| self.tags.track_artist())
+            .or_else(|| self.tags.album_artist())
+            .map(ToString::to_string)
             .unwrap_or_default()
     }
+
+    #[deprecated]
     pub fn title(&self) -> String {
         self.tags
-            .get(&"TrackTitle".to_string())
-            .cloned()
+            .track_title()
+            .map(ToString::to_string)
             .unwrap_or_default()
     }
 }

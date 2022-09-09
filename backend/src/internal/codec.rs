@@ -3,18 +3,17 @@ use std::process::{Command, Stdio};
 
 use anyhow::anyhow;
 
-use bytes::Bytes;
 use rocket::http::ContentType;
 
-pub fn prepare_for_browser(content_type: &ContentType, content: &Bytes) -> anyhow::Result<Vec<u8>> {
+pub fn prepare_for_browser(content_type: &ContentType, content: &[u8]) -> anyhow::Result<Vec<u8>> {
     if content_type.is_aac() {
-        remux_aac(content).map(|bytes| bytes.to_vec())
+        remux_aac(content)
     } else {
         Ok(content.to_vec())
     }
 }
 
-fn remux_aac(bytes: &Bytes) -> anyhow::Result<Bytes> {
+fn remux_aac(bytes: &[u8]) -> anyhow::Result<Vec<u8>> {
     let ffmpeg_path = std::env::var("FFMPEG_PATH")?;
     log::info!("FFMPEG_PATH: {}", ffmpeg_path);
 
@@ -33,6 +32,5 @@ fn remux_aac(bytes: &Bytes) -> anyhow::Result<Bytes> {
         .ok_or_else(|| anyhow!("Failed to acquire stdin"))
         .and_then(|mut stdin| stdin.write_all(bytes).map_err(|e| e.into()))?;
 
-    let remuxed: Bytes = proc.wait_with_output()?.stdout.into();
-    Ok(remuxed)
+    Ok(proc.wait_with_output()?.stdout)
 }

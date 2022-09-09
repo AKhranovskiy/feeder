@@ -1,12 +1,13 @@
 [workspace]
 
 members = [
-    "backend",
-    "emysound",
-    "fetcher",
-    "frontend",
-    "mfcc",
-    "mfccs-image-generator"
-,
-    "model",
-    "trainer"]
+"backend",
+"emysound",
+"hls-fetcher",
+"mfcc",
+"mfccs-image-generator",
+"model",
+"tags",
+"trainer"
+]
+

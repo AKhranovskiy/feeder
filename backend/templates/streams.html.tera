@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Adbanda :: Streams</title>
+
+	<link rel="icon" href="/static/favicon.ico">
+	<link rel="stylesheet" href="/static/reset.css">
+	<link rel="stylesheet" href="/static/style.css">
+	<script src="/static/streams.js" defer></script>
+</head>
+
+<body>
+	<header></header>
+	<main>
+		<template id="stream">
+			<article class="stream">
+				<header>
+					<h1>
+						<span>Stream Name</span>
+						<a href='#' target='_blank'><img src='/static/external-link.png' width="16px" /></a>
+					</h1>
+				</header>
+
+				<div class="statistics">
+					<!-- <span class="buffered">Buffered 10mins (60mins max)</span> -->
+					<!-- <span class="classification">Advertisement: 10%, Music: 75%, Talk: 10%, Unknown: 5%</span> -->
+				</div>
+
+				<div class="player">
+					<div class="visualisation">
+						<canvas class="bars"></canvas>
+						<canvas class="active-bar"></canvas>
+						<canvas class="play-position"></canvas>
+						<div class="active-zone"></div>
+						<div class="tooltip"></div>
+					</div>
+					<!-- <div class="playbutton" data-play-state="stop"></div> -->
+				</div>
+			</article>
+		</template>
+	</main>
+	<footer></footer>
+</body>

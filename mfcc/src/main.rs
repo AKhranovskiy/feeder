@@ -3,7 +3,6 @@ use std::io::Read;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
-use bytes::Bytes;
 use mfcc::{calculate_mel_coefficients_with_deltas, ffmpeg_decode, plot, SAMPLE_RATE};
 
 fn main() -> Result<()> {
@@ -12,7 +11,7 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("File name is required"))?;
 
     let content = load_file_content(file)?;
-    let samples = ffmpeg_decode(content)?;
+    let samples = ffmpeg_decode(&content)?;
 
     println!(
         "Sample rate: {SAMPLE_RATE}Hz, # samples: {}, length: {:0.2}",
@@ -28,11 +27,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn load_file_content<P>(filename: P) -> Result<Bytes>
+fn load_file_content<P>(filename: P) -> Result<Vec<u8>>
 where
     P: AsRef<Path>,
 {
     let mut buffer = Vec::new();
     File::open(filename)?.read_to_end(&mut buffer)?;
-    Ok(buffer.into())
+    Ok(buffer)
 }

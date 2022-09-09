@@ -5,7 +5,6 @@ use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Result};
 use bytemuck::cast_slice;
-use bytes::Bytes;
 use itertools::Itertools;
 use ndarray::{concatenate, Axis};
 use ordered_float::OrderedFloat;
@@ -36,6 +35,7 @@ fn extract_mfccs(data: &RawAudioData) -> Result<MFCCs> {
             let mut mfcc = aubio::MFCC::new(FRAME_SIZE, N_FILTERS, N_COEFFS, SAMPLE_RATE)?;
             let mut output = [0f32; N_COEFFS];
             // TODO handle unwrap.
+            #[allow(clippy::needless_borrow)]
             mfcc.do_(chunk.as_slice().unwrap(), &mut output)
                 .map(|_| output)
         })
@@ -111,7 +111,7 @@ pub fn plot(data: &MFCCs, filename: &str) {
     }
 }
 
-pub fn ffmpeg_decode(bytes: Bytes) -> Result<RawAudioData> {
+pub fn ffmpeg_decode(bytes: &[u8]) -> Result<RawAudioData> {
     let ffmpeg_path = std::env::var("FFMPEG_PATH")?;
 
     // println!("Execute ffmpeg, path={ffmpeg_path}");
@@ -131,6 +131,7 @@ pub fn ffmpeg_decode(bytes: Bytes) -> Result<RawAudioData> {
         .take()
         .ok_or_else(|| anyhow!("failed to get stdin"))?;
 
+    let bytes = bytes.to_vec();
     std::thread::spawn(move || {
         stdin.write_all(&bytes).expect("Failed to write content");
     });

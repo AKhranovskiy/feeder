@@ -29,6 +29,6 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Command::Insert => todo!(),
         Command::Query => todo!(),
-        Command::Delete { id } => emysound::delete(args.endpoint, id).await,
+        Command::Delete { id } => emysound::delete(args.endpoint.as_str(), id).await,
     }
 }
