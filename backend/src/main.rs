@@ -1,4 +1,5 @@
 #![feature(trait_alias)] // trait Optional, optional.rs
+#![feature(option_result_contains)] // IHR impl
 
 use rocket::fs::{relative, FileServer};
 use rocket_db_pools::Database;
