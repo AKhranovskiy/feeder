@@ -13,7 +13,7 @@ class Category {
         if (this.name == Category.Music.name) return 'green';
         if (this.name == Category.Talk.name) return 'blue';
         if (this.name == Category.Unknown.name) return 'grey';
-		return 'black';
+        return 'black';
     }
 }
 
@@ -36,40 +36,108 @@ const VisualisationSettings = Object.freeze({
     }
 });
 
+function fetchAudioBuffer(audioCtx, url) {
+    return fetch(url)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`HTTP error, status = ${response.status}`);
+            }
+            return response.arrayBuffer();
+        })
+        .then((buffer) => audioCtx.decodeAudioData(buffer))
+        .then((decodedData) => new AudioBufferSourceNode(audioCtx, {
+            buffer: decodedData
+        }))
+        .catch((e) => {
+            throw new Error(e);
+        })
+}
+
 class Stream {
     #player = null;
-	#audio = null;
+    #audioContext = null;
+    #sources = [];
+    #currentSource = null;
+    #nextStart = 0.0;
+    #playbutton = null;
 
     constructor(domElement) {
         this.#player = new Player(domElement.querySelector('.player'));
-		this.#audio = new Audio();
+        this.#audioContext = new AudioContext();
+        this.#playbutton = domElement.querySelector('.playbutton');
+        this.#playbutton.addEventListener('click', () => this.#onPlayButtonClick());
     }
 
-	addSegment(segment) {
-		const player = this.#player;
-		for (const [kind, conf] of segment.classification) {
-			const category = new Category(kind);
+    #onPlayButtonClick() {
+        if (this.#playbutton.dataset.playState == 'stopped') {
+            this.play();
+            this.#playbutton.dataset.playState = 'playing';
+        } else if (this.#playbutton.dataset.playState == 'playing') {
+            this.stop();
+            this.#playbutton.dataset.playState = this.#sources.length > 0 ? 'stopped' : 'disabled';
+        }
+    }
 
-			const bar = new Bar(
-				// TODO - give unique id.
-				segment.id,
-				segment.url,
-				segment.artist,
-				segment.title,
-				new Category(kind),
-				conf,
-			);
+    play() {
+        if (this.#sources.length == 0) {
+            return;
+        }
 
-			delay(200).then(function() {
-				player.push(bar)
-			});
-		}
-		new Audio(segment.url).addEventListener("canplaythrough", (event) => {
-			this.#audio.pause();
-			event.target.play();
-			this.#audio = event.target;
-		});
-	}
+        let source = this.#sources.shift();
+        this.#currentSource = source;
+
+        source.connect(this.#audioContext.destination);
+        source.start();
+        //this.#nextStart.toFixedFloat(3));
+        source.onended = () => this.play();
+        // this.#nextStart = this.#nextStart.toFixedFloat(3) + source.buffer.duration.toFixedFloat(3);
+    }
+
+    stop() {
+        this.#currentSource.onended = null;
+        this.#currentSource.stop();
+        this.#currentSource == null;
+    }
+
+    #onSourceAdded() {
+        if (this.#sources.length > 0) {
+            if (this.#playbutton.dataset.playState == 'disabled') {
+                this.#playbutton.dataset.playState = 'stopped';
+            }
+        } else {
+            this.#playbutton.dataset.playState = 'disabled';
+            this.stop();
+        }
+    }
+
+    addSegment(segment) {
+        const player = this.#player;
+
+        fetchAudioBuffer(this.#audioContext, segment.url)
+            .then((source) => {
+                this.#sources.push(source);
+                this.#onSourceAdded();
+            });
+
+        for (const [kind, conf] of segment.classification) {
+            const category = new Category(kind);
+
+            const bar = new Bar(
+                // TODO - give unique id.
+                segment.id,
+                segment.url,
+                segment.artist,
+                segment.title,
+                new Category(kind),
+                conf,
+            );
+
+            delay(200)
+                .then(function () {
+                    player.push(bar)
+                });
+        }
+    }
 }
 
 const delay = (milliseconds) => new Promise(resolve => {
@@ -79,11 +147,11 @@ const delay = (milliseconds) => new Promise(resolve => {
 class Bar {
     constructor(id, source, artist, title, category, confidence) {
         this.id = id;
-		this.source = source;
-		this.artist = artist;
-		this.title = title;
+        this.source = source;
+        this.artist = artist;
+        this.title = title;
         this.category = category;
-		this.confidence = confidence;
+        this.confidence = confidence;
     }
 }
 
@@ -255,69 +323,78 @@ class Visualisation {
         }
     }
 
-	#getTooltipText(bar) {
-		return `ID: ${bar.id}\n` +
-			`Source: ${bar.source}\n` +
-			`Artist: ${bar.artist}\n` +
-			`Title: ${bar.title}\n` +
-			`Category: ${bar.category.name}\n` +
-			`Confidence: ${bar.confidence}`;
-	}
+    #getTooltipText(bar) {
+        return `ID: ${bar.id}\n` +
+            `Source: ${bar.source}\n` +
+            `Artist: ${bar.artist}\n` +
+            `Title: ${bar.title}\n` +
+            `Category: ${bar.category.name}\n` +
+            `Confidence: ${bar.confidence}`;
+    }
 }
 
 
 window.onload = function () {
-	loadStreams()
-		.then(processStreams)
-		.then(subscribeForUpdates)
-		.catch(e => console.error(e));
+    loadStreams()
+        .then(processStreams)
+        .then(subscribeForUpdates)
+        .catch(e => console.error(e));
 }
 
 async function loadStreams() {
     const response = await fetch(
-		'/api/v1/streams',
-		{
-			method: 'GET',
-			headers: {'Accept': 'application/json'},
-		}
-	);
+        '/api/v1/streams', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            },
+        }
+    );
     return response.json();
 }
 
 async function processStreams(streams) {
-	window.streams = new Map();
+    window.streams = new Map();
 
-	for (const stream of streams) {
-		const template = document.querySelector('template#stream');
-		let node = template.content.cloneNode(true);
-		let article = node.querySelector('article');
-		article.id = stream.id;
+    for (const stream of streams) {
+        const template = document.querySelector('template#stream');
+        let node = template.content.cloneNode(true);
+        let article = node.querySelector('article');
+        article.id = stream.id;
 
-		article.querySelector('header > h1 > span').textContent = stream.name;
-		article.querySelector('header > h1 > a').href = stream.url;
-		document.querySelector('main').appendChild(node);
+        article.querySelector('header > h1 > span')
+            .textContent = stream.name;
+        article.querySelector('header > h1 > a')
+            .href = stream.url;
+        document.querySelector('main')
+            .appendChild(node);
 
-		window.streams.set(stream.id, new Stream(article));
-	}
+        window.streams.set(stream.id, new Stream(article));
+    }
 }
 
 function subscribeForUpdates() {
-	const sse = new EventSource('/api/v1/playbacks/updates');
-	sse.onerror = (e) => {
-		console.error("Update subcription failed");
-		sse.close()
-	}
+    const sse = new EventSource('/api/v1/playbacks/updates');
+    sse.onerror = (e) => {
+        console.error("Update subcription failed");
+        sse.close()
+    }
 
-	sse.addEventListener('add', (ev) => {
-		let playback =JSON.parse(ev.data); 
-		console.debug("ADD", ev.lastEventId, playback);
+    sse.addEventListener('add', (ev) => {
+        let playback = JSON.parse(ev.data);
+        console.debug("ADD", ev.lastEventId, playback);
 
-		window.streams.get(playback.stream_id).addSegment(playback);
-	});
-	sse.addEventListener('delete', (ev) => {
-		console.debug("DELETE", ev.lastEventId);
-	});
-	sse.addEventListener('error', (ev) => {
-		console.error("ERROR", ev.lastEventId);
-	});
+        window.streams.get(playback.stream_id)
+            .addSegment(playback);
+    });
+    sse.addEventListener('delete', (ev) => {
+        console.debug("DELETE", ev.lastEventId);
+    });
+    sse.addEventListener('error', (ev) => {
+        console.error("ERROR", ev.lastEventId);
+    });
 }
+
+Number.prototype.toFixedFloat = function (n) {
+    return Number.parseFloat(this.toFixed(n));
+};

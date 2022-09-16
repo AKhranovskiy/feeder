@@ -1,4 +1,7 @@
 mod analyser;
+mod check_db;
+mod check_emysound;
+mod classification;
 mod fetcher;
 mod playback;
 
@@ -9,6 +12,9 @@ pub fn stage() -> AdHoc {
     AdHoc::on_ignite("Live Stream Analyser", |rocket| async move {
         let (rs_tx, rs_rx) = flume::bounded(10);
         rocket
+            .attach(check_db::CheckDb)
+            .attach(check_emysound::CheckEmySound)
+            .attach(classification::IgniteClassifier)
             .manage(RawSegmentTx(rs_tx))
             .manage(RawSegmentRx(rs_rx))
             .attach(analyser::Analyser)

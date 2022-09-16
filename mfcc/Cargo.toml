@@ -5,12 +5,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.64"
+anyhow = "1.0.65"
 aubio = "0.2.1"
 bytemuck = "1.12.1"
 colorgrad = "0.6.1"
-itertools = "0.10.3"
+itertools = "0.10.4"
 ndarray = { version = "0.15.6", features = ["rayon"] }
 ordered-float = "3.0.0"
-plotters = "0.3.3"
+plotters = "0.3.4"
 rayon = "1.5.3"

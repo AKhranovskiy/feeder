@@ -5,14 +5,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.64"
+anyhow = "1.0.65"
 async-stream = "0.3.3"
 # TODO is it used?
 chrono = { version = "0.4.22", features = ["serde"] }
 flume = "0.10.14"
 futures = "0.3.24"
 hls_m3u8 = "0.4.1"
-itertools = "0.10.3"
+itertools = "0.10.4"
 lazy_static = "1.4.0"
 log = "0.4.17"
 mongodb = { version = "2.3.0", features = [
@@ -26,10 +26,10 @@ serde = { version = "1.0.144", features = ["derive"] }
 # TODO - hide dependency in `trainer` lib.
 tch = "0.8.0"
 time = { version = "0.3.14", features = ["formatting"] }
-tokio = { version = "1.21.0", features = ["macros", "rt"] }
+tokio = { version = "1.21.1", features = ["macros", "rt"] }
 tokio-stream = "0.1.9"
 ureq = "2.5.0"
-url = { version = "2.2.2", features = ["serde"] }
+url = { version = "2.3.1", features = ["serde"] }
 uuid = { version = "1.1.2", features = ["v4"] }
 
 [dependencies.emysound]

@@ -3,7 +3,6 @@ use rocket::http::ContentType;
 use rocket::serde::json::Json;
 use rocket_db_pools::Connection;
 
-use crate::internal::codec::prepare_for_browser;
 use crate::internal::storage::Storage;
 use crate::storage::playback::Playback;
 use crate::storage::StorageScheme;
@@ -32,12 +31,5 @@ pub async fn one_segment(
 fn prepare(playback: Playback) -> (ContentType, Vec<u8>) {
     let content_type =
         ContentType::parse_flexible(&playback.content_type).unwrap_or(ContentType::Binary);
-    let content = match prepare_for_browser(&content_type, &playback.content) {
-        Ok(bytes) => bytes.to_vec(),
-        Err(e) => {
-            log::error!("Failed remux aac: {e:#}");
-            playback.content
-        }
-    };
-    (content_type, content)
+    (content_type, playback.content)
 }

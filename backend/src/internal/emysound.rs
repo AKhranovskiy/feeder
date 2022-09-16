@@ -5,6 +5,10 @@ use uuid::Uuid;
 const MIN_CONFIDENCE: f32 = 0.2f32;
 const EMYSOUND_API: &str = "http://localhost:3340/api/v1.1/";
 
+pub async fn check_connection() -> anyhow::Result<()> {
+    emysound::check_connection(EMYSOUND_API).await
+}
+
 pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<SegmentMatchResponse>>> {
     let to_results = |results: Vec<emysound::QueryResult>| {
         results

@@ -53,25 +53,6 @@ tr[data-selected="false"] td:first-child::before {
   content: "\00a0\00a0\00a0\00a0";
 }
 
-.playbutton[data-play-state] {
-  font-size: xx-large;
-  width: 3ch;
-  height: 3ch;
-  border-radius: 50%;
-  border-width: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: conic-gradient(grey calc(var(--percent) * 1%), white calc(var(--percent) * 1%));
-}
-
-.playbutton[data-play-state="stop"]::before {
-  content: "▶";
-}
-
-.playbutton[data-play-state="play"]::before {
-  content: "⏹";
-}
 
 div.player {
   width: 50vw;
@@ -82,6 +63,24 @@ div.player .playbutton {
 	display: inline-block;
 	margin: auto;
 	height: 100%;
+	font-size: x-large;
+	border-radius: 50%;
+	border-width: 2;
+	justify-content: center;
+	align-items: center;
+}
+
+.playbutton[data-play-state="stopped"]::before {
+  content: "▶";
+}
+
+.playbutton[data-play-state="playing"]::before {
+  content: "⏹";
+}
+
+.playbutton[data-play-state="disabled"]::before{
+  content: "▶";
+  color: grey;
 }
 
 div.player .visualisation {

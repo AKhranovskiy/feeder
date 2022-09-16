@@ -79,7 +79,7 @@ pub async fn fetch(
                     .await
                     .context("Adding new stream")
                     .map(Created::new)
-                    .map_err(|ref e| FetchError::ServerError(e.to_string()))
+                    .map_err(|ref e| FetchError::ServerError(format!("{e:#}")))
             } else {
                 Err(FetchError::ServerError(format!(
                     "Not supported content, type={content_type}"

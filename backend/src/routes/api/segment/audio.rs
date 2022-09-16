@@ -19,13 +19,6 @@ pub async fn audio(id: &str, storage: Connection<Storage>) -> Option<(ContentTyp
         .map(|doc| {
             let content_type =
                 ContentType::parse_flexible(&doc.r#type).unwrap_or(ContentType::Binary);
-            let content = match prepare_for_browser(&content_type, &doc.content) {
-                Ok(bytes) => bytes.to_vec(),
-                Err(e) => {
-                    log::error!("Failed remux aac: {e:#}");
-                    doc.content.to_vec()
-                }
-            };
-            (content_type, content)
+            prepare_for_browser(&content_type, &doc.content).unwrap_or((content_type, doc.content))
         })
 }

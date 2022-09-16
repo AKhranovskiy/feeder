@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::Context;
-use futures::future::try_join3;
+use futures::future::try_join;
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::doc;
 use serde::Serialize;
@@ -13,26 +13,25 @@ use crate::internal::storage::MetadataDocument;
 use crate::internal::{from_bson_uuid, to_bson_uuid};
 
 use super::emysound::find_matches;
+use super::guess_content_kind;
 use super::prediction::Prediction;
-use super::{classification, guess_content_kind};
 
 pub async fn analyse(
     storage: &mongodb::Client,
     content: &[u8],
     comment: &str,
 ) -> anyhow::Result<(Tags, ContentKind, Vec<FingerprintMatch>, Vec<Prediction>)> {
-    let ((tags, content_kind_from_tags), fingerpints, predictions) = try_join3(
+    let ((tags, content_kind_from_tags), fingerpints) = try_join(
         analyse_tags(content, comment),
         lookup_fingerprints(storage, content),
-        classify(content),
     )
     .await
     .context("Segment analyse")?;
 
-    Ok((tags, content_kind_from_tags, fingerpints, predictions))
+    Ok((tags, content_kind_from_tags, fingerpints, vec![]))
 }
 
-async fn analyse_tags(content: &[u8], comment: &str) -> anyhow::Result<(Tags, ContentKind)> {
+pub async fn analyse_tags(content: &[u8], comment: &str) -> anyhow::Result<(Tags, ContentKind)> {
     let tags = Tags::try_from(content)
         .context("Tag analyse")?
         .with_comment(comment);
@@ -102,9 +101,4 @@ async fn lookup_fingerprints(
         .context("Collecting fingerpints")?;
 
     Ok(metadata)
-}
-
-async fn classify(content: &[u8]) -> anyhow::Result<Vec<Prediction>> {
-    classification::classify(content, classification::AveragePerSecondScore)
-        .context("Segment classification")
 }

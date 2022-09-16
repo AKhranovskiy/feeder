@@ -1,5 +1,4 @@
 mod analyse;
-mod classification;
 pub mod codec;
 pub mod documents;
 mod download;
@@ -11,6 +10,7 @@ pub mod storage;
 pub mod tera;
 
 pub use analyse::analyse;
+pub use analyse::analyse_tags;
 pub use analyse::FingerprintMatch;
 pub use download::download;
 pub use guess::guess_content_kind;

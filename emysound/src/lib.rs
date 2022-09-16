@@ -5,6 +5,18 @@ use reqwest::{Client, StatusCode, Url};
 use serde::Deserialize;
 use uuid::Uuid;
 
+pub async fn check_connection(endpoint: &str) -> Result<()> {
+    let url = Url::parse(endpoint)?.join("Streams")?;
+    Client::new()
+        .get(url)
+        .basic_auth("ADMIN", Some(""))
+        .send()
+        .await?
+        .error_for_status()
+        .map(|_| ())
+        .map_err(|e| e.into())
+}
+
 pub async fn insert(
     endpoint: Url,
     id: Uuid,

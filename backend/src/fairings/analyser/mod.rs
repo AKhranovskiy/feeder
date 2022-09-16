@@ -1,13 +1,16 @@
+use futures::future::try_join;
 use futures::{StreamExt, TryFutureExt};
 use model::ContentKind;
+use rocket::http::ContentType;
 use rocket::{fairing, Rocket};
 use rocket_db_pools::Database;
 use tokio::select;
 
-use crate::internal::analyse;
+use crate::fairings::classification::{AveragePerSecondScore, Classifier};
+use crate::internal::analyse_tags;
+use crate::internal::codec::prepare_for_browser;
 use crate::internal::storage::Storage;
-use crate::storage::playback::Playback;
-use crate::storage::StorageScheme;
+use crate::storage::{playback::Playback, StorageScheme};
 
 use super::RawSegmentRx;
 
@@ -39,6 +42,11 @@ impl fairing::Fairing for Analyser {
 
         let mut shutdown = rocket.shutdown();
 
+        let classifier: Classifier = rocket
+            .state::<Classifier>()
+            .expect("Classifier is ignited")
+            .clone();
+
         tokio::spawn(async move {
             loop {
                 let packet = select! {
@@ -50,35 +58,43 @@ impl fairing::Fairing for Analyser {
                     else => break,
                 };
 
-                // TODO - Put classificator to State.
-                if let Err(ref error) =
-                    analyse(&client, &packet.segment.content, &packet.segment.comment)
-                        .and_then(|(tags, _, _, classification)| {
-                            let classification = classification.iter().map(|p| p.max()).collect();
-                            let p = Playback::new(
-                                packet.stream_id,
-                                packet.segment.content_type,
-                                packet.segment.content.clone(),
-                                tags.track_title_or_empty(),
-                                tags.track_artist_or_empty(),
-                                packet.segment.duration,
-                                classification,
-                            );
+                let result = try_join(
+                    analyse_tags(&packet.segment.content, &packet.segment.comment),
+                    classifier.classify(&packet.segment.content, AveragePerSecondScore),
+                )
+                .and_then(|((tags, _), classification)| {
+                    let classification = classification.iter().map(|p| p.max()).collect();
 
-                            log::info!(
-                                "New segment from {}: {} - {}, {:.02}s, {}",
-                                p.stream_id,
-                                p.artist,
-                                p.title,
-                                p.duration.as_secs_f32(),
-                                p.classification.iter().map(short_kind).collect::<String>()
-                            );
+                    let content_type = ContentType::parse_flexible(&packet.segment.content_type)
+                        .unwrap_or(ContentType::Binary);
 
-                            playbacks.add(p)
-                        })
-                        .await
-                {
-                    log::error!("{error}");
+                    let (content_type, content) =
+                        prepare_for_browser(&content_type, &packet.segment.content)
+                            .unwrap_or((content_type, packet.segment.content.clone()));
+
+                    let p = Playback::new(
+                        packet.stream_id,
+                        content_type.to_string(),
+                        content,
+                        tags.track_title_or_empty(),
+                        tags.track_artist_or_empty(),
+                        packet.segment.duration,
+                        classification,
+                    );
+                    log::info!(
+                        "New segment from {}: {} - {}, {:.02}s, {}",
+                        p.stream_id,
+                        p.artist,
+                        p.title,
+                        p.duration.as_secs_f32(),
+                        p.classification.iter().map(short_kind).collect::<String>()
+                    );
+                    playbacks.add(p)
+                })
+                .await;
+
+                if let Err(ref error) = result {
+                    log::error!("{error:#}");
                 }
             }
         });

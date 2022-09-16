@@ -36,7 +36,7 @@
 						<div class="active-zone"></div>
 						<div class="tooltip"></div>
 					</div>
-					<!-- <div class="playbutton" data-play-state="stop"></div> -->
+					<div class="playbutton" data-play-state="disabled"></div>
 				</div>
 			</article>
 		</template>
