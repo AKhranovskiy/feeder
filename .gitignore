@@ -4,5 +4,4 @@ Cargo.lock
 *.bin
 *.7z
 *.tch
-*/.cargo/config.toml
 fleet.toml
