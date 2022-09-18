@@ -3,7 +3,6 @@ pub mod codec;
 pub mod documents;
 mod download;
 pub mod emysound;
-mod guess;
 mod optional;
 pub mod prediction;
 pub mod storage;
@@ -13,7 +12,6 @@ pub use analyse::analyse;
 pub use analyse::analyse_tags;
 pub use analyse::FingerprintMatch;
 pub use download::download;
-pub use guess::guess_content_kind;
 pub use optional::Optional;
 
 /// Converts `uuid::Uuid` to `bson::Uuid`.

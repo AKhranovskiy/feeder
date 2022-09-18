@@ -13,7 +13,6 @@ use crate::internal::storage::MetadataDocument;
 use crate::internal::{from_bson_uuid, to_bson_uuid};
 
 use super::emysound::find_matches;
-use super::guess_content_kind;
 use super::prediction::Prediction;
 
 pub async fn analyse(
@@ -35,7 +34,7 @@ pub async fn analyse_tags(content: &[u8], comment: &str) -> anyhow::Result<(Tags
     let tags = Tags::try_from(content)
         .context("Tag analyse")?
         .with_comment(comment);
-    let kind = guess_content_kind(&tags);
+    let kind = tag_analyser::analyse_tags(&tags);
     Ok((tags, kind))
 }
 

@@ -13,7 +13,6 @@ use rocket_db_pools::Connection;
 use serde::Serialize;
 use tokio::select;
 
-use crate::internal::guess_content_kind;
 use crate::internal::storage::{MetadataDocument, Storage};
 
 #[derive(Debug, FromForm)]
@@ -62,7 +61,8 @@ pub async fn reasses_content_kind(
             select! {
                 doc = cursor.try_next() => match doc {
                     Ok(Some(doc)) => {
-                        let new_kind = guess_content_kind(&doc.tags.clone().into());
+                        let tags = doc.tags.clone().into();
+                        let new_kind = tag_analyser::analyse_tags(&tags);
 
                         if new_kind != doc.kind {
                             if update {

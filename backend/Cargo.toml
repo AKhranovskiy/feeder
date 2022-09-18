@@ -60,6 +60,10 @@ features = ["mongodb"]
 git = "https://github.com/SergioBenitez/Rocket"
 features = ["tera"]
 
+[dependencies.tag_analyser]
+version = "*"
+path = "../tag_analyser"
+
 [dependencies.tags]
 version = "*"
 path = "../tags"

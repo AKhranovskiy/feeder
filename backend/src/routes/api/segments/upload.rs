@@ -8,7 +8,6 @@ use rocket_db_pools::Connection;
 use model::{ContentKind, Segment, SegmentMatchResponse, SegmentUploadResponse};
 
 use crate::internal::emysound::{add_fingerprints, find_matches};
-use crate::internal::guess_content_kind;
 use crate::internal::storage::{self, MetadataDocument, Storage};
 
 use super::to_internal_server_error;
@@ -40,7 +39,7 @@ pub async fn upload(
         ));
     }
 
-    let kind = guess_content_kind(&segment.tags);
+    let kind = tag_analyser::analyse_tags(&segment.tags);
 
     // if kind != ContentKind::Unknown {
     let response = add_fingerprints(&segment, kind)
