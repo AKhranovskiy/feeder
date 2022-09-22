@@ -1,15 +1,19 @@
 [package]
 name = "emysound"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.65"
-clap = { version = "3.2.22", features = ["derive"] }
 log = "0.4.17"
-reqwest = { version = "0.11.11", features = ["json", "multipart"] }
+mime = "0.3.16"
+multipart = { version = "0.18.0", default-features = false, features = ["client"] }
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0.85"
-tokio = { version = "1.21.1", features = ["full", "fs"] }
+ureq = { version = "2.5.0", default-features = false, features = ["json"] }
+url = "2.3.1"
 uuid = { version = "1.1.2", features = ["v4"] }
+
+[dev-dependencies]
+clap = { version = "3.2.22", features = ["derive"] }

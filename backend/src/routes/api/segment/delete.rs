@@ -73,7 +73,7 @@ pub async fn delete(storage: Connection<Storage>, id: &str) -> (Status, String) 
 
     log::debug!("Deleting fingerprints");
 
-    if let Err(ref error) = delete_segment(id).await {
+    if let Err(ref error) = delete_segment(id) {
         log::error!("Failed to delete fingerpints, id={id}, error={error}");
         // Tolerate fingerprint errors.
     }

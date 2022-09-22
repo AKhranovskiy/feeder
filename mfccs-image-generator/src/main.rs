@@ -2,13 +2,12 @@ use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
 
-use anyhow::{bail, Context};
-use bytes::Buf;
+use anyhow::Context;
 use mfcc::{calculate_mel_coefficients_with_deltas, ffmpeg_decode, RawAudioData};
 use model::{ContentKind, MetadataWithAudio};
 use ndarray::s;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use reqwest::{blocking::Client, StatusCode, Url};
+use url::Url;
 
 const ENDPOINT: &str = "http://localhost:3456";
 const MSGPACK_MIME: &str = "application/msgpack";
@@ -138,24 +137,20 @@ impl From<MetadataWithAudio> for AudioData {
 }
 
 fn fetch_data(skip: usize, limit: usize) -> anyhow::Result<Vec<AudioData>> {
-    let mut url = Url::parse(ENDPOINT)?.join("/api/v1/segments/msgpack")?;
+    let url = Url::parse(ENDPOINT)?.join("/api/v1/segments/msgpack")?;
 
-    url.set_query(Some(&format!("skip={skip}&limit={limit}")));
+    let resp = ureq::get(url.as_ref())
+        .query("skip", &skip.to_string())
+        .query("limit", &limit.to_string())
+        .set("accept", MSGPACK_MIME)
+        .call()
+        .context("Sending request")?;
 
-    let response = Client::new()
-        .get(url)
-        .header(reqwest::header::ACCEPT, MSGPACK_MIME)
-        .send()
-        .context("Sending reqwest")?;
-
-    match response.status() {
-        StatusCode::OK | StatusCode::CREATED => rmp_serde::from_read(response.bytes()?.reader())
-            .map_err(|e| e.into())
-            .map(|docs: Vec<MetadataWithAudio>| {
-                docs.into_iter().map(|doc| doc.into()).collect::<Vec<_>>()
-            }),
-        _ => bail!("{} {}", response.status(), response.text()?),
-    }
+    rmp_serde::from_read(resp.into_reader())
+        .map_err(|e| e.into())
+        .map(|docs: Vec<MetadataWithAudio>| {
+            docs.into_iter().map(|doc| doc.into()).collect::<Vec<_>>()
+        })
 }
 
 fn calculate_mfccs(data: &RawAudioData) -> anyhow::Result<Vec<mfcc::MFCCs>> {

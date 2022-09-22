@@ -43,7 +43,6 @@ pub async fn upload(
 
     // if kind != ContentKind::Unknown {
     let response = add_fingerprints(&segment, kind)
-        .await
         .map_err(|e| status::Custom(Status::InternalServerError, e.to_string()))?;
 
     storage::add_segment(&storage, &segment, response.id, kind)

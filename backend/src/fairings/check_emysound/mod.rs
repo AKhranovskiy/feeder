@@ -16,7 +16,7 @@ impl fairing::Fairing for CheckEmySound {
     }
 
     async fn on_ignite(&self, rocket: Rocket<rocket::Build>) -> fairing::Result {
-        match emysound::check_connection().await {
+        match emysound::check_connection() {
             Ok(_) => Ok(rocket),
             Err(ref error) => {
                 log::error!("{error:#}");

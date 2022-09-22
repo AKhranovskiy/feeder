@@ -1,12 +1,21 @@
 use anyhow::{anyhow, Context};
+use lazy_static::lazy_static;
 use model::{ContentKind, Segment, SegmentInsertResponse, SegmentMatchResponse};
+use url::Url;
 use uuid::Uuid;
 
 const MIN_CONFIDENCE: f32 = 0.2f32;
 const EMYSOUND_API: &str = "http://localhost:3340/api/v1.1/";
 
-pub async fn check_connection() -> anyhow::Result<()> {
-    emysound::check_connection(EMYSOUND_API).await
+fn endpoint() -> &'static Url {
+    lazy_static! {
+        static ref ENDPOINT: Url = Url::parse(EMYSOUND_API).expect("valid endpoint");
+    }
+    &ENDPOINT
+}
+
+pub fn check_connection() -> anyhow::Result<()> {
+    emysound::check_connection(endpoint())
 }
 
 pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<SegmentMatchResponse>>> {
@@ -24,8 +33,7 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
     };
 
     let matches: Vec<SegmentMatchResponse> =
-        emysound::query(EMYSOUND_API, "media.file", &segment.content, MIN_CONFIDENCE)
-            .await
+        emysound::query(endpoint(), &segment.content, MIN_CONFIDENCE)
             .context("EmySound::query")
             .and_then(to_results)
             .map(best_results)
@@ -38,7 +46,7 @@ pub async fn find_matches(segment: &Segment) -> anyhow::Result<Option<Vec<Segmen
     })
 }
 
-pub async fn add_fingerprints(
+pub fn add_fingerprints(
     segment: &Segment,
     kind: ContentKind,
 ) -> anyhow::Result<SegmentInsertResponse> {
@@ -56,22 +64,14 @@ pub async fn add_fingerprints(
         .map(ToString::to_string)
         .unwrap_or_default();
 
-    emysound::insert(
-        EMYSOUND_API.parse()?,
-        id,
-        artist.clone(),
-        title.clone(),
-        segment.url.clone(),
-        &segment.content,
-    )
-    .await
-    .context("EmySound::insert")
-    .map(|()| SegmentInsertResponse {
-        id,
-        artist,
-        title,
-        kind,
-    })
+    emysound::insert(endpoint(), &id, &artist, &title, &segment.content)
+        .context("EmySound::insert")
+        .map(|()| SegmentInsertResponse {
+            id,
+            artist,
+            title,
+            kind,
+        })
 }
 
 #[derive(Debug, Clone)]
@@ -142,7 +142,7 @@ fn best_results(results: Vec<QueryResult>) -> Vec<QueryResult> {
         .collect()
 }
 
-pub async fn delete_segment(id: &str) -> anyhow::Result<()> {
+pub fn delete_segment(id: &str) -> anyhow::Result<()> {
     let id = uuid::Uuid::parse_str(id)?;
-    emysound::delete(EMYSOUND_API, id).await
+    emysound::delete(endpoint(), &id)
 }

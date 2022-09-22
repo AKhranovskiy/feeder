@@ -1,5 +1,6 @@
+use anyhow::Context;
 use clap::{Parser, Subcommand};
-use reqwest::Url;
+use url::Url;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -22,13 +23,14 @@ enum Command {
     },
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
+    emysound::check_connection(&args.endpoint).context("Checking connection")?;
 
     match args.command {
         Command::Insert => todo!(),
         Command::Query => todo!(),
-        Command::Delete { id } => emysound::delete(args.endpoint.as_str(), id).await,
+        Command::Delete { id } => emysound::delete(&args.endpoint, &id),
     }
 }
