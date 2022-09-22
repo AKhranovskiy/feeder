@@ -24,7 +24,7 @@ ndarray = "0.15.6"
 regex = "1.6.0"
 serde = { version = "1.0.144", features = ["derive"] }
 # TODO - hide dependency in `trainer` lib.
-tch = "0.8.0"
+tch = { version = "0.8.0-no-zip", default-features = false, git = "https://github.com/AKhranovskiy/tch-rs.git", branch = "no-zip" }
 time = { version = "0.3.14", features = ["formatting"] }
 tokio = { version = "1.21.1", features = ["macros", "rt"] }
 tokio-stream = "0.1.9"

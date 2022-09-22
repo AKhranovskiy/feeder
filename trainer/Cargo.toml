@@ -13,7 +13,7 @@ ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
 num_cpus = "1.13.1"
 rand = "0.8.5"
 rayon = "1.5.3"
-tch = "0.8.0"
+tch = { version = "0.8.0-no-zip", default-features = false, git = "https://github.com/AKhranovskiy/tch-rs.git", branch = "no-zip" }
 
 [dependencies.mfcc]
 version = "*"

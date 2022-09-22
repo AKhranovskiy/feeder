@@ -1,5 +1,7 @@
 [env]
 FFMPEG_PATH = "../ffmpeg/linux"
+LIBTORCH = "/opt/libtorch1.12.1"
+LD_LIBRARY_PATH="/opt/libtorch1.12.1/lib"
 
 [build]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
