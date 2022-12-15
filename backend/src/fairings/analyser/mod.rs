@@ -95,13 +95,12 @@ impl fairing::Fairing for Analyser {
                         classification,
                     );
                     log::info!(
-                        "New segment from {}: {} - {}, {:.02}s, {} / {}",
+                        "New segment from {}: {} - {}, {:.02}s, {}",
                         stream_cache.get(&p.stream_id).unwrap_or(&p.stream_id),
                         p.artist,
                         p.title,
                         p.duration.as_secs_f32(),
                         kind.to_string(),
-                        p.classification.iter().map(short_kind).collect::<String>()
                     );
                     playbacks.add(p)
                 })

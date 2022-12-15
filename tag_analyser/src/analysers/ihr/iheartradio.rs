@@ -10,14 +10,17 @@ pub struct IHeartRadio;
 impl TagAnalyser for IHeartRadio {
     fn analyse(&self, tags: &Tags) -> ContentKind {
         let artist = tags.track_artist();
-        let title = tags.track_artist();
+        let title = tags.track_title();
 
         let kinds = ["Comment", "TXXX", "URL", "WXXX"]
             .into_iter()
-            .inspect(|s| log::debug!("Getting tag {s}"))
+            // .inspect(|s| log::debug!("Getting tag {s}"))
             .filter_map(|name| tags.get(name))
             .filter_map(|tag| match Ihr::try_from(tag) {
-                Ok(ihr) => Some(ihr),
+                Ok(ihr) => {
+                    // log::info!(target: "TagAnalyser::IHR", "IHR {ihr:?}");
+                    Some(ihr)
+                },
                 Err(ref error) => {
                     log::error!(target: "TagAnalyser::IHR", "Failed to create IHR: {error:#}");
                     None
@@ -25,6 +28,7 @@ impl TagAnalyser for IHeartRadio {
             })
             .filter(|ihr| verify_tags(ihr, artist, title))
             .map(|ihr| ihr.get_kind())
+            .filter(|kind| kind != &ContentKind::Unknown)
             .unique()
             .collect_vec();
 
@@ -41,13 +45,13 @@ impl TagAnalyser for IHeartRadio {
 
 fn verify_tags(ihr: &Ihr, artist: Option<&str>, title: Option<&str>) -> bool {
     #[allow(clippy::shadow_reuse)]
-    let matches = |comment: Option<&str>, tag: Option<&str>| match (comment, tag) {
+    let matches = |name, comment: Option<&str>, tag: Option<&str>| match (comment, tag) {
         (Some(comment), Some(tag)) if comment != tag => {
-            log::error!("Value mismatch: comment={comment}, tag={tag}");
-            true
+            log::error!("Value mismatch for {name}: comment={comment}, tag={tag}");
+            false
         }
-        _ => false,
+        _ => true,
     };
 
-    matches(artist, ihr.artist.as_deref()) && matches(title, ihr.title.as_deref())
+    matches("artist", artist, ihr.artist.as_deref()) && matches("title", title, ihr.title.as_deref())
 }
