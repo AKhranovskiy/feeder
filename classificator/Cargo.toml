@@ -1,0 +1,33 @@
+[package]
+name = "classificator"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ac-ffmpeg = "0.17.4"
+anyhow = "1.0.66"
+async-stream = "0.3.3"
+aubio = { version = "0.2.1", features = ["pkg-config"] }
+bson = { version = "2.4.0", features = ["time-0_3", "serde_with"] }
+bytemuck = "1.12.3"
+colorgrad = { version = "0.6.2", optional = true, default-features = false }
+futures = "0.3.25"
+itertools = { version = "0.10.5", optional = true }
+kdam = "0.3.0"
+model = { version = "0.3.0", path = "../model" }
+mongodb = "2.3.1"
+ordered-float = { version = "3.4.0", optional = true }
+plotters = { version = "0.3.4", optional = true, default-features = false, features = ["svg_backend"] }
+serde = { version = "1.0.150", features = ["derive"] }
+serde-pickle = "1.1.1"
+serde_with = "2.1.0"
+tch = { workspace = true }
+time = { version = "0.3.17", features = ["serde"] }
+tokio = { version = "1.23.0", features = ["macros", "rt", "rt-multi-thread", "process"] }
+
+[features]
+small-data = []
+export-audio = []
+export-image = ["dep:colorgrad", "dep:itertools", "dep:plotters", "dep:ordered-float"]
+

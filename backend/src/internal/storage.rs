@@ -6,6 +6,7 @@ use mongodb::bson::{DateTime, Uuid};
 use rocket_db_pools::mongodb::Client;
 use rocket_db_pools::{Connection, Database};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, Bytes};
 
 #[derive(Database)]
 #[database("storage")]
@@ -28,9 +29,11 @@ impl From<&SegmentMatchResponse> for MatchDocument {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioDocument {
     pub id: Uuid,
+    #[serde_as(as = "Bytes")]
     pub content: Vec<u8>,
     pub r#type: String,
 }

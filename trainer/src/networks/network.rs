@@ -1,13 +1,11 @@
-use std::path::Path;
-
-use clap::ArgEnum;
+use clap::ValueEnum;
 use tch::nn::{self, OptimizerConfig, SequentialT};
 
 use super::cnn_ms::cnn_ms;
 use super::cnn_projectpro::cnn_projectpro;
 use super::fast_resnet::fast_resnet;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Network {
     /// Fast ResNet architecture, from rust-tch.
     FastResNet,
@@ -26,10 +24,8 @@ impl Network {
         }
     }
 
-    pub fn create_varstore(&self, weight_file: &Path) -> (nn::VarStore, anyhow::Result<()>) {
-        let mut varstore = nn::VarStore::new(tch::Device::cuda_if_available());
-        let loaded = varstore.load(Path::new(&weight_file));
-        (varstore, loaded.map_err(anyhow::Error::msg))
+    pub fn create_varstore(&self) -> nn::VarStore {
+        nn::VarStore::new(tch::Device::cuda_if_available())
     }
 
     pub fn learning_rate(&self, epoch: usize) -> f64 {

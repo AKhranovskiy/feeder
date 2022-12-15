@@ -115,4 +115,9 @@ impl StreamCollection {
         let result = self.inner().delete_one(doc! {"_id": id}, None).await?;
         Ok(result.deleted_count == 1)
     }
+
+    pub async fn all(self) -> anyhow::Result<Vec<StreamDocument>> {
+        let doc = self.inner().find(None, None).await?.try_collect().await?;
+        Ok(doc)
+    }
 }

@@ -2,13 +2,18 @@
 
 members = [
 "backend",
+"classificator",
 "emysound",
 "hls-fetcher",
 "mfcc",
-"mfccs-image-generator",
 "model",
 "tag_analyser",
 "tags",
 "trainer"
 ]
+
+exclude = ["audio-importer"]
+
+[workspace.dependencies]
+tch = { git = "https://github.com/LaurentMazare/tch-rs.git", branch = "main" }
 

@@ -107,7 +107,8 @@ pub async fn segments_msgpack(
         .into_iter()
         .map(from_document::<MetadataWithAudioDocument>)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| to_internal_server_error(e.into()))?
+        .context("Converting")
+        .map_err(to_internal_server_error)?
         .into_iter()
         .map(MetadataWithAudio::from)
         .collect::<Vec<_>>();

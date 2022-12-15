@@ -1,112 +1,45 @@
-use std::os::unix::prelude::OsStrExt;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::path::Path;
 
-use anyhow::anyhow;
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use flate2::read::DeflateDecoder;
+use tch::Tensor;
 
-use crate::utils::random_bucket_indices;
+pub const NN_IMAGE_W: usize = 200;
+pub const NN_IMAGE_H: usize = 39;
 
-pub const IMAGE_TENSOR_SHAPE: [i64; 3] = [1, 39, 171];
+pub fn load_data(path: &Path) -> anyhow::Result<Vec<Tensor>> {
+    let buf = {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut decoder = DeflateDecoder::new(reader);
+        let mut buf = vec![];
+        decoder.read_to_end(&mut buf)?;
+        buf
+    };
 
-pub fn load_data(
-    path: &Path,
-    samples: &Option<usize>,
-) -> anyhow::Result<(tch::Tensor, tch::Tensor)> {
-    let mut files = std::fs::read_dir(path)?
-        .filter_map(|e| {
-            if let Ok(entry) = e {
-                if entry.path().is_file() {
-                    Some(entry.path())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+    let data: Vec<Vec<f32>> = bincode::deserialize_from(buf.as_slice())?;
 
-    println!("Total files: {}", files.len());
-
-    files.sort_unstable();
-
-    let file_groups = files
-        .as_slice()
-        .group_by(|a, b| match (a.file_name(), b.file_name()) {
-            (Some(a), Some(b)) => a.as_bytes()[0..4] == b.as_bytes()[0..4],
-            _ => false,
-        })
-        .collect::<Vec<_>>();
-
-    #[allow(clippy::string_from_utf8_as_bytes)]
-    for &fg in &file_groups {
-        println!(
-            "Label {}, count: {}",
-            std::str::from_utf8(&fg[0].file_name().unwrap().as_bytes()[0..4]).unwrap(),
-            fg.len()
-        );
-    }
-
-    // Indices must be shuffled so train/test split takes all classes.
-    // TODO - Separate train/test files before selecting to guarantee presence of all classes in both sets.
-    let indices = random_bucket_indices(
-        &file_groups.iter().map(|x| x.len()).collect::<Vec<_>>(),
-        samples.unwrap_or(files.len()),
+    anyhow::ensure!(
+        data.len() == 2,
+        "Bin must contain 2 arrays, found {}",
+        data.len()
     );
 
-    let files = indices
-        .par_iter()
-        .map(|idx| files[*idx].clone())
-        .collect::<Vec<_>>();
+    anyhow::ensure!(
+        data.iter().flat_map(|v| v.iter()).all(|f| f.is_finite()),
+        "Data contains NaN or infinities"
+    );
 
-    let images = files
-        .par_iter()
-        .map(|p| read_bin(p))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let images = tch::Tensor::stack(&images, 0);
-
-    let labels = files
-        .par_iter()
-        .map(|p| path_to_label(p))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let labels = tch::Tensor::concat(&labels, 0);
-
-    Ok((images, labels))
+    Ok(data
+        .into_iter()
+        .map(linear_to_tensor_t::<{ NN_IMAGE_W }, { NN_IMAGE_H }>)
+        .collect())
 }
 
-fn read_bin(path: &Path) -> anyhow::Result<tch::Tensor> {
-    std::fs::read(path)
-        .map_err(|e| anyhow!("Error reading bin {}: {:#?}", path.display(), e))
-        .and_then(|bin| {
-            bincode::deserialize::<mfcc::MFCCs>(&bin)
-                .map_err(|e| anyhow!("Failed to load bin {}: {}", path.display(), e))
-        })
-        .and_then(|mfccs| {
-            tch::Tensor::try_from(mfccs)
-                .map(|t| t.transpose(0, 1).reshape(&IMAGE_TENSOR_SHAPE))
-                .map_err(|e| e.into())
-        })
-}
-
-fn path_to_label(p: &Path) -> anyhow::Result<tch::Tensor> {
-    p.file_name()
-        .ok_or_else(|| anyhow!("Failed to get filename"))
-        .and_then(|p| p.to_str().ok_or_else(|| anyhow!("Failed to get string")))
-        .and_then(|name| {
-            name.split_once('|')
-                .ok_or_else(|| anyhow!("Failed to split"))
-        })
-        .and_then(|(kind, _)| match model::ContentKind::try_from(kind) {
-            Ok(model::ContentKind::Advertisement) => Ok(0),
-            Ok(model::ContentKind::Music) => Ok(1),
-            Ok(model::ContentKind::Talk) => Ok(2),
-            _ => Err(anyhow!("Invalid kind: {}", kind)),
-        })
-        .map(|kind| {
-            tch::Tensor::of_slice(&[kind as i64]).to_device(tch::Device::cuda_if_available())
-        })
+fn full_tensor((value, tensor): (usize, &Tensor)) -> Tensor {
+    let size = tensor.size()[0];
+    Tensor::full(&[size], value as i64, (tch::Kind::Int64, tch::Device::Cpu))
 }
 
 fn split_data(data: tch::Tensor, pivot: i64) -> (tch::Tensor, tch::Tensor) {
@@ -115,46 +48,94 @@ fn split_data(data: tch::Tensor, pivot: i64) -> (tch::Tensor, tch::Tensor) {
 }
 
 pub fn prepare_dataset(
-    images: tch::Tensor,
-    labels: tch::Tensor,
+    images: Vec<tch::Tensor>,
     test_set_size: f64,
 ) -> tch::vision::dataset::Dataset {
-    let image_set_size = images.size()[0];
-    let label_set_size = labels.size()[0];
-
-    assert!(image_set_size > 0, "Image set may not be empty.");
-    assert_eq!(
-        image_set_size, label_set_size,
-        "Image and Label sets must have equal size. {image_set_size} != {label_set_size}."
-    );
     assert!(
         test_set_size > 0.0 && test_set_size <= 1.0,
         "Test set size must be in range (0.0, 1.0), given: {test_set_size}."
     );
 
-    let pivot = image_set_size as f64 * (1f64 - test_set_size);
-    let pivot = pivot.trunc() as i64;
-    // println!("Test set size: {test_set_size}. Pivot point: {pivot}");
+    let labels = images.len() as i64;
 
-    let (train_images, test_images) = split_data(images, pivot);
-    let (train_labels, test_labels) = split_data(labels, pivot);
+    let (train_set, test_set): (Vec<Tensor>, Vec<Tensor>) = images
+        .into_iter()
+        .map(|t| split_tensor(t, test_set_size))
+        .unzip();
 
-    // println!("Train images set size: {:?}", train_images.size());
-    // println!("Test images set size: {:?}", test_images.size());
-    // println!("Train labels set size: {:?}", train_labels.size());
-    // println!("Test labels set size: {:?}", test_labels.size());
-
-    println!(
-        "Selected: {image_set_size}, train={}, test={}",
-        train_images.size()[0],
-        test_images.size()[0]
+    let train_images = Tensor::concat(&train_set, 0);
+    let train_labels = Tensor::concat(
+        &train_set
+            .iter()
+            .enumerate()
+            .map(full_tensor)
+            .collect::<Vec<Tensor>>(),
+        0,
     );
+
+    assert_eq!(
+        train_images.size()[0],
+        train_labels.size()[0],
+        "Train images and Labels mismatch"
+    );
+
+    let test_images = Tensor::concat(&test_set, 0);
+    let test_labels = Tensor::concat(
+        &test_set
+            .iter()
+            .enumerate()
+            .map(full_tensor)
+            .collect::<Vec<Tensor>>(),
+        0,
+    );
+
+    println!("Train images set size: {:?}", train_images.size());
+    println!("Test images set size: {:?}", test_images.size());
+    println!("Train labels set size: {:?}", train_labels.size());
+    println!("Test labels set size: {:?}", test_labels.size());
 
     tch::vision::dataset::Dataset {
         train_images,
         train_labels,
         test_images,
         test_labels,
-        labels: 3,
+        labels,
+    }
+}
+
+fn split_tensor(t: Tensor, test_set_size: f64) -> (Tensor, Tensor) {
+    let size = t.size()[0];
+    assert!(size > 0, "Empty tensor");
+
+    let pivot = size as f64 * (1f64 - test_set_size);
+    let pivot = pivot.trunc() as i64;
+    println!("Test set size: {test_set_size}. Pivot point: {pivot}");
+
+    split_data(t, pivot)
+}
+
+/// Convert a linear[X * W * H] array to a tensor of [X, 1, H, W].
+///
+/// Example:
+/// [1,2,3,4,5,6,7,8,9,10,11,12] -> convert::<3,2>() ->
+///   1 3 5   7  9 11
+///   2 4 6   8 10 12
+fn linear_to_tensor_t<const W: usize, const H: usize>(input: Vec<f32>) -> tch::Tensor {
+    let chunk = W * H;
+    let len = (input.len() / chunk) * chunk;
+    tch::Tensor::from(&input[..len])
+        .reshape(&[(len / chunk) as i64, 1, W as i64, H as i64])
+        .transpose(2, 3)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::linear_to_tensor_t;
+
+    #[test]
+    fn test_convert() {
+        let data: Vec<f32> = (0u8..45).map(f32::from).collect();
+        let t = linear_to_tensor_t::<5, 3>(data);
+        assert_eq!(t.size(), [3, 1, 3, 5]);
     }
 }

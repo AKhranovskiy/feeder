@@ -1,13 +1,9 @@
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+#![allow(dead_code)]
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use mfcc::{ffmpeg_decode, SAMPLE_RATE};
 use ndarray::s;
-use tch::nn::ModuleT;
 use tch::{IndexOp, Tensor};
-use trainer::networks::Network;
-use trainer::utils::data::IMAGE_TENSOR_SHAPE;
 
 use crate::internal::prediction::Prediction;
 
@@ -16,50 +12,50 @@ use super::INPUT_CHUNK_DURATION_SEC;
 
 #[derive(Clone)]
 pub struct Classifier {
-    net: Arc<Mutex<Box<dyn ModuleT>>>,
+    // net: Arc<Mutex<Box<dyn ModuleT>>>,
 }
 
 impl Classifier {
     pub(crate) fn new() -> anyhow::Result<Self> {
-        let model_path = std::env::var("CLASSIFIER_MODEL_PATH").context("Getting model path")?;
-        let model_path =
-            std::path::PathBuf::from_str(&model_path).context("Validating model path")?;
+        // let model_path = std::env::var("CLASSIFIER_MODEL_PATH").context("Getting model path")?;
+        // let model_path =
+        //     std::path::PathBuf::from_str(&model_path).context("Validating model path")?;
+        //
+        // if !model_path.exists() {
+        //     bail!("Model path does not exists, path={}", model_path.display())
+        // }
+        //
+        // let network_name = std::env::var("CLASSIFIER_NETWORK_NAME")
+        //     .or_else(|_| {
+        //         model_path
+        //             .file_name()
+        //             .and_then(std::ffi::OsStr::to_str)
+        //             .and_then(|s| s.split('.').nth(1))
+        //             .map(|s| s.to_owned())
+        //             .ok_or_else(|| {
+        //                 anyhow!(
+        //                     "Failed to get the network name from the model name, model={}",
+        //                     model_path.display()
+        //                 )
+        //             })
+        //     })
+        //     .context("Getting network name")?;
 
-        if !model_path.exists() {
-            bail!("Model path does not exists, path={}", model_path.display())
-        }
+        // let network = match network_name.to_lowercase().as_str() {
+        //     "cnnpp" => Network::CnnPp,
+        //     _ => bail!("Unknown network name, name={}", network_name),
+        // };
 
-        let network_name = std::env::var("CLASSIFIER_NETWORK_NAME")
-            .or_else(|_| {
-                model_path
-                    .file_name()
-                    .and_then(std::ffi::OsStr::to_str)
-                    .and_then(|s| s.split('.').nth(1))
-                    .map(|s| s.to_owned())
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "Failed to get the network name from the model name, model={}",
-                            model_path.display()
-                        )
-                    })
-            })
-            .context("Getting network name")?;
-
-        let network = match network_name.to_lowercase().as_str() {
-            "cnnpp" => Network::CnnPp,
-            _ => bail!("Unknown network name, name={}", network_name),
-        };
-
-        let (vs, loaded) = network.create_varstore(&model_path);
-        loaded.context("Loading weights")?;
-
-        let net = Arc::new(Mutex::new(
-            Box::new(network.create_network(&vs.root())) as Box<dyn ModuleT>
-        ));
-        Ok(Self { net })
+        // let vs = network.create_varstore();
+        // // loaded.context("Loading weights")?;
+        //
+        // let net = Arc::new(Mutex::new(
+        //     Box::new(network.create_network(&vs.root())) as Box<dyn ModuleT>
+        // ));
+        Ok(Self { })
     }
 
-    fn prepare_tensor(data: &[u8]) -> anyhow::Result<Tensor> {
+    fn _prepare_tensor(data: &[u8]) -> anyhow::Result<Tensor> {
         let raw_data: mfcc::RawAudioData = ffmpeg_decode(data)?;
 
         if raw_data.len() < SAMPLE_RATE as usize * INPUT_CHUNK_DURATION_SEC {
@@ -75,7 +71,7 @@ impl Classifier {
             // Require standard memory layout to guarantee the correct slice.
             let image =
                 Tensor::try_from(m.as_standard_layout()).context("Converting ndarray to Tensor")?;
-            let image = image.transpose(1, 1).reshape(&IMAGE_TENSOR_SHAPE);
+            let image = image.transpose(1, 1).reshape(&[1, 39, 171]);
             images.i(idx as i64).copy_(&image);
         }
 
@@ -84,27 +80,29 @@ impl Classifier {
 
     pub async fn classify<S: Score>(
         &self,
-        data: &[u8],
-        score: S,
+        _data: &[u8],
+        _score: S,
     ) -> anyhow::Result<Vec<Prediction>> {
-        let images = Classifier::prepare_tensor(data)?;
-        let result = self.classify_tensor(&images).context("Classification")?;
-        Ok(score.calculate(&result))
+        // let images = Classifier::prepare_tensor(data)?;
+        // let result = self.classify_tensor(&images).context("Classification")?;
+        // Ok(score.calculate(&result))
+        Ok(vec![Prediction::default();10])
     }
 
-    fn classify_tensor(&self, images: &Tensor) -> anyhow::Result<Tensor> {
-        let labels = tch::Tensor::zeros(&[images.size()[0], 3], tch::kind::FLOAT_CPU);
-
-        let net = self.net.lock().unwrap();
-        for (idx, image) in images.split(1, 0).iter().enumerate() {
-            labels.i(idx as i64).copy_(
-                &net.forward_t(image, /*train=*/ false)
-                    .softmax(-1, tch::Kind::Float)
-                    .squeeze(),
-            );
-        }
-
-        Ok(labels)
+    fn _classify_tensor(&self, _images: &Tensor) -> anyhow::Result<Tensor> {
+        todo!()
+        // let labels = tch::Tensor::zeros(&[images.size()[0], 3], tch::kind::FLOAT_CPU);
+        //
+        // let net = self.net.lock().unwrap();
+        // for (idx, image) in images.split(1, 0).iter().enumerate() {
+        //     labels.i(idx as i64).copy_(
+        //         &net.forward_t(image, /*train=*/ false)
+        //             .softmax(-1, tch::Kind::Float)
+        //             .squeeze(),
+        //     );
+        // }
+        //
+        // Ok(labels)
     }
 }
 

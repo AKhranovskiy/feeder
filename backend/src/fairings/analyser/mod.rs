@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures::future::try_join;
 use futures::{StreamExt, TryFutureExt};
 use model::ContentKind;
@@ -33,6 +35,15 @@ impl fairing::Fairing for Analyser {
         let client = (*Storage::fetch(rocket).expect("Storage must be initialized.")).clone();
         let playbacks = client.playbacks();
 
+        let stream_cache: HashMap<String, String> = client
+            .streams()
+            .all()
+            .await
+            .expect("Streams collection is available")
+            .into_iter()
+            .map(|doc| (doc.id(), doc.name))
+            .collect();
+
         let mut segments = rocket
             .state::<RawSegmentRx>()
             .expect("RawSegment channel must be set up.")
@@ -55,14 +66,16 @@ impl fairing::Fairing for Analyser {
                         log::info!("Analyser shutting down");
                         break;
                     },
-                    else => break,
+                    else => {
+                        panic!("Analyser stops due to unexpected future result");
+                    },
                 };
 
                 let result = try_join(
                     analyse_tags(&packet.segment.content, &packet.segment.comment),
                     classifier.classify(&packet.segment.content, AveragePerSecondScore),
                 )
-                .and_then(|((tags, _), classification)| {
+                .and_then(|((tags, kind), classification)| {
                     let classification = classification.iter().map(|p| p.max()).collect();
 
                     let content_type = ContentType::parse_flexible(&packet.segment.content_type)
@@ -82,11 +95,12 @@ impl fairing::Fairing for Analyser {
                         classification,
                     );
                     log::info!(
-                        "New segment from {}: {} - {}, {:.02}s, {}",
-                        p.stream_id,
+                        "New segment from {}: {} - {}, {:.02}s, {} / {}",
+                        stream_cache.get(&p.stream_id).unwrap_or(&p.stream_id),
                         p.artist,
                         p.title,
                         p.duration.as_secs_f32(),
+                        kind.to_string(),
                         p.classification.iter().map(short_kind).collect::<String>()
                     );
                     playbacks.add(p)

@@ -18,7 +18,7 @@ pub fn prepare_for_browser(
 
 fn remux_aac(bytes: &[u8]) -> anyhow::Result<(ContentType, Vec<u8>)> {
     let ffmpeg_path = std::env::var("FFMPEG_PATH")?;
-    log::info!("FFMPEG_PATH: {}", ffmpeg_path);
+    log::debug!("FFMPEG_PATH: {}", ffmpeg_path);
 
     let args = "-i pipe: -vn -c copy -map_metadata 0 -movflags +faststart -f adts pipe:";
     log::debug!("FFMPEG ARGS: {args}");
@@ -27,6 +27,7 @@ fn remux_aac(bytes: &[u8]) -> anyhow::Result<(ContentType, Vec<u8>)> {
         .env("PATH", ffmpeg_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::null()) // Supress ffmpeg error output.
         .args(args.split_ascii_whitespace())
         .spawn()?;
 

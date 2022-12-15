@@ -1,8 +1,7 @@
 use tch::Tensor;
-use trainer::utils::Stats;
 
-use crate::internal::classification::INPUT_CHUNK_DURATION_SEC;
-use crate::internal::prediction::Prediction;
+use crate::prediction::Prediction;
+use crate::stat::Stats;
 
 pub trait Score {
     fn calculate(&self, prediction: &Tensor) -> Vec<Prediction>;
@@ -18,7 +17,7 @@ impl Score for AveragePerSecondScore {
         let n = probabilities.len();
         assert!(n > 0);
 
-        let padding = INPUT_CHUNK_DURATION_SEC - 1;
+        let padding = 4 - 1;
 
         (0..n + padding)
             .map(|sec| {

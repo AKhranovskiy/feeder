@@ -1,9 +1,13 @@
+#![allow(dead_code)]
+
 mod config;
+mod plot;
 mod train;
 
 use std::path::PathBuf;
 
 use clap::Parser;
+use plot::plot;
 use trainer::networks::Network;
 
 use crate::config::TrainingConfig;
@@ -13,24 +17,19 @@ use crate::train::train;
 #[clap(about = "Trains a network using given samples.")]
 pub struct Args {
     /// Network name.
-    #[clap(arg_enum, short, long)]
+    #[clap(value_enum, short, long)]
     network: Network,
 
-    /// Input weight file. Default "model.[NETWORK NAME].tch".
-    #[clap(value_parser, short, long)]
-    input_weights: Option<String>,
-
+    // /// Input weight file. Default "model.[NETWORK NAME].tch".
+    // #[clap(value_parser, short, long)]
+    // input_weights: Option<String>,
     /// Output weight file. Default "model.[NETWORK NAME].tch".
     #[clap(value_parser, short, long)]
-    output_weights: Option<String>,
+    output: Option<String>,
 
-    /// Data (bins) directory.
-    #[clap(short, long, value_parser, value_name = "DATA_DIR", default_value_t = String::from("./bins/"))]
-    data: String,
-
-    /// Number of samples for training, all samples by default.
-    #[clap(long, short)]
-    samples: Option<usize>,
+    /// MFCCs bin file.
+    #[clap(short, long, value_parser, value_name = "MFCCs bin")]
+    input: String,
 
     /// Test fraction, in percents (0..50).
     #[clap(short, long, default_value_t = 25, value_parser=clap::value_parser!(u8).range(0..50))]
@@ -50,18 +49,10 @@ impl From<&Args> for TrainingConfig {
         let default_weights_filename = format!("model.{:?}.tch", &args.network);
 
         Self {
-            input_weights_filename: PathBuf::from(
-                args.input_weights
-                    .as_ref()
-                    .unwrap_or(&default_weights_filename),
-            ),
             output_weights_filename: PathBuf::from(
-                args.output_weights
-                    .as_ref()
-                    .unwrap_or(&default_weights_filename),
+                args.output.as_ref().unwrap_or(&default_weights_filename),
             ),
-            data_directory: PathBuf::from(&args.data),
-            samples: args.samples,
+            input: PathBuf::from(&args.input),
             test_fraction: f64::from(args.test_fraction) / 100.0,
             epochs: args.epochs,
             dry_run: args.dry_run,

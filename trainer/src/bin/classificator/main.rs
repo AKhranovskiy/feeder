@@ -11,7 +11,6 @@ use mfcc::ffmpeg_decode;
 use ndarray::s;
 use tch::IndexOp;
 use trainer::networks::Network;
-use trainer::utils::data::IMAGE_TENSOR_SHAPE;
 use trainer::utils::Stats;
 
 use crate::classify::classify;
@@ -20,7 +19,7 @@ use crate::classify::classify;
 #[clap(about = "Classify an audio segment.")]
 struct Args {
     /// Network name.
-    #[clap(arg_enum, short, long)]
+    #[clap(value_enum, short, long)]
     network: Network,
 
     /// Input weight file. Default "model.[NETWORK NAME].tch".
@@ -69,8 +68,7 @@ fn main() -> anyhow::Result<()> {
 
     let images = tch::Tensor::zeros(&[mfccs.len() as i64, 1, 39, 171], tch::kind::FLOAT_CPU);
     for (idx, m) in mfccs.iter().enumerate() {
-        let image =
-            tch::Tensor::try_from(m).map(|t| t.transpose(0, 1).reshape(&IMAGE_TENSOR_SHAPE))?;
+        let image = tch::Tensor::try_from(m).map(|t| t.transpose(0, 1).reshape(&[1, 39, 171]))?;
         images.i(idx as i64).copy_(&image);
     }
 

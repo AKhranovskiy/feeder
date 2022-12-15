@@ -54,7 +54,9 @@ pub(crate) async fn start_worker(
                     log::info!(target: TARGET, "shutting down");
                     break;
                 },
-                else => break,
+                else => {
+                    panic!("Worker stopped due to unexpected feature result.");
+                }
             };
         }
     });

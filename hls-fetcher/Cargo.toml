@@ -5,10 +5,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.65"
+anyhow = "1.0.66"
 async-stream = "0.3.3"
-async-trait = "0.1.57"
-futures = "0.3.24"
+async-trait = "0.1.59"
+futures = "0.3.25"
 hls_m3u8 = "0.4.1"
-tokio = { version = "1.21.1", features = ["rt", "macros"] }
+tokio = { version = "1.23.0", features = ["rt", "macros"] }
 ureq = "2.5.0"

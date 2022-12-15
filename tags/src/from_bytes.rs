@@ -22,7 +22,7 @@ impl TryFrom<&[u8]> for Tags {
         let tagged_file = Probe::new(Cursor::new(bytes))
             .guess_file_type()
             .context("guessing file type")?
-            .read(false)
+            .read()
             .context("reading tags");
 
         if let Err(e) = tagged_file {
