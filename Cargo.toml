@@ -1,19 +1,27 @@
 [workspace]
 
 members = [
-"backend",
-"classificator",
-"emysound",
-"hls-fetcher",
-"mfcc",
-"model",
-"tag_analyser",
-"tags",
-"trainer"
+"unstreamer",
+# "backend",
+# "classificator",
+# "emysound",
+# "hls-fetcher",
+# "mfcc",
+# "model",
+# "tag_analyser",
+# "tags",
+# "trainer"
 ]
 
-exclude = ["audio-importer"]
+# exclude = ["audio-importer"]
 
 [workspace.dependencies]
-tch = { git = "https://github.com/LaurentMazare/tch-rs.git", branch = "main" }
+anyhow = "1.0.66"
+clap = { version = "4.0.29", features = ["derive"] }
+flume = { version = "0.10.14", default-features = false }
+hls_m3u8 = "0.4.1"
+mime = "0.3.16"
+ureq = "2.5.0"
+url = "2.3.1"
+# tch = { git = "https://github.com/LaurentMazare/tch-rs.git", branch = "main" }
 

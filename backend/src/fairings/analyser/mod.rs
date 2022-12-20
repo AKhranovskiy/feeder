@@ -114,7 +114,7 @@ impl fairing::Fairing for Analyser {
     }
 }
 
-fn short_kind((kind, _): &(ContentKind, f32)) -> char {
+fn _short_kind((kind, _): &(ContentKind, f32)) -> char {
     kind.to_string()
         .chars()
         .next()
