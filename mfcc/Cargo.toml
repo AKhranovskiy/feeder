@@ -1,16 +1,23 @@
 [package]
 name = "mfcc"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = { workspace = true }
 aubio = { version = "0.2.1", features = ["pkg-config"] }
 bytemuck = "1.12.3"
-colorgrad = "0.6.2"
-itertools = "0.10.5"
-ndarray = { version = "0.15.6", features = ["rayon"] }
-ordered-float = "3.4.0"
-plotters = "0.3.4"
-rayon = "1.6.1"
+clap = { workspace = true }
+codec = { path = "../codec" }
+futures = { version = "0.3.25", optional = true }
+ndarray = { version = "0.15.6", features = ["serde"] }
+rayon = { version = "1.6.1" }
+serde = "1.0.151"
+serde-pickle = "1.1.1"
+tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"], optional = true }
+
+[features]
+async = ["dep:futures", "dep:tokio"]
+parallel = []
+default = ["parallel"]

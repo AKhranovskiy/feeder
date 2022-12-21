@@ -4,8 +4,7 @@ Cargo.lock
 *.bin
 *.7z
 *.tch
+*.pickle
 fleet.toml
 classificator/plots
 classificator/audio
-classificator/mfccs.pickle
-classificator/data.pickle

@@ -1,12 +1,13 @@
 [workspace]
 
 members = [
+"codec",
+"mfcc",
 "unstreamer",
 # "backend",
 # "classificator",
 # "emysound",
 # "hls-fetcher",
-# "mfcc",
 # "model",
 # "tag_analyser",
 # "tags",
