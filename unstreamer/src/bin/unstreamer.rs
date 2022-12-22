@@ -12,11 +12,11 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let mut unstreamer = Unstreamer::open(Args::parse().source)?;
     loop {
-        let mut buf = vec![];
-        if unstreamer.read_to_end(&mut buf)? > 0 {
-            let mut stdout = std::io::stdout().lock();
-            stdout.write_all(&buf)?;
-            stdout.flush()?;
+        let mut buf = [0u8;2048];
+        let read = unstreamer.read(&mut buf)?;
+        if read > 0 {
+            std::io::stdout().write_all(&buf[0..read])?;
+            std::io::stdout().flush()?;
         } else {
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
