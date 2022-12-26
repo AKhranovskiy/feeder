@@ -8,3 +8,4 @@ Cargo.lock
 fleet.toml
 classificator/plots
 classificator/audio
+mongodb2sqlite/exported.sqlite

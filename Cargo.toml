@@ -9,9 +9,9 @@ members = [
 "mfcc",
 "tags",
 "unstreamer",
+"mongodb2sqlite"
 ]
 
-exclude = ["backend"]
 
 [workspace.dependencies]
 ac-ffmpeg = "0.17.4"
