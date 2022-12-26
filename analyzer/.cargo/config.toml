@@ -1,0 +1,4 @@
+[env]
+FFMPEG_INCLUDE_DIR="/usr/include/x86_64-linux-gnu/"
+FFMPEG_LIB_DIR="/usr/lib/x86_64-linux-gnu/"
+

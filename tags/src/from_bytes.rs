@@ -75,6 +75,8 @@ fn tag_key(tag: &TagItem) -> anyhow::Result<String> {
         ItemKey::TrackNumber => "TrackNumber",
         ItemKey::TrackTitle => "TrackTitle",
         ItemKey::TrackTotal => "TrackTotal",
+        ItemKey::EncodedBy => "EncodedBy",
+        ItemKey::Year => "Year",
         ItemKey::Unknown(v) => v.as_str(),
         not_supported => bail!("Not supported tag: key={not_supported:?}"),
     };

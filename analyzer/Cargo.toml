@@ -1,6 +1,6 @@
 [package]
-name = "codec"
-version = "0.1.0"
+name = "analyzer"
+version = "0.2.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -8,3 +8,11 @@ edition = "2021"
 ac-ffmpeg = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+ndarray = { workspace = true }
+ndarray-stats = { workspace = true }
+
+[dependencies.classifier]
+path = "../classifier"
+
+[dependencies.mfcc]
+path = "../mfcc"

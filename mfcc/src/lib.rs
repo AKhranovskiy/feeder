@@ -6,13 +6,13 @@ mod util;
 
 #[allow(dead_code)]
 pub struct Config {
-    sample_rate_hz: usize,
-    num_coefficients: usize,
-    frame_size: usize,
-    hop_length: usize,
-    filters: usize,
-    deltas: bool,
-    extend_tail: bool,
+    pub sample_rate_hz: usize,
+    pub num_coefficients: usize,
+    pub frame_size: usize,
+    pub hop_length: usize,
+    pub filters: usize,
+    pub deltas: bool,
+    pub extend_tail: bool,
 }
 
 impl Default for Config {

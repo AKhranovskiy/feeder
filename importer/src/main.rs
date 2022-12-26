@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Error, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use futures::future::try_join_all;
 use futures::TryFutureExt;
 use kdam::{tqdm, BarExt};
 use mongodb::bson::{doc, DateTime, Uuid};
 use mongodb::options::ClientOptions;
 use mongodb::{Client, Database};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tags::Tags;
 use tokio::sync::Mutex;
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
 
     try_join_all(files.into_iter().map(|path| {
         let pb = pb.clone();
-        insert(db.clone(), path, args.dry_run).and_then(|_| async move {
+        insert(db.clone(), path, &args).and_then(|_| async move {
             pb.lock().await.update(1);
             Ok(())
         })
@@ -54,12 +54,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn insert(db: Database, path: PathBuf, dry_run: bool) -> Result<()> {
+async fn insert(db: Database, path: PathBuf, args: &Args) -> Result<()> {
     let audio_doc = AudioDocument::try_from(&path)?;
-    let metadata_doc = MetadataDocument::try_from(&audio_doc)?;
+    let metadata_doc = {
+        let mut doc = MetadataDocument::try_from(&audio_doc)?;
+        doc.kind = args.kind.clone();
+        doc
+    };
 
-    if dry_run {
-        sleep(Duration::from_secs(1)).await;
+    if args.dry_run {
+        println!("Inserting {:?} {}", args.kind, path.display());
+        sleep(Duration::from_millis(300)).await;
     } else {
         db.collection("audio").insert_one(audio_doc, None).await?;
         db.collection("metadata")
@@ -95,7 +100,7 @@ impl TryFrom<&PathBuf> for AudioDocument {
 pub struct MetadataDocument {
     pub id: Uuid,
     pub date_time: DateTime,
-    pub kind: String,
+    pub kind: ContentKind,
     pub artist: String,
     pub title: String,
     // Must be BTreeMap because it is stored in DB.
@@ -112,7 +117,7 @@ impl TryFrom<&AudioDocument> for MetadataDocument {
         Ok(Self {
             id: doc.id,
             date_time: DateTime::now(),
-            kind: "Talk".into(),
+            kind: ContentKind::Advertisement,
             artist: tags.track_artist_or_empty(),
             title: tags.track_title_or_empty(),
             tags: tags.into(),
@@ -146,4 +151,14 @@ struct Args {
     dry_run: bool,
 
     source: PathBuf,
+
+    #[arg(value_enum)]
+    kind: ContentKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ValueEnum)]
+pub enum ContentKind {
+    Advertisement,
+    Music,
+    Talk,
 }

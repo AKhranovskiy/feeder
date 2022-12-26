@@ -1,9 +1,0 @@
-[env]
-FFMPEG_PATH = "../ffmpeg/linux"
-LIBTORCH = "/opt/libtorch1.13.0"
-
-
-[build]
-# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-# rustc-wrapper = "/home/andrey/.cargo/bin/sccache"
-# incremental = false

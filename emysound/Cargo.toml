@@ -5,15 +5,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = { workspace = true }
 log = "0.4.17"
 mime = "0.3.16"
 multipart = { version = "0.18.0", default-features = false, features = ["client"] }
-serde = { version = "1.0.150", features = ["derive"] }
-serde_json = "1.0.89"
-ureq = { version = "2.5.0", default-features = false, features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0.91"
+ureq = { workspace = true, features = ["json"] }
 url = "2.3.1"
 uuid = { version = "1.2.2", features = ["v4"] }
 
 [dev-dependencies]
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { workspace = true }

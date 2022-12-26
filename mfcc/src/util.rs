@@ -13,7 +13,10 @@ pub(crate) fn stepped_windows(width: usize, window: usize, step: usize) -> (usiz
     let tail = steps.fract() * step as f32;
     assert!(tail.fract() < 1e6);
 
-    (steps.trunc() as usize + 1, (step - tail.trunc() as usize) % step)
+    (
+        steps.trunc() as usize + 1,
+        (step - tail.trunc() as usize) % step,
+    )
 }
 
 #[inline(always)]

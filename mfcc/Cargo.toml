@@ -7,15 +7,17 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 aubio = { version = "0.2.1", features = ["pkg-config"] }
-bytemuck = "1.12.3"
+bytemuck = { workspace = true }
 clap = { workspace = true }
-codec = { path = "../codec" }
 futures = { version = "0.3.25", optional = true }
-ndarray = { version = "0.15.6", features = ["serde"] }
+ndarray = { workspace = true, features = ["serde"] }
 rayon = { version = "1.6.1" }
-serde = "1.0.151"
-serde-pickle = "1.1.1"
+serde = { workspace = true }
+serde-pickle = { workspace = true }
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"], optional = true }
+
+[dependencies.codec]
+path = "../codec"
 
 [features]
 async = ["dep:futures", "dep:tokio"]
