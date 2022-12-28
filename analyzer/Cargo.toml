@@ -8,11 +8,7 @@ edition = "2021"
 ac-ffmpeg = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+classifier = { workspace = true }
+mfcc = { workspace = true }
 ndarray = { workspace = true }
 ndarray-stats = { workspace = true }
-
-[dependencies.classifier]
-path = "../classifier"
-
-[dependencies.mfcc]
-path = "../mfcc"

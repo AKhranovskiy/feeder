@@ -5,18 +5,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow ={ workspace = true }
-async-stream = "0.3.3"
-futures = "0.3.25"
-humansize = { version = "2.1.2", features = ["impl_style"] }
-kdam = "0.3.0"
-mongodb = { version = "2.3.1", features = [
-    "bson-uuid-0_8",
-    "bson-chrono-0_4",
-] }
-rusqlite = { version = "0.28.0", features = ["bundled", "blob", "i128_blob", "time"] }
-serde = { workspace = true, features = ["derive"] }
-serde_with = "2.1.0"
-time = "0.3.17"
-tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread"] }
-ulid = "1.0.0"
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+futures = { workspace = true }
+humansize = { workspace = true }
+kdam = { workspace = true }
+mongodb ={ workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+ulid = { workspace = true }

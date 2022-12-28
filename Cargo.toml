@@ -5,25 +5,55 @@ members = [
 "classifier",
 "codec",
 "emysound",
-"importer",
+"hls-fetcher",
 "mfcc",
-"mongodb2sqlite"
-,
+"model",
+"mongodb2sqlite",
+"tag_analyser",
 "tags",
 "unstreamer"]
 
 [workspace.dependencies]
 ac-ffmpeg = "0.17.4"
 anyhow = "1.0.68"
+async-stream = "0.3.3"
+async-trait = "0.1.59"
+aubio = { version = "0.2.1", features = ["pkg-config"] }
+bson = "2.4.0"
 bytemuck = "1.12.3"
-clap = { version = "4.0.30", features = ["derive"] }
+clap = { version = "4.0.32", features = ["derive"] }
 flume = { version = "0.10.14", default-features = false }
+futures = { version = "0.3.25" }
 hls_m3u8 = "0.4.1"
+humansize = { version = "2.1.2", features = ["impl_style"] }
+itertools = "0.10.5"
+kdam = "0.3.0"
+lazy_static = "1.4.0"
+lofty = "0.10.0"
+log = "0.4.17"
 mime = "0.3.16"
+mongodb = { version = "2.3.1", features = ["bson-uuid-0_8", "bson-chrono-0_4"] }
+multipart = { version = "0.18.0", default-features = false, features = ["client"] }
+ndarray = { version = "0.15.6", features = ["serde"] }
 ndarray-stats = "0.5.1"
-ndarray = "0.15.6"
-serde = "1.0.151"
+numpy = "0.17.2"
+pyo3 = { version = "0.17.3", features = ["auto-initialize"] }
+rayon = { version = "1.6.1" }
+regex = "1.7.0"
+rusqlite = { version = "0.28.0", features = ["bundled", "blob", "i128_blob", "time"] }
+serde = { version = "1.0.152", features = ["derive"] }
 serde-pickle = "1.1.1"
-ureq = "2.5.0"
+serde_json = "1.0.91"
+serde_with = "2.1.0"
+time = "0.3.17"
+tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"] }
+ulid = "1.0.0"
+ureq = { version = "2.5.0", features = ["json"] }
 url = "2.3.1"
+uuid = { version = "1.2.2", features = ["v4", "serde"] }
 
+classifier = { version = "*", path = "./classifier" }
+codec = { version = "*", path = "./codec" }
+mfcc = { version = "*", path = "../mfcc" }
+model = { version = "*", path = "./model" }
+tags = { version = "*", path = "./tags" }

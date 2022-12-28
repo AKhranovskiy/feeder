@@ -9,6 +9,5 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 flume = { workspace = true }
 hls_m3u8 = { workspace = true }
-mime = { workspace = true }
 ureq = { workspace = true }
 url = { workspace = true }

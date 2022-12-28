@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use anyhow::{bail, Context};
-use lofty::{ItemKey, ItemValue, Probe, TagItem};
+use lofty::{ItemKey, ItemValue, Probe, TagItem, TaggedFileExt};
 
 use crate::Tags;
 
