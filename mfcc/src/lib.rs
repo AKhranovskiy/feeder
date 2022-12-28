@@ -31,7 +31,7 @@ impl Default for Config {
     }
 }
 
-pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray::Array2<f32>> {
+pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray::Array2<f64>> {
     // let (_, tail) = stepped_windows(input.len(), config.frame_size, config.hop_length);
     // let input = if tail != 0 {
     //     let mut v = input.to_vec();
@@ -61,6 +61,8 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray:
 
         output.extend_from_slice(&mfccs);
     }
+
+    let output = output.into_iter().map(f64::from).collect();
 
     let output = ndarray::Array2::from_shape_vec((segments, config.num_coefficients), output)?;
     Ok(output)

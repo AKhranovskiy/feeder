@@ -2,7 +2,6 @@
 name = "audio-importer"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -13,6 +12,6 @@ kdam = "0.2.7"
 mongodb = "2.3.1"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_with = "2.0.1"
-tags = {version = "*", path="../tags"}
+tags = { version = "*", path = "../tags" }
 tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
 uuid = { version = "1.2.1", features = ["v4"] }

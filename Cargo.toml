@@ -7,11 +7,10 @@ members = [
 "emysound",
 "importer",
 "mfcc",
-"tags",
-"unstreamer",
 "mongodb2sqlite"
-]
-
+,
+"tags",
+"unstreamer"]
 
 [workspace.dependencies]
 ac-ffmpeg = "0.17.4"

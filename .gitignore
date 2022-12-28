@@ -9,3 +9,5 @@ fleet.toml
 classificator/plots
 classificator/audio
 mongodb2sqlite/exported.sqlite
+analyzer/model
+classifier/model/

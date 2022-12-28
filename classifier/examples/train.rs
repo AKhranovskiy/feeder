@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ndarray::Axis;
+use ndarray::{s, Axis};
 
 use classifier::{verify, Classifier};
 
@@ -9,6 +9,8 @@ fn main() -> anyhow::Result<()> {
     let (data, labels) = prepare_data("./data.pickle")?;
 
     println!("Loaded {} images", labels.len());
+
+    println!("data={:?} labels={:?}", data.shape(), labels.shape());
 
     let mut classifier = Classifier::new()?;
     classifier.train(&data, &labels)?;
@@ -46,21 +48,18 @@ where
     let f = std::fs::File::open(source)?;
     let reader = std::io::BufReader::new(f);
 
-    let data: Vec<Vec<f64>> = serde_pickle::from_reader(reader, Default::default())?;
-    assert_eq!(2, data.len());
+    let data: ndarray::Array3<f64> = serde_pickle::from_reader(reader, Default::default())?;
+    assert_eq!(3, data.shape()[0]);
+    assert_eq!(39, data.shape()[2]);
 
-    let min_len = data.iter().map(Vec::len).min().unwrap();
-    let min_len = min_len - (min_len % (150 * 39));
-    assert_eq!(0, min_len % (150 * 39));
+    let min_len = data.shape()[1];
+    let min_len = min_len - (min_len % 150);
+    assert_eq!(0, min_len % 150);
 
-    let data = data
-        .into_iter()
-        .flat_map(|v| v.into_iter().take(min_len))
-        .collect::<Vec<_>>();
+    let data = data.slice(s![0..2, 0..min_len, ..]).into_owned();
 
-    let number_of_images = data.len() / (150 * 39);
-
-    let data = ndarray::Array4::from_shape_vec((number_of_images, 150, 39, 1), data)?;
+    let number_of_images = (2 * min_len) / 150;
+    let data = data.into_shape((number_of_images, 150, 39, 1))?;
 
     let labels = ndarray::concatenate![
         ndarray::Axis(0),

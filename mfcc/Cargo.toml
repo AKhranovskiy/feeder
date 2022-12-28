@@ -9,9 +9,12 @@ anyhow = { workspace = true }
 aubio = { version = "0.2.1", features = ["pkg-config"] }
 bytemuck = { workspace = true }
 clap = { workspace = true }
+flume = { workspace = true }
 futures = { version = "0.3.25", optional = true }
+kdam = "0.3.0"
 ndarray = { workspace = true, features = ["serde"] }
 rayon = { version = "1.6.1" }
+rusqlite = { version = "0.28.0", features = ["bundled", "blob", "i128_blob", "time"] }
 serde = { workspace = true }
 serde-pickle = { workspace = true }
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"], optional = true }
