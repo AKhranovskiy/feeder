@@ -9,6 +9,7 @@ members = [
 "mfcc",
 "model",
 "mongodb2sqlite",
+"ndarray-shuffle",
 "tag_analyser",
 "tags",
 "unstreamer"]
@@ -17,11 +18,12 @@ members = [
 ac-ffmpeg = "0.17.4"
 anyhow = "1.0.68"
 async-stream = "0.3.3"
-async-trait = "0.1.59"
+async-trait = "0.1.60"
 aubio = { version = "0.2.1", features = ["pkg-config"] }
 bson = "2.4.0"
 bytemuck = "1.12.3"
 clap = { version = "4.0.32", features = ["derive"] }
+criterion = "0.4.0"
 flume = { version = "0.10.14", default-features = false }
 futures = { version = "0.3.25" }
 hls_m3u8 = "0.4.1"
@@ -38,6 +40,7 @@ ndarray = { version = "0.15.6", features = ["serde"] }
 ndarray-stats = "0.5.1"
 numpy = "0.17.2"
 pyo3 = { version = "0.17.3", features = ["auto-initialize"] }
+rand = { version = "0.8.5", features = ["small_rng", "simd_support"] }
 rayon = { version = "1.6.1" }
 regex = "1.7.0"
 rusqlite = { version = "0.28.0", features = ["bundled", "blob", "i128_blob", "time"] }
@@ -45,6 +48,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 serde-pickle = "1.1.1"
 serde_json = "1.0.91"
 serde_with = "2.1.0"
+thiserror = "1.0.38"
 time = "0.3.17"
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"] }
 ulid = "1.0.0"
@@ -54,6 +58,6 @@ uuid = { version = "1.2.2", features = ["v4", "serde"] }
 
 classifier = { version = "*", path = "./classifier" }
 codec = { version = "*", path = "./codec" }
-mfcc = { version = "*", path = "../mfcc" }
+mfcc = { version = "*", path = "./mfcc" }
 model = { version = "*", path = "./model" }
 tags = { version = "*", path = "./tags" }

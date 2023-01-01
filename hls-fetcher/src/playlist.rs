@@ -60,7 +60,7 @@ pub fn make_media_playlist(
                         n,
                         ExtInf::with_title(
                             Duration::from_secs(7),
-                            format!("Title for segment {}", n),
+                            format!("Title for segment {n}"),
                         ),
                     )
                 })

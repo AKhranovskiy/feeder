@@ -3,6 +3,9 @@ use std::path::Path;
 use ndarray::{s, Axis};
 
 use classifier::{verify, Classifier};
+use ndarray_shuffle::NdArrayShuffleInplaceExt;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
 fn main() -> anyhow::Result<()> {
     println!("Loading data...");
@@ -59,14 +62,17 @@ where
     let data = data.slice(s![0..2, 0..min_len, ..]).into_owned();
 
     let number_of_images = (2 * min_len) / 150;
-    let data = data.into_shape((number_of_images, 150, 39, 1))?;
+    let mut data = data.into_shape((number_of_images, 150, 39, 1))?;
 
-    let labels = ndarray::concatenate![
+    let mut labels = ndarray::concatenate![
         ndarray::Axis(0),
         ndarray::Array1::from_elem((number_of_images / 2,), 0),
         ndarray::Array1::from_elem((number_of_images / 2,), 1),
         // ndarray::Array1::from_elem((number_of_images / 3,), 2)
     ];
+
+    data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
+    labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
 
     Ok((data, labels))
 }
