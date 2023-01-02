@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdBanda</title>
+    <!--
+    <link rel="stylesheet" href="./style.css">
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    -->
+  </head>
+  <body>
+    <main>
+      <section>
+        <form onsubmit="return false">
+          <label for="stream_uri">Stream URL (audio or HLS):&nbsp;</label>
+          <input type="url" id="stream_uri" name="stream_uri" size=100
+            onchange="encode_stream_uri()"
+          />
+          <br />
+          <label for="ads_lang">Advertisement replacement:&nbsp;&nbsp;</label>
+          <select name="ads_action" id="ads_action"
+            onchange="encode_stream_uri()"
+          >
+            <option value="passthrough">Passthrough</option>
+            <option value="silence" selected>Silence</option>
+            <option value="en">English</option>
+            <option value="nl">Dutch</option>
+            <option value="ru">Russian</option>
+          </select>
+        </form>
+      </section>
+      <section>
+        <a id="encoded_stream_uri"></a>
+      </section>
+    </main>
+
+    <script type="application/javascript">
+        function encode_stream_uri() {
+            const data = new FormData(document.querySelector("form"));
+            const uri = data.get("stream_uri");
+            const action = data.get("ads_action");
+            try {
+                const encoded = encodeURI(new URL(uri));
+                const base = new URL(window.location.protocol + "//" + window.location.host);
+                const searchParams = new URLSearchParams({"url": encoded, "action": action});
+                const full = new URL('play?' + searchParams.toString(), base);
+                document.querySelector('a#encoded_stream_uri').href = full;
+                document.querySelector('a#encoded_stream_uri').text = full;
+            } catch(error) {}
+        }
+    </script>
+  </body>
+</html>
+

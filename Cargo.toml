@@ -11,6 +11,7 @@ members = [
 "ndarray-shuffle",
 "tag_analyser",
 "tags",
+"restreamer",
 "unstreamer"]
 
 exclude = ["mongodb2sqlite"]
@@ -54,7 +55,7 @@ time = "0.3.17"
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread", "fs"] }
 ulid = "1.0.0"
 ureq = { version = "2.5.0", features = ["json"] }
-url = "2.3.1"
+url = { version = "2.3.1", features = ["serde"] }
 uuid = { version = "1.2.2", features = ["v4", "serde"] }
 
 classifier = { version = "*", path = "./classifier" }
