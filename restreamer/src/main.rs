@@ -1,10 +1,13 @@
-use std::io;
+use std::io::{self, Read};
 
+use async_stream::stream;
+use axum::body::StreamBody;
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, get_service};
 use axum::{Router, Server};
+use futures::Stream;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use tower_http::services::ServeDir;
@@ -27,12 +30,18 @@ async fn handle_error(_err: io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }
 
-async fn play(Query(params): Query<PlayParams>) -> String {
-    format!(
-        "{:?} {}",
-        params.action.unwrap_or(PlayAction::Passthrough),
-        params.url.as_str()
-    )
+async fn play(
+    Query(params): Query<PlayParams>,
+) -> StreamBody<impl Stream<Item = anyhow::Result<Vec<u8>>>> {
+    stream! {
+        let mut input = unstreamer::Unstreamer::open(params.url)?;
+        loop {
+            let mut buf = [0u8;1024];
+            let read = input.read(&mut buf)?;
+            yield Ok(buf[0..read].to_vec())
+        }
+    }
+    .into()
 }
 
 #[derive(Debug, Deserialize)]

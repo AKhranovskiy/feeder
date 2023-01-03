@@ -8,7 +8,7 @@ use url::Url;
 static MIME_AUDIO: &str = "audio/";
 
 #[non_exhaustive]
-pub struct Unstreamer(Box<dyn Read>);
+pub struct Unstreamer(Box<dyn Read + Send>);
 
 impl Unstreamer {
     pub fn open(source: Url) -> anyhow::Result<Unstreamer> {

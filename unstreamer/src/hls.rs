@@ -19,7 +19,7 @@ pub(crate) struct HLSUnstreamer {
 }
 
 impl HLSUnstreamer {
-    pub(crate) fn open(source: Url) -> anyhow::Result<Box<dyn Read>> {
+    pub(crate) fn open(source: Url) -> anyhow::Result<Box<dyn Read + Send>> {
         let resp = ureq::get(source.as_ref()).call()?;
 
         ensure!(
