@@ -11,7 +11,6 @@ use ac_ffmpeg::{
         demuxer::Demuxer,
         io::IO,
         muxer::{Muxer, OutputFormat},
-        stream::Stream,
     },
 };
 use anyhow::anyhow;
@@ -93,35 +92,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-fn _print_info(stream: &Stream) {
-    let codec = stream.codec_parameters();
-    let codec = codec.as_audio_codec_parameters().unwrap();
-
-    println!(
-        r#"
-        Stream info
-            Start time: {:?}
-            Duration: {:?}
-            Frames: {:?}
-
-            Codec
-                decoder name: {}
-                bit rate: {}kbps
-                sample rate: {}Hz
-                sample format: {}
-                channels: {:?}
-            "#,
-        stream.start_time(),
-        stream.duration(),
-        stream.frames(),
-        codec.decoder_name().unwrap_or("unknown"),
-        codec.bit_rate() / 1_000,
-        codec.sample_rate(),
-        codec.sample_format().name(),
-        codec.channel_layout().channels()
-    );
 }
 
 struct BufferedAnalyzer {

@@ -1,27 +1,21 @@
 use std::io::{Read, Seek};
 use std::str::FromStr;
 
-use ac_ffmpeg::codec::audio::{AudioDecoder, AudioResampler, ChannelLayout, SampleFormat};
-use ac_ffmpeg::codec::Decoder;
-use ac_ffmpeg::format::demuxer::Demuxer;
-use ac_ffmpeg::format::io::IO;
+use ac_ffmpeg::codec::audio::{AudioResampler, ChannelLayout, SampleFormat};
 use bytemuck::cast_slice;
+
+mod demuxer;
+pub use demuxer::Demuxer;
+
+mod decoder;
+pub use decoder::Decoder;
 
 pub fn decode<RS>(input: RS) -> anyhow::Result<Vec<i16>>
 where
     RS: Read + Seek,
 {
-    let io = IO::from_seekable_read_stream(input);
-
-    let mut demuxer = Demuxer::builder()
-        .build(io)?
-        .find_stream_info(None)
-        .map_err(|(_, err)| err)?;
-
-    let mut decoder = AudioDecoder::from_stream(&demuxer.streams()[0])?.build()?;
-
-    let codec = demuxer.streams()[0].codec_parameters();
-    let params = codec.as_audio_codec_parameters().unwrap();
+    let decoder = Decoder::try_from(input)?;
+    let params = decoder.audio_codec_parameters().unwrap();
 
     let mut resampler = AudioResampler::builder()
         .source_sample_rate(params.sample_rate())
@@ -34,26 +28,15 @@ where
 
     let mut output = vec![];
 
-    while let Some(packet) = demuxer.take()? {
-        decoder.push(packet)?;
-        while let Some(frame) = decoder.take()? {
-            resampler.push(frame)?;
-            while let Some(frame) = resampler.take()? {
-                output.extend_from_slice(frame.planes()[0].data());
-            }
-        }
-    }
-
-    decoder.flush()?;
-
-    while let Some(frame) = decoder.take()? {
-        resampler.push(frame)?;
+    for frame in decoder {
+        resampler.push(frame?)?;
         while let Some(frame) = resampler.take()? {
             output.extend_from_slice(frame.planes()[0].data());
         }
     }
 
     resampler.flush()?;
+
     while let Some(frame) = resampler.take()? {
         output.extend_from_slice(frame.planes()[0].data());
     }
