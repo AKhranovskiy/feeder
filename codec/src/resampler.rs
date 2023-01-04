@@ -4,6 +4,8 @@ pub use ac_ffmpeg::codec::audio::AudioFrame;
 use ac_ffmpeg::codec::audio::{AudioResampler, ChannelLayout, SampleFormat as AcSampleFormat};
 use ac_ffmpeg::codec::AudioCodecParameters;
 
+use crate::Decoder;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SampleFormat {
     S16,
@@ -93,7 +95,7 @@ impl Resampler {
     }
 }
 
-impl Iterator for &mut Resampler {
+impl Iterator for Resampler {
     type Item = anyhow::Result<AudioFrame>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -104,5 +106,42 @@ impl Iterator for &mut Resampler {
                 .and_then(|_| self.0.take().map_err(Into::into))
                 .transpose()
         })
+    }
+}
+
+pub struct ResamplingDecoder<T> {
+    decoder: Decoder<T>,
+    resampler: Resampler,
+}
+
+impl<T> ResamplingDecoder<T> {
+    pub(crate) fn new(decoder: Decoder<T>, target: CodecParams) -> Self {
+        let source = decoder.codec_parameters().into();
+        let resampler = Resampler::new(source, target);
+        Self { decoder, resampler }
+    }
+}
+
+impl<T> Iterator for ResamplingDecoder<T> {
+    type Item = anyhow::Result<AudioFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Is there anything in resampler?
+        match self.resampler.next() {
+            Some(Ok(frame)) => return Some(Ok(frame)),
+            Some(Err(error)) => return Some(Err(error)),
+            None => {}
+        };
+
+        match self.decoder.next() {
+            Some(Ok(frame)) => match self.resampler.push(frame) {
+                Ok(_) => return self.resampler.next(),
+                Err(error) => return Some(Err(error)),
+            },
+            Some(Err(error)) => return Some(Err(error)),
+            None => {}
+        }
+
+        None
     }
 }

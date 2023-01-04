@@ -3,6 +3,7 @@ use std::io::{Read, Seek};
 use ac_ffmpeg::codec::audio::{AudioDecoder, AudioFrame};
 use ac_ffmpeg::codec::{AudioCodecParameters, Decoder as AcDecoder};
 
+use crate::resampler::{CodecParams, ResamplingDecoder};
 use crate::Demuxer;
 
 #[non_exhaustive]
@@ -17,12 +18,17 @@ impl<RS: Read + Seek> Decoder<RS> {
     }
 }
 impl<T> Decoder<T> {
-    pub(crate) fn audio_codec_parameters(&self) -> Option<AudioCodecParameters> {
+    pub(crate) fn codec_parameters(&self) -> AudioCodecParameters {
         self.demuxer
             .stream()
             .codec_parameters()
             .as_audio_codec_parameters()
             .cloned()
+            .unwrap()
+    }
+
+    pub fn resample(self, target: CodecParams) -> ResamplingDecoder<T> {
+        ResamplingDecoder::new(self, target)
     }
 }
 
