@@ -8,3 +8,4 @@ edition = "2021"
 ac-ffmpeg = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+derive_builder = { version = "0.12.0", features = ["clippy"] }

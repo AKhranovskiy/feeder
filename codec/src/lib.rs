@@ -8,10 +8,16 @@ pub use demuxer::Demuxer;
 mod decoder;
 pub use decoder::Decoder;
 
+mod encoder;
+pub use encoder::Encoder;
+
 mod resampler;
-pub use resampler::{CodecParams, Resampler, ResamplingDecoder, SampleFormat};
+pub use resampler::SampleFormat;
+pub use resampler::{CodecParams, CodecParamsBuilder};
+pub use resampler::{Resampler, ResamplingDecoder};
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
+pub use ac_ffmpeg::packet::Packet;
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<RS, Sample>(input: RS, target: CodecParams) -> anyhow::Result<Vec<Sample>>

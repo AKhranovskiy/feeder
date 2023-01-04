@@ -3,6 +3,7 @@ use std::str::FromStr;
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 use ac_ffmpeg::codec::audio::{AudioResampler, ChannelLayout, SampleFormat as AcSampleFormat};
 use ac_ffmpeg::codec::AudioCodecParameters;
+use derive_builder::Builder;
 
 use crate::Decoder;
 
@@ -34,10 +35,16 @@ impl From<AcSampleFormat> for SampleFormat {
     }
 }
 
+#[derive(Debug, Copy, Clone, Builder)]
 pub struct CodecParams {
-    sample_rate: u32,
-    sample_format: SampleFormat,
-    channels: u32,
+    pub(crate) sample_rate: u32,
+    pub(crate) sample_format: SampleFormat,
+    #[builder(default = "1")]
+    pub(crate) channels: u32,
+    #[builder(default)]
+    pub(crate) bit_rate: u64,
+    #[builder(default)]
+    pub(crate) samples_per_frame: Option<usize>,
 }
 
 impl CodecParams {
@@ -46,6 +53,8 @@ impl CodecParams {
             sample_rate,
             sample_format,
             channels,
+            bit_rate: 0,
+            samples_per_frame: None,
         }
     }
 
@@ -60,6 +69,14 @@ impl CodecParams {
     pub fn channel_layout(&self) -> ChannelLayout {
         ChannelLayout::from_channels(self.channels).expect("Valid channel layout")
     }
+
+    pub const fn bit_rate(&self) -> u64 {
+        self.bit_rate
+    }
+
+    pub const fn samples_per_frame(&self) -> Option<usize> {
+        self.samples_per_frame
+    }
 }
 
 impl From<&AudioCodecParameters> for CodecParams {
@@ -68,6 +85,8 @@ impl From<&AudioCodecParameters> for CodecParams {
             sample_rate: params.sample_rate(),
             sample_format: params.sample_format().into(),
             channels: params.channel_layout().channels(),
+            bit_rate: params.bit_rate(),
+            samples_per_frame: None,
         }
     }
 }
@@ -78,6 +97,8 @@ impl From<&AudioFrame> for CodecParams {
             sample_rate: frame.sample_rate(),
             sample_format: frame.sample_format().into(),
             channels: frame.channels(),
+            bit_rate: 0u64,
+            samples_per_frame: None,
         }
     }
 }
@@ -92,6 +113,7 @@ impl Resampler {
                 .source_sample_rate(source.sample_rate())
                 .source_sample_format(source.sample_format().into())
                 .source_channel_layout(source.channel_layout())
+                .target_frame_samples(target.samples_per_frame())
                 .target_sample_rate(target.sample_rate())
                 .target_sample_format(target.sample_format().into())
                 .target_channel_layout(target.channel_layout())
@@ -109,13 +131,14 @@ impl Iterator for Resampler {
     type Item = anyhow::Result<AudioFrame>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.take().map_err(Into::into).transpose().or_else(|| {
-            self.0
-                .flush()
-                .map_err(Into::into)
-                .and_then(|_| self.0.take().map_err(Into::into))
-                .transpose()
-        })
+        self.0.take().map_err(Into::into).transpose()
+        // .or_else(|| {
+        //     self.0
+        //         .flush()
+        //         .map_err(Into::into)
+        //         .and_then(|_| self.0.take().map_err(Into::into))
+        //         .transpose()
+        // })
     }
 }
 
