@@ -1,0 +1,108 @@
+use std::str::FromStr;
+
+pub use ac_ffmpeg::codec::audio::AudioFrame;
+use ac_ffmpeg::codec::audio::{AudioResampler, ChannelLayout, SampleFormat as AcSampleFormat};
+use ac_ffmpeg::codec::AudioCodecParameters;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampleFormat {
+    S16,
+    Flt,
+    FltPlanar,
+}
+
+impl From<SampleFormat> for AcSampleFormat {
+    fn from(format: SampleFormat) -> Self {
+        match format {
+            SampleFormat::S16 => AcSampleFormat::from_str("s16").expect("s16"),
+            SampleFormat::Flt => AcSampleFormat::from_str("flt").expect("flt"),
+            SampleFormat::FltPlanar => AcSampleFormat::from_str("fltp").expect("flt"),
+        }
+    }
+}
+
+impl From<AcSampleFormat> for SampleFormat {
+    fn from(format: AcSampleFormat) -> Self {
+        match format.name() {
+            "s16" => SampleFormat::S16,
+            "flt" => SampleFormat::Flt,
+            "fltp" => SampleFormat::FltPlanar,
+            x => unreachable!("Unknown format {}", x),
+        }
+    }
+}
+
+pub struct CodecParams {
+    sample_rate: u32,
+    sample_format: SampleFormat,
+    channels: u32,
+}
+
+impl CodecParams {
+    pub fn new(sample_rate: u32, sample_format: SampleFormat, channels: u32) -> Self {
+        Self {
+            sample_rate,
+            sample_format,
+            channels,
+        }
+    }
+
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub fn sample_format(&self) -> SampleFormat {
+        self.sample_format
+    }
+
+    pub fn channel_layout(&self) -> ChannelLayout {
+        ChannelLayout::from_channels(self.channels).expect("Valid channel layout")
+    }
+}
+
+impl From<AudioCodecParameters> for CodecParams {
+    fn from(params: AudioCodecParameters) -> Self {
+        Self {
+            sample_rate: params.sample_rate(),
+            sample_format: params.sample_format().into(),
+            channels: params.channel_layout().channels(),
+        }
+    }
+}
+
+#[non_exhaustive]
+pub struct Resampler(AudioResampler);
+
+impl Resampler {
+    pub fn new(source: CodecParams, target: CodecParams) -> Self {
+        Self(
+            AudioResampler::builder()
+                .source_sample_rate(source.sample_rate())
+                .source_sample_format(source.sample_format().into())
+                .source_channel_layout(source.channel_layout())
+                .target_sample_rate(target.sample_rate())
+                .target_sample_format(target.sample_format().into())
+                .target_channel_layout(target.channel_layout())
+                .build()
+                .expect("Resample setup is complete"),
+        )
+    }
+
+    pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<&mut Self> {
+        self.0.try_push(frame).map(|_| self).map_err(Into::into)
+    }
+}
+
+impl Iterator for &mut Resampler {
+    type Item = anyhow::Result<AudioFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.take().map_err(Into::into).transpose().or_else(|| {
+            self.0
+                .flush()
+                .map_err(Into::into)
+                .and_then(|_| self.0.take().map_err(Into::into))
+                .transpose()
+        })
+    }
+}
