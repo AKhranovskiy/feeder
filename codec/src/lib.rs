@@ -11,27 +11,23 @@ pub use decoder::Decoder;
 mod resampler;
 pub use resampler::{CodecParams, ResamplingDecoder, SampleFormat};
 
-pub fn decode<RS>(input: RS) -> anyhow::Result<Vec<i16>>
+// TODO Sample should be bound to SampleFormat.
+pub fn resample<RS, Sample>(input: RS, target: CodecParams) -> anyhow::Result<Vec<Sample>>
 where
     RS: Read + Seek,
-{
-    resample(input, CodecParams::new(22050, SampleFormat::S16, 1))
-        .map(|data| cast_slice::<u8, i16>(data.as_slice()).to_vec())
-}
-
-pub fn resample<RS>(input: RS, target: CodecParams) -> anyhow::Result<Vec<u8>>
-where
-    RS: Read + Seek,
+    Sample: Clone + bytemuck::Pod,
 {
     let decoder = Decoder::try_from(input)?.resample(target);
 
-    let mut output = vec![];
+    let mut output: Vec<Sample> = vec![];
 
     for frame in decoder {
         for plane in frame?.planes().iter() {
-            output.extend_from_slice(plane.data());
+            output.extend_from_slice(cast_slice::<u8, Sample>(plane.data()));
         }
     }
 
     Ok(output)
 }
+
+

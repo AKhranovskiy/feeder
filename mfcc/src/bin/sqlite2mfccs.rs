@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use codec::{CodecParams, SampleFormat};
 use kdam::{tqdm, BarExt};
 use ndarray::{s, Array2, Axis};
 
@@ -121,10 +122,8 @@ where
 
             let io = std::io::Cursor::new(content);
 
-            let data = codec::decode(io)?
-                .into_iter()
-                .map(f32::from)
-                .collect::<Vec<_>>();
+            let data =
+                codec::resample::<_, f32>(io, CodecParams::new(22050, SampleFormat::Flt, 1))?;
 
             let mfccs = calculate_mfccs(data.as_slice(), Default::default())?;
             pb.lock().unwrap().update(1);
