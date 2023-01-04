@@ -26,8 +26,10 @@ fn main() -> anyhow::Result<()> {
             .channels(params.channel_layout().channels())
             .bit_rate(params.bit_rate())
             .build()?,
+        // TODO add output stream, and mux inside
     )?;
 
+    // TODO encoder should resample.
     let decoder = decoder.resample(encoder.codec_params());
 
     let mut muxer = {
