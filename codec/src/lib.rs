@@ -15,7 +15,15 @@ pub fn decode<RS>(input: RS) -> anyhow::Result<Vec<i16>>
 where
     RS: Read + Seek,
 {
-    let decoder = Decoder::try_from(input)?.resample(CodecParams::new(22050, SampleFormat::S16, 1));
+    resample(input, CodecParams::new(22050, SampleFormat::S16, 1))
+        .map(|data| cast_slice::<u8, i16>(data.as_slice()).to_vec())
+}
+
+pub fn resample<RS>(input: RS, target: CodecParams) -> anyhow::Result<Vec<u8>>
+where
+    RS: Read + Seek,
+{
+    let decoder = Decoder::try_from(input)?.resample(target);
 
     let mut output = vec![];
 
@@ -25,5 +33,5 @@ where
         }
     }
 
-    Ok(cast_slice::<u8, i16>(output.as_slice()).to_vec())
+    Ok(output)
 }
