@@ -41,7 +41,7 @@ pub struct CodecParams {
 }
 
 impl CodecParams {
-    pub fn new(sample_rate: u32, sample_format: SampleFormat, channels: u32) -> Self {
+    pub const fn new(sample_rate: u32, sample_format: SampleFormat, channels: u32) -> Self {
         Self {
             sample_rate,
             sample_format,
@@ -49,11 +49,11 @@ impl CodecParams {
         }
     }
 
-    pub fn sample_rate(&self) -> u32 {
+    pub const fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
 
-    pub fn sample_format(&self) -> SampleFormat {
+    pub const fn sample_format(&self) -> SampleFormat {
         self.sample_format
     }
 
@@ -62,12 +62,22 @@ impl CodecParams {
     }
 }
 
-impl From<AudioCodecParameters> for CodecParams {
-    fn from(params: AudioCodecParameters) -> Self {
+impl From<&AudioCodecParameters> for CodecParams {
+    fn from(params: &AudioCodecParameters) -> Self {
         Self {
             sample_rate: params.sample_rate(),
             sample_format: params.sample_format().into(),
             channels: params.channel_layout().channels(),
+        }
+    }
+}
+
+impl From<&AudioFrame> for CodecParams {
+    fn from(frame: &AudioFrame) -> Self {
+        Self {
+            sample_rate: frame.sample_rate(),
+            sample_format: frame.sample_format().into(),
+            channels: frame.channels(),
         }
     }
 }
@@ -116,7 +126,7 @@ pub struct ResamplingDecoder<T> {
 
 impl<T> ResamplingDecoder<T> {
     pub(crate) fn new(decoder: Decoder<T>, target: CodecParams) -> Self {
-        let source = decoder.codec_parameters().into();
+        let source = CodecParams::from(&decoder.codec_parameters());
         let resampler = Resampler::new(source, target);
         Self { decoder, resampler }
     }
