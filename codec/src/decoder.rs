@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::io::Read;
 
 use ac_ffmpeg::codec::audio::{AudioDecoder, AudioFrame};
 use ac_ffmpeg::codec::{AudioCodecParameters, Decoder as AcDecoder};
@@ -12,13 +12,13 @@ pub struct Decoder<T> {
     decoder: AudioDecoder,
 }
 
-impl<RS: Read + Seek> Decoder<RS> {
-    pub fn try_from(input: RS) -> anyhow::Result<Self> {
+impl<R: Read> Decoder<R> {
+    pub fn try_from(input: R) -> anyhow::Result<Self> {
         Demuxer::try_from(input).and_then(TryInto::try_into)
     }
 }
 impl<T> Decoder<T> {
-    pub(crate) fn codec_parameters(&self) -> AudioCodecParameters {
+    pub fn codec_parameters(&self) -> AudioCodecParameters {
         self.demuxer
             .stream()
             .codec_parameters()

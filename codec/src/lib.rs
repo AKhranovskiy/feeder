@@ -9,7 +9,9 @@ mod decoder;
 pub use decoder::Decoder;
 
 mod resampler;
-pub use resampler::{CodecParams, ResamplingDecoder, SampleFormat};
+pub use resampler::{CodecParams, Resampler, ResamplingDecoder, SampleFormat};
+
+pub use ac_ffmpeg::codec::audio::AudioFrame;
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<RS, Sample>(input: RS, target: CodecParams) -> anyhow::Result<Vec<Sample>>
@@ -29,5 +31,3 @@ where
 
     Ok(output)
 }
-
-

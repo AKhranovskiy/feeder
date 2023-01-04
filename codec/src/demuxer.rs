@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::io::Read;
 
 use ac_ffmpeg::format::demuxer::Demuxer as AcDemuxer;
 use ac_ffmpeg::format::demuxer::DemuxerWithStreamInfo as AcDemuxerWithStreamInfo;
@@ -9,9 +9,9 @@ use ac_ffmpeg::packet::Packet;
 #[non_exhaustive]
 pub struct Demuxer<T>(AcDemuxerWithStreamInfo<T>);
 
-impl<RS: Read + Seek> Demuxer<RS> {
-    pub fn try_from(input: RS) -> anyhow::Result<Self> {
-        let io = IO::from_seekable_read_stream(input);
+impl<R: Read> Demuxer<R> {
+    pub fn try_from(input: R) -> anyhow::Result<Self> {
+        let io = IO::from_read_stream(input);
 
         let demuxer = AcDemuxer::builder()
             .build(io)?
