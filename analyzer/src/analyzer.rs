@@ -13,6 +13,7 @@ pub struct BufferedAnalyzer {
     queue: VecDeque<f64>,
     classifer: Classifier,
     smoother: LabelSmoother,
+    last_class: Option<&'static str>,
 }
 
 impl BufferedAnalyzer {
@@ -21,12 +22,13 @@ impl BufferedAnalyzer {
             queue: VecDeque::with_capacity(150 * 39 * 2),
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
             smoother,
+            last_class: None,
         }
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<&'static str>> {
         if frame.samples() < 128 {
-            return Ok(None);
+            return Ok(self.last_class);
         }
 
         let mut samples: Vec<f32> = vec![];
@@ -59,15 +61,15 @@ impl BufferedAnalyzer {
             let prediction = self.classifer.predict(&data)?;
             let prediction = self.smoother.push(prediction);
 
-            match prediction.argmax()?.1 {
-                0 => Ok(Some("A")),
-                1 => Ok(Some("M")),
-                2 => Ok(Some("T")),
+            self.last_class = match prediction.argmax()?.1 {
+                0 => Some("A"),
+                1 => Some("M"),
+                2 => Some("T"),
                 _ => unreachable!("Unexpected prediction shape"),
-            }
-        } else {
-            Ok(None)
+            };
         }
+
+        Ok(self.last_class)
     }
 }
 

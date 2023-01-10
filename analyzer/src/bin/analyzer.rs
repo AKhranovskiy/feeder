@@ -1,5 +1,6 @@
 use std::io::{BufWriter, Write};
 
+use ac_ffmpeg::codec::audio::AudioFrameMut;
 use codec::{Decoder, Encoder};
 
 use analyzer::BufferedAnalyzer;
@@ -18,11 +19,21 @@ fn main() -> anyhow::Result<()> {
     for frame in decoder {
         let frame = frame?;
 
-        if let Some(class) = analyzer.push(frame.clone())? {
-            std::io::stderr().write_all(class.as_bytes())?;
+        let class = analyzer.push(frame.clone())?;
+        if class == Some("A") {
+            let silence = AudioFrameMut::silence(
+                frame.channel_layout(),
+                frame.sample_format(),
+                frame.sample_rate(),
+                frame.samples(),
+            )
+            .freeze();
+            encoder.push(silence)?;
+        } else {
+            encoder.push(frame)?;
         }
 
-        encoder.push(frame)?;
+        std::io::stderr().write_all(class.unwrap_or("").as_bytes())?;
     }
 
     encoder.flush()?;
