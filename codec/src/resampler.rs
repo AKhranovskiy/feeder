@@ -96,7 +96,7 @@ impl From<&AudioFrame> for CodecParams {
         Self {
             sample_rate: frame.sample_rate(),
             sample_format: frame.sample_format().into(),
-            channels: frame.channels(),
+            channels: frame.channel_layout().channels(),
             bit_rate: 0u64,
             samples_per_frame: None,
         }

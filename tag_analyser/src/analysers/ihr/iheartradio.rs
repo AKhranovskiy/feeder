@@ -20,7 +20,7 @@ impl TagAnalyser for IHeartRadio {
                 Ok(ihr) => {
                     // log::info!(target: "TagAnalyser::IHR", "IHR {ihr:?}");
                     Some(ihr)
-                },
+                }
                 Err(ref error) => {
                     log::error!(target: "TagAnalyser::IHR", "Failed to create IHR: {error:#}");
                     None
@@ -53,5 +53,6 @@ fn verify_tags(ihr: &Ihr, artist: Option<&str>, title: Option<&str>) -> bool {
         _ => true,
     };
 
-    matches("artist", artist, ihr.artist.as_deref()) && matches("title", title, ihr.title.as_deref())
+    matches("artist", artist, ihr.artist.as_deref())
+        && matches("title", title, ihr.title.as_deref())
 }

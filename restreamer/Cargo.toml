@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
-axum = { version = "0.6.1" }
+axum = { version = "0.6.2" }
 codec = { workspace = true }
 futures = { workspace = true }
 mfcc = { workspace = true }

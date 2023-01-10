@@ -35,11 +35,11 @@ fn main() -> anyhow::Result<()> {
     let mut resampler = AudioResampler::builder()
         .source_sample_rate(params.sample_rate())
         .source_sample_format(params.sample_format())
-        .source_channel_layout(params.channel_layout())
+        .source_channel_layout(params.channel_layout().to_owned())
         .target_frame_samples(encoder.samples_per_frame())
         .target_sample_rate(OPUS_SAMPLE_RATE)
         .target_sample_format(SampleFormat::Flt.into())
-        .target_channel_layout(params.channel_layout())
+        .target_channel_layout(params.channel_layout().to_owned())
         .build()?;
 
     let mut muxer = {
