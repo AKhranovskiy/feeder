@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::io::Read;
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 pub use ac_ffmpeg::packet::Packet;
@@ -18,9 +18,9 @@ pub use resampler::{Resampler, ResamplingDecoder};
 mod muxer;
 
 // TODO Sample should be bound to SampleFormat.
-pub fn resample<RS, Sample>(input: RS, target: CodecParams) -> anyhow::Result<Vec<Sample>>
+pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>
 where
-    RS: Read + Seek,
+    R: Read,
     Sample: Clone + bytemuck::Pod,
 {
     let decoder = Decoder::try_from(input)?.resample(target);
