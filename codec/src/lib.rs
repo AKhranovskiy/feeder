@@ -15,8 +15,6 @@ pub use resampler::SampleFormat;
 pub use resampler::{CodecParams, CodecParamsBuilder};
 pub use resampler::{Resampler, ResamplingDecoder};
 
-mod muxer;
-
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>
 where
