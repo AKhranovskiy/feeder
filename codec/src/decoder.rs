@@ -2,25 +2,35 @@ use std::io::Read;
 
 use ac_ffmpeg::codec::audio::{AudioDecoder, AudioFrame};
 use ac_ffmpeg::codec::{AudioCodecParameters, Decoder as AcDecoder};
+use ac_ffmpeg::format::demuxer::{Demuxer, DemuxerWithStreamInfo};
+use ac_ffmpeg::format::io::IO;
 
 use crate::resampler::{CodecParams, ResamplingDecoder};
-use crate::Demuxer;
 
 #[non_exhaustive]
 pub struct Decoder<T> {
-    demuxer: Demuxer<T>,
+    demuxer: DemuxerWithStreamInfo<T>,
     decoder: AudioDecoder,
 }
 
 impl<R: Read> Decoder<R> {
     pub fn try_from(input: R) -> anyhow::Result<Self> {
-        Demuxer::try_from(input).and_then(TryInto::try_into)
+        let io = IO::from_read_stream(input);
+
+        let demuxer = Demuxer::builder()
+            .build(io)?
+            .find_stream_info(None)
+            .map_err(|(_, err)| err)?;
+
+        let decoder = AudioDecoder::from_stream(&demuxer.streams()[0])?.build()?;
+
+        Ok(Self { demuxer, decoder })
     }
 }
+
 impl<T> Decoder<T> {
     pub fn codec_parameters(&self) -> AudioCodecParameters {
-        self.demuxer
-            .stream()
+        self.demuxer.streams()[0]
             .codec_parameters()
             .as_audio_codec_parameters()
             .cloned()
@@ -29,15 +39,6 @@ impl<T> Decoder<T> {
 
     pub fn resample(self, target: CodecParams) -> ResamplingDecoder<T> {
         ResamplingDecoder::new(self, target)
-    }
-}
-
-impl<T> TryFrom<Demuxer<T>> for Decoder<T> {
-    type Error = anyhow::Error;
-
-    fn try_from(demuxer: Demuxer<T>) -> Result<Self, Self::Error> {
-        let decoder = AudioDecoder::from_stream(demuxer.stream())?.build()?;
-        Ok(Self { demuxer, decoder })
     }
 }
 
@@ -52,7 +53,9 @@ impl<T> Iterator for Decoder<T> {
         }
 
         // If not, push demuxed packet
-        match self.demuxer.next() {
+        let packet = self.demuxer.take().map_err(Into::into).transpose();
+
+        match packet {
             None => {}
             Some(Ok(packet)) => {
                 if let Err(error) = self.decoder.try_push(packet) {

@@ -1,9 +1,8 @@
 use std::io::{Read, Seek};
 
+pub use ac_ffmpeg::codec::audio::AudioFrame;
+pub use ac_ffmpeg::packet::Packet;
 use bytemuck::cast_slice;
-
-mod demuxer;
-pub use demuxer::Demuxer;
 
 mod decoder;
 pub use decoder::Decoder;
@@ -16,8 +15,7 @@ pub use resampler::SampleFormat;
 pub use resampler::{CodecParams, CodecParamsBuilder};
 pub use resampler::{Resampler, ResamplingDecoder};
 
-pub use ac_ffmpeg::codec::audio::AudioFrame;
-pub use ac_ffmpeg::packet::Packet;
+mod muxer;
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<RS, Sample>(input: RS, target: CodecParams) -> anyhow::Result<Vec<Sample>>
