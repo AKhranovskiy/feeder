@@ -5,7 +5,7 @@ use ac_ffmpeg::codec::{AudioCodecParameters, Decoder as AcDecoder};
 use ac_ffmpeg::format::demuxer::{Demuxer, DemuxerWithStreamInfo};
 use ac_ffmpeg::format::io::IO;
 
-use crate::resampler::{CodecParams, ResamplingDecoder};
+use crate::{CodecParams, ResamplingDecoder};
 
 #[non_exhaustive]
 pub struct Decoder<T> {
@@ -35,6 +35,10 @@ impl<T> Decoder<T> {
             .as_audio_codec_parameters()
             .cloned()
             .unwrap()
+    }
+
+    pub fn codec_params(&self) -> CodecParams {
+        CodecParams::from(&self.codec_parameters())
     }
 
     pub fn resample(self, target: CodecParams) -> ResamplingDecoder<T> {

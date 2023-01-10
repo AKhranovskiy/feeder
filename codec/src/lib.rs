@@ -11,9 +11,13 @@ mod encoder;
 pub use encoder::Encoder;
 
 mod resampler;
-pub use resampler::SampleFormat;
-pub use resampler::{CodecParams, CodecParamsBuilder};
 pub use resampler::{Resampler, ResamplingDecoder};
+
+mod sample_format;
+pub use sample_format::SampleFormat;
+
+mod codec_params;
+pub use codec_params::{CodecParams, CodecParamsBuilder};
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>

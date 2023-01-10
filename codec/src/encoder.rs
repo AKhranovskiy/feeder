@@ -2,14 +2,13 @@ use std::io::Write;
 
 use ac_ffmpeg::codec::audio::AudioEncoder;
 use ac_ffmpeg::codec::audio::AudioFrame;
-use ac_ffmpeg::codec::audio::ChannelLayout;
 use ac_ffmpeg::codec::Encoder as AsEncoder;
 use ac_ffmpeg::format::io::IO;
 use ac_ffmpeg::format::muxer::Muxer;
 use ac_ffmpeg::format::muxer::OutputFormat;
-use anyhow::anyhow;
 
 use crate::CodecParams;
+use crate::Resampler;
 use crate::SampleFormat;
 
 static OPUS_SAMPLE_RATE: u32 = 48_000;
@@ -19,21 +18,16 @@ static OPUS_SAMPLE_FORMAT: SampleFormat = SampleFormat::Flt;
 pub struct Encoder<T> {
     encoder: AudioEncoder,
     muxer: Muxer<T>,
-}
-
-#[inline(always)]
-fn to_channel_layout(channels: u32) -> anyhow::Result<ChannelLayout> {
-    ChannelLayout::from_channels(channels)
-        .ok_or_else(|| anyhow!("Invalid channels number {channels}"))
+    resampler: Resampler,
 }
 
 impl<W: Write> Encoder<W> {
-    pub fn opus(bit_rate: u64, channels: u32, output: W) -> anyhow::Result<Self> {
+    pub fn opus(params: CodecParams, output: W) -> anyhow::Result<Self> {
         let encoder = AudioEncoder::builder("libopus")?
             .sample_rate(OPUS_SAMPLE_RATE)
             .sample_format(OPUS_SAMPLE_FORMAT.into())
-            .bit_rate(bit_rate)
-            .channel_layout(to_channel_layout(channels)?)
+            .bit_rate(params.bit_rate)
+            .channel_layout(params.channel_layout())
             .build()?;
 
         let mut muxer_builder = Muxer::builder();
@@ -44,13 +38,27 @@ impl<W: Write> Encoder<W> {
             OutputFormat::find_by_name("ogg").expect("output format"),
         )?;
 
-        Ok(Self { encoder, muxer })
+        let target = {
+            let mut params = CodecParams::from(&encoder.codec_parameters());
+            params.samples_per_frame = encoder.samples_per_frame();
+            params
+        };
+
+        let resampler = Resampler::new(params, target);
+
+        Ok(Self {
+            encoder,
+            muxer,
+            resampler,
+        })
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<&mut Self> {
-        self.encoder.try_push(frame)?;
-        while let Some(frame) = self.encoder.take()? {
-            self.muxer.push(frame)?;
+        for frame in self.resampler.push(frame)? {
+            self.encoder.try_push(frame?)?;
+            while let Some(frame) = self.encoder.take()? {
+                self.muxer.push(frame)?;
+            }
         }
 
         Ok(self)
@@ -66,16 +74,5 @@ impl<W: Write> Encoder<W> {
         self.muxer.flush()?;
 
         Ok(self)
-    }
-
-    pub fn codec_params(&self) -> CodecParams {
-        let params = self.encoder.codec_parameters();
-        CodecParams {
-            sample_rate: params.sample_rate(),
-            sample_format: params.sample_format().into(),
-            channels: params.channel_layout().channels(),
-            bit_rate: params.bit_rate(),
-            samples_per_frame: self.encoder.samples_per_frame(),
-        }
     }
 }
