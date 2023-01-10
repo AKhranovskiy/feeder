@@ -44,10 +44,8 @@ fn process(files: &[PathBuf]) -> anyhow::Result<()> {
             .into_par_iter()
             .map(|path| {
                 let io = std::io::BufReader::new(std::fs::File::open(path)?);
-                let data = codec::resample::<_, f32>(
-                    io,
-                    CodecParams::new(22050, codec::SampleFormat::Flt, 1),
-                )?;
+                let data: Vec<f32> =
+                    codec::resample(io, CodecParams::new(22050, codec::SampleFormat::Flt, 1))?;
                 calculate_mfccs(data.as_slice(), Default::default()).map_err(anyhow::Error::from)
             })
             .inspect(|v| {
