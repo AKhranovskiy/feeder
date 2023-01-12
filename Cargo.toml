@@ -53,13 +53,17 @@ serde_with = "2.2.0"
 thiserror = "1.0.38"
 time = "0.3.17"
 tokio = { version = "1.24.1", features = ["macros", "rt-multi-thread", "fs"] }
+tower = "0.4.13"
+tower-http = { version = "0.3.5", features = ["full"] }
 ulid = "1.0.0"
 ureq = { version = "2.6.1", features = ["json"] }
 url = { version = "2.3.1", features = ["serde"] }
 uuid = { version = "1.2.2", features = ["v4", "serde"] }
 
+analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }
 codec = { version = "*", path = "./codec" }
 mfcc = { version = "*", path = "./mfcc" }
 model = { version = "*", path = "./model" }
 tags = { version = "*", path = "./tags" }
+unstreamer = { version = "0.1.0", path = "./unstreamer" }

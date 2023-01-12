@@ -1,4 +1,5 @@
 use std::io::{BufWriter, Write};
+use std::str::FromStr;
 
 use ac_ffmpeg::codec::audio::AudioFrameMut;
 use codec::{Decoder, Encoder};
@@ -6,11 +7,12 @@ use codec::{Decoder, Encoder};
 use analyzer::BufferedAnalyzer;
 use analyzer::LabelSmoother;
 
-/**
- * Takes stdin, decode, analyze, put encoded/muxed stream to stdin and analysis result to stderr.
- */
 fn main() -> anyhow::Result<()> {
-    let decoder = Decoder::try_from(std::io::stdin())?;
+    let url = url::Url::from_str(&std::env::args().nth(1).expect("Expects URL"))?;
+
+    let input = unstreamer::Unstreamer::open(url)?;
+
+    let decoder = Decoder::try_from(input)?;
 
     let mut encoder = Encoder::opus(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
 
