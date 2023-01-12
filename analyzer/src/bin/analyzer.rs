@@ -4,8 +4,8 @@ use std::str::FromStr;
 use ac_ffmpeg::codec::audio::AudioFrameMut;
 use codec::{Decoder, Encoder};
 
-use analyzer::BufferedAnalyzer;
 use analyzer::LabelSmoother;
+use analyzer::{BufferedAnalyzer, ContentKind};
 
 fn main() -> anyhow::Result<()> {
     let url = url::Url::from_str(&std::env::args().nth(1).expect("Expects URL"))?;
@@ -21,8 +21,8 @@ fn main() -> anyhow::Result<()> {
     for frame in decoder {
         let frame = frame?;
 
-        let class = analyzer.push(frame.clone())?;
-        if class == Some("A") {
+        let kind = analyzer.push(frame.clone())?;
+        if kind == ContentKind::Advertisement {
             let silence = AudioFrameMut::silence(
                 frame.channel_layout(),
                 frame.sample_format(),
@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
             encoder.push(frame)?;
         }
 
-        std::io::stderr().write_all(class.unwrap_or("").as_bytes())?;
+        std::io::stderr().write_all(&kind.name().as_bytes()[..1])?;
     }
 
     encoder.flush()?;

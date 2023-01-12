@@ -1,6 +1,7 @@
 use std::io::Read;
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
+use ac_ffmpeg::codec::audio::AudioFrameMut;
 pub use ac_ffmpeg::packet::Packet;
 use bytemuck::cast_slice;
 
@@ -36,4 +37,14 @@ where
     }
 
     Ok(output)
+}
+
+pub fn silence_frame(frame: &AudioFrame) -> AudioFrame {
+    AudioFrameMut::silence(
+        frame.channel_layout(),
+        frame.sample_format(),
+        frame.sample_rate(),
+        frame.samples(),
+    )
+    .freeze()
 }

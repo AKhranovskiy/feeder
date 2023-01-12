@@ -7,13 +7,13 @@ use classifier::Classifier;
 use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
 use ndarray_stats::QuantileExt;
 
-use crate::LabelSmoother;
+use crate::{ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
     queue: VecDeque<f64>,
     classifer: Classifier,
     smoother: LabelSmoother,
-    last_class: Option<&'static str>,
+    last_kind: ContentKind,
 }
 
 impl BufferedAnalyzer {
@@ -22,13 +22,13 @@ impl BufferedAnalyzer {
             queue: VecDeque::with_capacity(150 * 39 * 2),
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
             smoother,
-            last_class: None,
+            last_kind: ContentKind::Unknown,
         }
     }
 
-    pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<&'static str>> {
+    pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<ContentKind> {
         if frame.samples() < 128 {
-            return Ok(self.last_class);
+            return Ok(self.last_kind);
         }
 
         let mut samples: Vec<f32> = vec![];
@@ -61,15 +61,15 @@ impl BufferedAnalyzer {
             let prediction = self.classifer.predict(&data)?;
             let prediction = self.smoother.push(prediction);
 
-            self.last_class = match prediction.argmax()?.1 {
-                0 => Some("A"),
-                1 => Some("M"),
-                2 => Some("T"),
+            self.last_kind = match prediction.argmax()?.1 {
+                0 => ContentKind::Advertisement,
+                1 => ContentKind::Music,
+                2 => ContentKind::Talk,
                 _ => unreachable!("Unexpected prediction shape"),
             };
         }
 
-        Ok(self.last_class)
+        Ok(self.last_kind)
     }
 }
 
