@@ -14,4 +14,4 @@ mfcc = { workspace = true }
 ndarray = { workspace = true }
 ndarray-stats = { workspace = true }
 unstreamer = { workspace = true }
-url = {workspace = true}
+url = { workspace = true }

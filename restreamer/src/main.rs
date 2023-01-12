@@ -71,7 +71,7 @@ async fn play(
 
 
         std::thread::spawn(move || {
-        let action = params.action.unwrap_or(PlayAction::Passthrough);
+            let action = params.action.unwrap_or(PlayAction::Passthrough);
 
             let input = unstreamer::Unstreamer::open(params.url)?;
 
