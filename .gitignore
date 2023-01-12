@@ -1,13 +1,5 @@
 target/
 Cargo.lock
-*.bmp
-*.bin
-*.7z
-*.tch
 *.pickle
-fleet.toml
-classificator/plots
-classificator/audio
-mongodb2sqlite/exported.sqlite
-analyzer/model
-classifier/model/
+*.sqlite
+*/model
