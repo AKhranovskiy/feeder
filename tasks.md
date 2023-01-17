@@ -10,9 +10,9 @@ Replace detected audio with desired content.
 
 [x] Detect ads in stream and silence audio.
 
-[ ] 1w  Replace by another audio, exact piece, no buffering
-        If ads is detected, start playing the replacement audio.
-        When ads ends, stop playing the replacement audio.
+[x] Replace by another audio, exact piece, no buffering
+    If ads is detected, start playing the replacement audio.
+    When ads ends, stop playing the replacement audio.
 
 [ ] 1w  Cross-fade
         Add cross-fading for entering and exiting ads-replacement block.

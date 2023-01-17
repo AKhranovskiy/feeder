@@ -46,6 +46,13 @@ impl CodecParams {
     pub const fn samples_per_frame(&self) -> Option<usize> {
         self.samples_per_frame
     }
+
+    pub const fn with_samples_per_frame(self, samples: usize) -> Self {
+        Self {
+            samples_per_frame: Some(samples),
+            ..self
+        }
+    }
 }
 
 impl From<&AudioCodecParameters> for CodecParams {

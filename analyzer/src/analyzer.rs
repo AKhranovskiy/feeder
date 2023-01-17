@@ -17,6 +17,10 @@ pub struct BufferedAnalyzer {
 }
 
 impl BufferedAnalyzer {
+    pub fn warmup() {
+        Classifier::new().expect("Empty model");
+    }
+
     pub fn new(smoother: LabelSmoother) -> Self {
         Self {
             queue: VecDeque::with_capacity(150 * 39 * 2),
