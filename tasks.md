@@ -28,10 +28,14 @@ Replace detected audio with desired content.
 Integrate with Ads network (D.) 
 
 [ ] 1w  Fetch ads from AdsNet
+
     [ ] VAST parser
+
     [ ] Download ads and store them locally.
+
 [ ] 0.5w    Play random ads from AdsNet
             Select an ads according to VAST information, so ads do not repeat endlessly.
+
 [ ] 0.5w    Feedback to AdsNet
             Send feedback to AdsNet on playing ads.
 
@@ -40,9 +44,13 @@ Integrate with Ads network (D.)
 Automate data collection and training
 
 [ ] 2w  Revive ads scrapper for training
+
     [ ] Create storage
+
     [ ] Create standalone tool that takes HLS and scraps ads
+
     [ ] Create interface to review scrapped ads
+
 [ ] 2d  Nightly job to train on confirmed data
 
 ## Detection tuning
@@ -50,7 +58,9 @@ Automate data collection and training
 How to improve quality of detection?
 
 [ ] Investigate false-positives when ads is detected in the middle of song.
+
 [ ] How to detect talks?
+
 [ ] How to improve ads detection?
 
 ## Deployment
@@ -58,7 +68,9 @@ How to improve quality of detection?
 Deploy project to Google Cloud for training and demo.
 
 [ ] Prepare Docker container with server and pre-trained model for Google Cloud
+
 [ ] Prepare Docker container with scrappers and training data for Google Cloud
+
 [ ] Train in Google Cloud
 
 ## Android
