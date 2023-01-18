@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{stdout, BufReader, BufWriter, Write};
 
 use anyhow::ensure;
-use bytemuck::cast_slice_mut;
+use bytemuck::{cast_slice, cast_slice_mut};
 use codec::{CodecParams, Decoder, Encoder, SampleFormat};
 
 fn main() -> anyhow::Result<()> {
@@ -25,16 +25,45 @@ fn main() -> anyhow::Result<()> {
     // 576 samples per frame.
     // ~38 frames per second
 
-    let cf = cross_fade_coeffs(576 * 38 * 3); // ~3 secs
+    let cf = cross_fade_coeffs(576 * 38 * 4); // ~3 secs
                                               //
     let frames_a = decoder_a.collect::<anyhow::Result<Vec<_>>>()?;
     let frames_b = decoder_b.collect::<anyhow::Result<Vec<_>>>()?;
 
-    let mut frames = Vec::with_capacity(frames_a.len() / 2 + frames_b.len() * 2 + 38 * 3);
+    let mut frames = Vec::with_capacity(frames_a.len() / 2 + frames_b.len() * 2 + 38 * 4);
 
     frames.extend_from_slice(&frames_a[..frames_a.len() / 2]);
 
     // todo cross-fade
+    for (index, (a, b)) in frames_a[frames_a.len() / 2..][0..38 * 3]
+        .iter()
+        .zip(frames_b[..frames_b.len() / 2][0..38 * 4].iter())
+        .enumerate()
+    {
+        let planes_a = a.planes();
+        assert_eq!(1, planes_a.len());
+
+        let planes_b = b.planes();
+        assert_eq!(1, planes_b.len());
+
+        let data_a = cast_slice::<_, f32>(planes_a[0].data());
+        let data_b = cast_slice::<_, f32>(planes_b[0].data());
+
+        let mut frame = codec::silence_frame(&a).into_mut();
+        let mut planes = frame.planes_mut();
+        let mut data = cast_slice_mut::<_, f32>(planes[0].data_mut());
+
+        for (((a, b), c), d) in data_a
+            .iter()
+            .zip(data_b.iter())
+            .zip(cf[index * 576..][..576].iter())
+            .zip(data.iter_mut())
+        {
+            *d = (a * c.1).max(b * c.0)
+        }
+
+        frames.push(frame.freeze());
+    }
 
     frames.extend_from_slice(&frames_b[frames_b.len() / 2..]);
 
