@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
-use codec::{CossinCrossFade, CrossFade, CrossFadePair, Decoder, Encoder};
+use codec::{CossinCrossFade, CrossFade, CrossFadePair, Decoder, Encoder, EqualPowerCrossFade};
 
 fn main() -> anyhow::Result<()> {
     let file_in = args().nth(1).expect("Expects file");
@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
     // 576 samples per frame.
     // ~38 frames per second
     let spf = frames_in[0].samples();
-    let cross_fade_frames = ((3 * sr) as f64 / spf as f64).ceil().trunc() as usize;
+    let cross_fade_frames = ((1 * sr) as f64 / spf as f64).ceil().trunc() as usize;
 
     eprintln!(
         "left: {} frames, {} samples, {:0.03} secs",
@@ -69,6 +69,28 @@ fn main() -> anyhow::Result<()> {
             let left_planes = left[index].planes();
             let left_data = cast_slice::<_, f32>(left_planes[0].data());
 
+            // let right_planes = right[index].planes();
+            // let right_data = cast_slice::<_, f32>(right_planes[0].data());
+
+            let mut frame = left[index].clone().into_mut();
+            let mut planes = frame.planes_mut();
+            let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
+
+            for x in 0..spf {
+                let c = cf[index * spf + x];
+                let sout = left_data[x] as f64;
+                let sin = 0_f64; //right_data[x] as f64;
+
+                data[x] = c.apply(sout, sin) as f32;
+            }
+
+            encoder.push(frame.freeze())?;
+        }
+
+        for index in 0..cross_fade_frames {
+            // let left_planes = left[index].planes();
+            // let left_data = cast_slice::<_, f32>(left_planes[0].data());
+
             let right_planes = right[index].planes();
             let right_data = cast_slice::<_, f32>(right_planes[0].data());
 
@@ -78,7 +100,7 @@ fn main() -> anyhow::Result<()> {
 
             for x in 0..spf {
                 let c = cf[index * spf + x];
-                let sout = left_data[x] as f64;
+                let sout = 0_f64; //left_data[x] as f64;
                 let sin = right_data[x] as f64;
 
                 data[x] = c.apply(sout, sin) as f32;
@@ -110,5 +132,5 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn cross_fade_coeffs(size: usize) -> Vec<CrossFadePair> {
-    CossinCrossFade::generate(size)
+    EqualPowerCrossFade::generate(size)
 }
