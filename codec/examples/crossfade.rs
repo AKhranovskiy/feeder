@@ -1,71 +1,107 @@
 use std::env::args;
 use std::fs::File;
 use std::io::{stdout, BufReader, BufWriter};
+use std::time::Duration;
 
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
-use codec::{Decoder, Encoder};
+use codec::{CrossFade, CrossFadePair, Decoder, Encoder, EqualPowerCrossFade, LinearCrossFade};
 
 fn main() -> anyhow::Result<()> {
-    let file_a = args().nth(1).expect("Expects file");
-    let file_b = args().nth(2).expect("Expects file");
+    let file_in = args().nth(1).expect("Expects file");
+    let file_out = args().nth(2).expect("Expects file");
 
-    let decoder_a = Decoder::try_from(BufReader::new(File::open(file_a)?))?;
-    let decoder_b = Decoder::try_from(BufReader::new(File::open(file_b)?))?;
+    let decoder_in = Decoder::try_from(BufReader::new(File::open(file_in)?))?;
+    let decoder_out = Decoder::try_from(BufReader::new(File::open(file_out)?))?;
 
     ensure!(
-        decoder_a.codec_params() == decoder_b.codec_params(),
+        decoder_in.codec_params() == decoder_out.codec_params(),
         "Audio format mismatches: {:?} != {:?}",
-        decoder_a.codec_params(),
-        decoder_b.codec_params()
+        decoder_in.codec_params(),
+        decoder_out.codec_params()
     );
 
-    let mut encoder = Encoder::opus(decoder_a.codec_params(), BufWriter::new(stdout()))?;
+    let sr = decoder_in.codec_params().sample_rate() as usize;
 
-    let frames_a = decoder_a.collect::<anyhow::Result<Vec<_>>>()?;
-    let frames_b = decoder_b.collect::<anyhow::Result<Vec<_>>>()?;
+    let mut encoder = Encoder::opus(decoder_in.codec_params(), BufWriter::new(stdout()))?;
 
-    let len = frames_a.len().min(frames_b.len());
+    let frames_in = decoder_in.collect::<anyhow::Result<Vec<_>>>()?;
+    let frames_out = decoder_out.collect::<anyhow::Result<Vec<_>>>()?;
 
     // 576 samples per frame.
+    // ~38 frames per second
+    let spf = frames_in[0].samples();
+    let cross_fade_frames = ((3 * sr) as f64 / spf as f64).ceil().trunc() as usize;
 
-    let cf = cross_fade_coeffs(576 * len); // ~3 secs
-                                           //
-    let mut frames = Vec::with_capacity(frames_a.len().max(frames_b.len()));
+    eprintln!(
+        "left: {} frames, {} samples, {:0.03} secs",
+        frames_in.len(),
+        frames_in.len() * spf,
+        (frames_in.len() * spf) as f64 / sr as f64
+    );
+    eprintln!(
+        "right: {} frames, {} samples, {:0.03} secs",
+        frames_out.len(),
+        frames_out.len() * spf,
+        (frames_out.len() * spf) as f64 / sr as f64
+    );
+    eprintln!(
+        "cross-fade: {} frames, {} samples, {:0.03} secs",
+        cross_fade_frames,
+        cross_fade_frames * spf,
+        (cross_fade_frames * spf) as f64 / sr as f64
+    );
 
-    for index in 0..len {
-        let a = &frames_a[index];
-        let planes_a = a.planes();
-        assert_eq!(1, planes_a.len());
+    for frame in &frames_in[..frames_in.len() - cross_fade_frames] {
+        encoder.push(frame.clone());
+    }
 
-        let b = &frames_b[index];
-        let planes_b = b.planes();
-        assert_eq!(1, planes_b.len());
+    {
+        let cf = cross_fade_coeffs(cross_fade_frames * spf);
 
-        let data_a = cast_slice::<_, f32>(planes_a[0].data());
-        let data_b = cast_slice::<_, f32>(planes_b[0].data());
+        let left = &frames_in[frames_in.len() - cross_fade_frames..];
+        let right = &frames_out[..cross_fade_frames];
 
-        let mut frame = a.clone().into_mut();
-        let mut planes = frame.planes_mut();
-        let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
+        assert_eq!(cf.len(), left.len() * spf);
+        assert_eq!(cf.len(), right.len() * spf);
 
-        for x in 0..576 {
-            let (fout, fin) = cf[index * 576 + x];
-            let sout = data_a[x];
-            let sin = data_b[x];
+        for index in 0..cross_fade_frames {
+            let left_planes = left[index].planes();
+            let left_data = cast_slice::<_, f32>(left_planes[0].data());
 
-            data[x] = (sout * fout).max(sin * fin);
+            let right_planes = right[index].planes();
+            let right_data = cast_slice::<_, f32>(right_planes[0].data());
+
+            let mut frame = left[index].clone().into_mut();
+            let mut planes = frame.planes_mut();
+            let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
+
+            for x in 0..spf {
+                let c = cf[index * spf + x];
+                let sout = left_data[x] as f64;
+                let sin = right_data[x] as f64;
+
+                data[x] = c.apply(sout, sin) as f32;
+            }
+
+            encoder.push(frame.freeze())?;
         }
-
-        frames.push(frame.freeze());
     }
 
-    if frames_b.len() > len {
-        frames.extend_from_slice(&frames_b[len..]);
-    }
+    let pts_shift = Duration::from_nanos(
+        frames_in
+            .last()
+            .and_then(|f| f.pts().as_nanos())
+            .unwrap_or_default() as u64
+            - frames_out[cross_fade_frames]
+                .pts()
+                .as_nanos()
+                .unwrap_or_default() as u64,
+    );
 
-    for frame in frames {
-        encoder.push(frame)?;
+    for frame in &frames_out[cross_fade_frames..] {
+        let pts = frame.pts() + pts_shift;
+        encoder.push(frame.clone().with_pts(pts))?;
     }
 
     encoder.flush()?;
@@ -73,20 +109,6 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn cross_fade_coeffs(size: usize) -> Vec<(f32, f32)> {
-    // https://signalsmith-audio.co.uk/writing/2021/cheap-energy-crossfade/
-
-    let step = 1.0f64 / (size - 1) as f64;
-
-    (0..size)
-        .map(|n| {
-            let x = step * (n as f64);
-            let x2 = 1_f64 - x;
-            let a = x * x2;
-            let b = a + 1.4186_f64 * a.powi(2);
-            let fin = (b + x).powi(2) as f32;
-            let fout = (b + x2).powi(2) as f32;
-            (fout, fin)
-        })
-        .collect()
+fn cross_fade_coeffs(size: usize) -> Vec<CrossFadePair> {
+    EqualPowerCrossFade::generate(size)
 }
