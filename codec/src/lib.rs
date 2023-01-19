@@ -21,7 +21,9 @@ mod codec_params;
 pub use codec_params::{CodecParams, CodecParamsBuilder};
 
 mod crossfade;
-pub use crossfade::{CrossFade, CrossFadePair, EqualPowerCrossFade, LinearCrossFade};
+pub use crossfade::{
+    CossinCrossFade, CrossFade, CrossFadePair, EqualPowerCrossFade, LinearCrossFade,
+};
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>

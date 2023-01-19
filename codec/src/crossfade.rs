@@ -36,40 +36,54 @@ impl CrossFadePair {
 }
 
 pub trait CrossFade {
-    fn generate(size: usize) -> Vec<CrossFadePair>;
+    fn step(size: usize) -> f64 {
+        1.0f64 / (size - 1) as f64
+    }
+
+    fn generate(size: usize) -> Vec<CrossFadePair> {
+        let step = Self::step(size);
+
+        (0..size)
+            .map(|n| n as f64 * step)
+            .map(Self::calculate)
+            .collect()
+    }
+
+    fn calculate(x: f64) -> CrossFadePair;
 }
 
 pub struct EqualPowerCrossFade;
 
 impl CrossFade for EqualPowerCrossFade {
-    fn generate(size: usize) -> Vec<CrossFadePair> {
+    fn calculate(x: f64) -> CrossFadePair {
         // https://signalsmith-audio.co.uk/writing/2021/cheap-energy-crossfade/
+        let x2 = 1_f64 - x;
+        let a = x * x2;
+        let b = a + 1.4186_f64 * a.powi(2);
+        let fin = (b + x).powi(2);
+        let fout = (b + x2).powi(2);
 
-        let step = 1.0f64 / (size - 1) as f64;
-
-        (0..size)
-            .map(|n| {
-                let x = step * (n as f64);
-                let x2 = 1_f64 - x;
-                let a = x * x2;
-                let b = a + 1.4186_f64 * a.powi(2);
-                let fin = (b + x).powi(2);
-                let fout = (b + x2).powi(2);
-                (fout, fin).into()
-            })
-            .collect()
+        (fout, fin).into()
     }
 }
 
 pub struct LinearCrossFade;
 
 impl CrossFade for LinearCrossFade {
-    fn generate(size: usize) -> Vec<CrossFadePair> {
-        let step = 1.0f64 / (size - 1) as f64;
-        (0..size)
-            .map(|n| n as f64)
-            .map(|n| (1_f64 - step * n, step * n).into())
-            .collect()
+    fn calculate(x: f64) -> CrossFadePair {
+        (1_f64 - x, x).into()
+    }
+}
+
+pub struct CossinCrossFade;
+
+impl CrossFade for CossinCrossFade {
+    fn step(size: usize) -> f64 {
+        std::f64::consts::FRAC_PI_2 / (size - 1) as f64
+    }
+
+    fn calculate(x: f64) -> CrossFadePair {
+        (x.cos(), x.sin()).into()
     }
 }
 
@@ -113,6 +127,26 @@ mod tests {
                 (0.19999999999999996, 0.8).into(),
                 (0.09999999999999998, 0.9).into(),
                 (0.0, 1.0).into(),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_cossin_cross_fade() {
+        assert_eq!(
+            CossinCrossFade::generate(11),
+            vec![
+                (1.0, 0.0).into(),
+                (0.9876883405951378, 0.15643446504023087).into(),
+                (0.9510565162951535, 0.3090169943749474).into(),
+                (0.8910065241883679, 0.45399049973954675).into(),
+                (0.8090169943749475, 0.5877852522924731).into(),
+                (0.7071067811865476, 0.7071067811865475).into(),
+                (0.5877852522924731, 0.8090169943749475).into(),
+                (0.4539904997395468, 0.8910065241883678).into(),
+                (0.30901699437494745, 0.9510565162951535).into(),
+                (0.15643446504023092, 0.9876883405951378).into(),
+                (6.123233995736766e-17, 1.0).into()
             ],
         );
     }
