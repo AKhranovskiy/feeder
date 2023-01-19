@@ -24,7 +24,7 @@ impl CrossFadePair {
     }
 
     pub fn apply(&self, left: f64, right: f64) -> f64 {
-        (self.0 * left).max(self.1 * right)
+        self.0 * left + self.1 * right
     }
 
     pub fn fade_out(&self) -> f64 {
