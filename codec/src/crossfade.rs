@@ -14,7 +14,22 @@ impl Eq for CrossFadePair {}
 
 impl From<(f64, f64)> for CrossFadePair {
     fn from(pair: (f64, f64)) -> Self {
-        Self::new(pair.0, pair.1)
+        Self::new(pair.0.clamp(0.0, 1.0), pair.1.clamp(0.0, 1.0))
+    }
+}
+
+trait Clamp {
+    fn clamp<T>(input: T, min: T, max: T) -> T
+    where
+        T: PartialOrd<T>,
+    {
+        if input < min {
+            min
+        } else if input > max {
+            max
+        } else {
+            input
+        }
     }
 }
 
@@ -111,6 +126,14 @@ impl CrossFade for SemicircleCrossFade {
     }
 }
 
+pub struct ParabolicCrossFade;
+
+impl CrossFade for ParabolicCrossFade {
+    fn calculate(x: f64) -> CrossFadePair {
+        ((1.0 - 3.0 * x.powi(2)), (1.0 - 3.0 * (x - 1.0).powi(2))).into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,6 +213,26 @@ mod tests {
                 CrossFadePair(0.0, 0.8),
                 CrossFadePair(0.0, 0.9165151389911681),
                 CrossFadePair(0.0, 0.9797958971132712),
+                CrossFadePair(0.0, 1.0)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parabolic_cross_fade() {
+        assert_eq!(
+            ParabolicCrossFade::generate(11),
+            vec![
+                CrossFadePair(1.0, 0.0),
+                CrossFadePair(0.97, 0.0),
+                CrossFadePair(0.88, 0.0),
+                CrossFadePair(0.73, 0.0),
+                CrossFadePair(0.5199999999999999, 0.0),
+                CrossFadePair(0.25, 0.25),
+                CrossFadePair(0.0, 0.5200000000000002),
+                CrossFadePair(0.0, 0.7300000000000002),
+                CrossFadePair(0.0, 0.8800000000000001),
+                CrossFadePair(0.0, 0.97),
                 CrossFadePair(0.0, 1.0)
             ]
         );

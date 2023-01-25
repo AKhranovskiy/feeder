@@ -23,7 +23,7 @@ pub use codec_params::{CodecParams, CodecParamsBuilder};
 mod crossfade;
 pub use crossfade::{
     CossinCrossFade, CrossFade, CrossFadePair, EqualPowerCrossFade, LinearCrossFade,
-    SemicircleCrossFade,
+    ParabolicCrossFade, SemicircleCrossFade,
 };
 
 // TODO Sample should be bound to SampleFormat.
