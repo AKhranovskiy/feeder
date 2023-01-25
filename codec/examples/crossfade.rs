@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
-use codec::{CossinCrossFade, CrossFade, CrossFadePair, Decoder, Encoder, EqualPowerCrossFade};
+use codec::{CrossFade, CrossFadePair, Decoder, Encoder, EqualPowerCrossFade};
 
 fn main() -> anyhow::Result<()> {
     let file_in = args().nth(1).expect("Expects file");
