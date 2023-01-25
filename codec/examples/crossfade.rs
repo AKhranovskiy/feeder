@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
-use codec::{CrossFade, CrossFadePair, Decoder, Encoder, EqualPowerCrossFade};
+use codec::{CrossFade, CrossFadePair, Decoder, Encoder, SemicircleCrossFade};
 
 fn main() -> anyhow::Result<()> {
     let file_in = args().nth(1).expect("Expects file");
@@ -132,5 +132,5 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn cross_fade_coeffs(size: usize) -> Vec<CrossFadePair> {
-    EqualPowerCrossFade::generate(size)
+    SemicircleCrossFade::generate(size)
 }

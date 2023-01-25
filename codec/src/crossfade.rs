@@ -87,6 +87,30 @@ impl CrossFade for CossinCrossFade {
     }
 }
 
+pub struct SemicircleCrossFade;
+
+impl CrossFade for SemicircleCrossFade {
+    fn calculate(x: f64) -> CrossFadePair {
+        let y1 = if x <= 1_f64 {
+            (1_f64 - x.powi(2)).sqrt()
+        } else {
+            0_f64
+        };
+
+        let y2 = if x >= 1_f64 {
+            (1_f64 - (x - 2_f64).powi(2)).sqrt()
+        } else {
+            0_f64
+        };
+
+        (y1, y2).into()
+    }
+
+    fn step(size: usize) -> f64 {
+        2.0f64 / (size - 1) as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,6 +171,26 @@ mod tests {
                 (0.0954915028125263, 0.9045084971874736).into(),
                 (0.02447174185242323, 0.9755282581475768).into(),
                 (3.749399456654644e-33, 1.0).into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_semicircle_cross_fade() {
+        assert_eq!(
+            SemicircleCrossFade::generate(11),
+            vec![
+                CrossFadePair(1.0, 0.0),
+                CrossFadePair(0.9797958971132712, 0.0),
+                CrossFadePair(0.916515138991168, 0.0),
+                CrossFadePair(0.7999999999999999, 0.0),
+                CrossFadePair(0.5999999999999999, 0.0),
+                CrossFadePair(0.0, 0.0), // middle point
+                CrossFadePair(0.0, 0.6000000000000003),
+                CrossFadePair(0.0, 0.8),
+                CrossFadePair(0.0, 0.9165151389911681),
+                CrossFadePair(0.0, 0.9797958971132712),
+                CrossFadePair(0.0, 1.0)
             ]
         );
     }
