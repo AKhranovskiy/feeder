@@ -5,7 +5,8 @@ use std::time::Duration;
 
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
-use codec::{CrossFade, CrossFadePair, Decoder, Encoder, ParabolicCrossFade};
+use codec::dsp::{CrossFade, CrossFadePair, ParabolicCrossFade};
+use codec::{Decoder, Encoder};
 
 fn main() -> anyhow::Result<()> {
     let file_in = args().nth(1).expect("Expects file");
@@ -77,11 +78,7 @@ fn main() -> anyhow::Result<()> {
             let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
 
             for x in 0..spf {
-                let c = cf[index * spf + x];
-                let sout = left_data[x] as f64;
-                let sin = 0_f64; //right_data[x] as f64;
-
-                data[x] = c.apply(sout, sin) as f32;
+                data[x] = cf[index * spf + x].apply(left_data[x], 0_f32) as f32;
             }
 
             encoder.push(frame.freeze())?;
@@ -99,11 +96,7 @@ fn main() -> anyhow::Result<()> {
             let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
 
             for x in 0..spf {
-                let c = cf[index * spf + x];
-                let sout = 0_f64; //left_data[x] as f64;
-                let sin = right_data[x] as f64;
-
-                data[x] = c.apply(sout, sin) as f32;
+                data[x] = cf[index * spf + x].apply(0_f32, right_data[x]) as f32;
             }
 
             encoder.push(frame.freeze())?;

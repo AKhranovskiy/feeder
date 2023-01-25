@@ -1,7 +1,16 @@
 use std::cmp::Ordering;
+use std::ops::Mul;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CrossFadePair(pub f64, pub f64);
+
+impl Mul<(f32, f32)> for CrossFadePair {
+    type Output = f32;
+
+    fn mul(self, rhs: (f32, f32)) -> Self::Output {
+        (self.0 * rhs.0 as f64 + self.1 * rhs.1 as f64) as Self::Output
+    }
+}
 
 impl PartialEq for CrossFadePair {
     fn eq(&self, other: &Self) -> bool {
@@ -38,8 +47,8 @@ impl CrossFadePair {
         Self(fade_out, fade_in)
     }
 
-    pub fn apply(&self, left: f64, right: f64) -> f64 {
-        self.0 * left + self.1 * right
+    pub fn apply(&self, left: f32, right: f32) -> f32 {
+        (self.0 * (left as f64) + self.1 * (right as f64)) as f32
     }
 
     pub fn fade_out(&self) -> f64 {
