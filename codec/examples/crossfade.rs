@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     // 576 samples per frame.
     // ~38 frames per second
     let spf = frames_in[0].samples();
-    let cross_fade_frames = ((1 * sr) as f64 / spf as f64).ceil().trunc() as usize;
+    let cross_fade_frames = ((2 * sr) as f64 / spf as f64).ceil().trunc() as usize;
 
     eprintln!(
         "left: {} frames, {} samples, {:0.03} secs",
@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
             let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
 
             for x in 0..spf {
-                data[x] = cf[index * spf + x].apply(left_data[x], 0_f32) as f32;
+                data[x] = cf[index * spf + x].apply(left_data[x], 0_f32);
             }
 
             encoder.push(frame.freeze())?;
@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
             let data = cast_slice_mut::<_, f32>(planes[0].data_mut());
 
             for x in 0..spf {
-                data[x] = cf[index * spf + x].apply(0_f32, right_data[x]) as f32;
+                data[x] = cf[index * spf + x].apply(0_f32, right_data[x]);
             }
 
             encoder.push(frame.freeze())?;

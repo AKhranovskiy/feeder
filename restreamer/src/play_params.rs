@@ -1,6 +1,6 @@
-use serde::Deserializer;
-use serde::Deserialize;
 use serde::de::Error;
+use serde::Deserialize;
+use serde::Deserializer;
 
 #[derive(Debug, Deserialize)]
 pub struct PlayParams {
@@ -17,11 +17,11 @@ pub enum PlayAction {
     Lang(String),
 }
 
-static SUPPORTED_LANGUAGES: [&str;3] = ["en", "nl", "fr"];
+static SUPPORTED_LANGUAGES: [&str; 3] = ["en", "nl", "fr"];
 
 #[inline(always)]
 fn is_lang_supported(lang: &str) -> bool {
-    SUPPORTED_LANGUAGES.iter().find(|&&v| v == lang).is_some()
+    SUPPORTED_LANGUAGES.iter().any(|&v| v == lang)
 }
 
 fn deserialize_action<'de, D>(de: D) -> Result<Option<PlayAction>, D::Error>
@@ -29,7 +29,7 @@ where
     D: Deserializer<'de>,
 {
     let Some(value) = Option::<String>::deserialize(de)? else {
-        return Ok(Some(PlayAction::Passthrough)) 
+        return Ok(Some(PlayAction::Passthrough))
     };
 
     match value.to_lowercase().as_str() {
