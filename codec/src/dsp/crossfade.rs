@@ -1,8 +1,11 @@
 use std::cmp::Ordering;
 use std::ops::Mul;
 
+use ac_ffmpeg::codec::audio::AudioFrame;
+use bytemuck::{cast_slice, cast_slice_mut};
+
 #[derive(Debug, Default, Clone, Copy)]
-pub struct CrossFadePair(pub f64, pub f64);
+pub struct CrossFadePair(f64, f64);
 
 impl Mul<(f32, f32)> for CrossFadePair {
     type Output = f32;
@@ -16,6 +19,44 @@ impl PartialEq for CrossFadePair {
     fn eq(&self, other: &Self) -> bool {
         self.0.total_cmp(&other.0) == Ordering::Equal
             && self.1.total_cmp(&other.1) == Ordering::Equal
+    }
+}
+
+impl Mul<(&AudioFrame, &AudioFrame)> for &CrossFadePair {
+    type Output = AudioFrame;
+
+    fn mul(self, (left, right): (&AudioFrame, &AudioFrame)) -> Self::Output {
+        assert_eq!(
+            left.samples(),
+            right.samples(),
+            "Frames must have equal number of samples",
+        );
+
+        let samples_per_frame = left.samples();
+
+        let left_planes = left.planes();
+        let right_planes = right.planes();
+
+        assert_eq!(
+            left_planes.len(),
+            right_planes.len(),
+            "Frames must have equal number of planes",
+        );
+
+        let mut frame = left.clone().into_mut();
+        let mut planes = frame.planes_mut();
+
+        for i in 0..left_planes.len() {
+            let left_data = cast_slice::<_, f32>(left_planes[i].data());
+            let right_data = cast_slice::<_, f32>(right_planes[i].data());
+            let data = cast_slice_mut::<_, f32>(planes[i].data_mut());
+
+            for x in 0..samples_per_frame {
+                data[x] = self.apply(left_data[x], right_data[x]);
+            }
+        }
+
+        frame.freeze()
     }
 }
 

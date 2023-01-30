@@ -5,6 +5,9 @@ use ac_ffmpeg::codec::audio::AudioFrameMut;
 pub use ac_ffmpeg::packet::Packet;
 use bytemuck::cast_slice;
 
+mod frame_ext;
+pub use frame_ext::FrameDuration;
+
 mod decoder;
 pub use decoder::Decoder;
 

@@ -1,10 +1,12 @@
 use std::io::{Read, Write};
+use std::time::Duration;
 
 use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use async_stream::stream;
 use axum::body::StreamBody;
 use axum::extract::{Query, State};
-use codec::{AudioFrame, CodecParams, Decoder, Encoder, Resampler};
+use codec::dsp::{CrossFade, CrossFadePair, ParabolicCrossFade};
+use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
 use futures::Stream;
 
 use crate::play_params::{PlayAction, PlayParams};
@@ -68,11 +70,24 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
 
     let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
 
+    const CROSS_FADE_DURATION: Duration = Duration::from_secs(2);
+
+    let cf = ParabolicCrossFade::generate(
+        (CROSS_FADE_DURATION.as_millis() / sample_audio_frames[0].duration().as_millis()) as usize,
+    );
+
+    eprintln!(
+        "Cross-fade {:0.1}s, {} frames",
+        CROSS_FADE_DURATION.as_secs_f32(),
+        cf.len()
+    );
+
     let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
 
-    let mut iter = sample_audio_frames.iter().cycle();
+    let mut ad_iter = sample_audio_frames.iter().cycle();
+    let mut cf_iter = cf.iter();
 
     for frame in decoder {
         let frame = frame?;
@@ -81,17 +96,28 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
 
         let frame = match kind {
             ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => {
-                iter = sample_audio_frames.iter().cycle();
+                ad_iter = sample_audio_frames.iter().cycle();
+                cf_iter = cf.iter();
                 frame
             }
             ContentKind::Advertisement => match action {
                 PlayAction::Passthrough => frame,
                 PlayAction::Silence => codec::silence_frame(&frame),
-                PlayAction::Lang(_) => iter
-                    .next()
-                    .cloned()
-                    .map(|f| f.with_pts(frame.pts()))
-                    .unwrap_or_else(|| codec::silence_frame(&frame)),
+                PlayAction::Lang(_) => {
+                    let cf: CrossFadePair = cf_iter.next().cloned().unwrap_or((0.0, 1.0).into());
+
+                    let ad = if cf.fade_in() > 0.0 {
+                        ad_iter
+                            .next()
+                            .cloned()
+                            .map(|f| f.with_pts(frame.pts()))
+                            .unwrap_or_else(|| codec::silence_frame(&frame))
+                    } else {
+                        codec::silence_frame(&frame)
+                    };
+
+                    &cf * (&frame, &ad)
+                }
             },
         };
 
