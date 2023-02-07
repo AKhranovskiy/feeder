@@ -84,6 +84,9 @@ trait Clamp {
 }
 
 impl CrossFadePair {
+    pub const BEGIN: CrossFadePair = CrossFadePair(1.0, 0.0);
+    pub const END: CrossFadePair = CrossFadePair(0.0, 1.0);
+
     pub fn new(fade_out: f64, fade_in: f64) -> Self {
         Self(fade_out, fade_in)
     }

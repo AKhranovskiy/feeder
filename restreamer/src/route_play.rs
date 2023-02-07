@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use std::iter::repeat;
 use std::time::Duration;
 
 use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
@@ -87,7 +88,8 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
 
     let mut ad_iter = sample_audio_frames.iter().cycle();
-    let mut cf_iter = cf.iter();
+    let mut cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
+    let mut ad_segment = false;
 
     for frame in decoder {
         let frame = frame?;
@@ -96,29 +98,61 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
 
         let frame = match kind {
             ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => {
-                ad_iter = sample_audio_frames.iter().cycle();
-                cf_iter = cf.iter();
-                frame
-            }
-            ContentKind::Advertisement => match action {
-                PlayAction::Passthrough => frame,
-                PlayAction::Silence => codec::silence_frame(&frame),
-                PlayAction::Lang(_) => {
-                    let cf: CrossFadePair = cf_iter.next().cloned().unwrap_or((0.0, 1.0).into());
-
-                    let ad = if cf.fade_in() > 0.0 {
-                        ad_iter
-                            .next()
-                            .cloned()
-                            .map(|f| f.with_pts(frame.pts()))
-                            .unwrap_or_else(|| codec::silence_frame(&frame))
-                    } else {
-                        codec::silence_frame(&frame)
-                    };
-
-                    &cf * (&frame, &ad)
+                if ad_segment {
+                    cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
+                    ad_segment = false;
                 }
-            },
+
+                match action {
+                    PlayAction::Passthrough => frame,
+                    PlayAction::Silence => {
+                        let silence = codec::silence_frame(&frame);
+                        cf_iter.next().unwrap() * (&silence, &frame)
+                    }
+                    PlayAction::Lang(_) => {
+                        let cf = cf_iter.next().unwrap();
+                        let ad = if cf.fade_out() > 0.0 {
+                            ad_iter
+                                .next()
+                                .cloned()
+                                .map(|f| f.with_pts(frame.pts()))
+                                .unwrap_or_else(|| codec::silence_frame(&frame))
+                        } else {
+                            codec::silence_frame(&frame)
+                        };
+                        cf * (&ad, &frame)
+                    }
+                }
+            }
+            ContentKind::Advertisement => {
+                if !ad_segment {
+                    ad_iter = sample_audio_frames.iter().cycle();
+                    cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
+                    ad_segment = true;
+                }
+
+                match action {
+                    PlayAction::Passthrough => frame,
+                    PlayAction::Silence => {
+                        let cf = cf_iter.next().unwrap();
+                        let silence = codec::silence_frame(&frame);
+                        cf * (&silence, &frame)
+                    }
+                    PlayAction::Lang(_) => {
+                        let cf = cf_iter.next().unwrap();
+                        let ad = if cf.fade_in() > 0.0 {
+                            ad_iter
+                                .next()
+                                .cloned()
+                                .map(|f| f.with_pts(frame.pts()))
+                                .unwrap_or_else(|| codec::silence_frame(&frame))
+                        } else {
+                            codec::silence_frame(&frame)
+                        };
+                        cf * (&frame, &ad)
+                    }
+                }
+            }
         };
 
         encoder.push(frame)?;
