@@ -84,81 +84,17 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
     );
 
     let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
-
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
-
-    let mut ad_iter = sample_audio_frames.iter().cycle();
-    let mut cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
-    let mut ad_segment = false;
+    let mut mixer = Mixer::new(action, &sample_audio_frames, &cf);
 
     for frame in decoder {
         let frame = frame?;
-
         let kind = analyzer.push(frame.clone())?;
-
-        let frame = match kind {
-            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => {
-                if ad_segment {
-                    cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
-                    ad_segment = false;
-                }
-
-                match action {
-                    PlayAction::Passthrough => frame,
-                    PlayAction::Silence => {
-                        let silence = codec::silence_frame(&frame);
-                        cf_iter.next().unwrap() * (&silence, &frame)
-                    }
-                    PlayAction::Lang(_) => {
-                        let cf = cf_iter.next().unwrap();
-                        let ad = if cf.fade_out() > 0.0 {
-                            ad_iter
-                                .next()
-                                .cloned()
-                                .map(|f| f.with_pts(frame.pts()))
-                                .unwrap_or_else(|| codec::silence_frame(&frame))
-                        } else {
-                            codec::silence_frame(&frame)
-                        };
-                        cf * (&ad, &frame)
-                    }
-                }
-            }
-            ContentKind::Advertisement => {
-                if !ad_segment {
-                    ad_iter = sample_audio_frames.iter().cycle();
-                    cf_iter = cf.iter().chain(repeat(&CrossFadePair::END));
-                    ad_segment = true;
-                }
-
-                match action {
-                    PlayAction::Passthrough => frame,
-                    PlayAction::Silence => {
-                        let cf = cf_iter.next().unwrap();
-                        let silence = codec::silence_frame(&frame);
-                        cf * (&silence, &frame)
-                    }
-                    PlayAction::Lang(_) => {
-                        let cf = cf_iter.next().unwrap();
-                        let ad = if cf.fade_in() > 0.0 {
-                            ad_iter
-                                .next()
-                                .cloned()
-                                .map(|f| f.with_pts(frame.pts()))
-                                .unwrap_or_else(|| codec::silence_frame(&frame))
-                        } else {
-                            codec::silence_frame(&frame)
-                        };
-                        cf * (&frame, &ad)
-                    }
-                }
-            }
-        };
+        let frame = mixer.push(frame, kind);
 
         encoder.push(frame)?;
 
-        std::io::stdout().write_all(&kind.name().as_bytes()[..1])?;
-        std::io::stdout().flush()?;
+        print_kind(kind);
 
         if terminator.is_terminated() {
             break;
@@ -171,4 +107,107 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
     std::io::stdout().flush()?;
 
     Ok(())
+}
+
+fn print_kind(kind: ContentKind) {
+    use std::io::stdout;
+    let _ = stdout()
+        .write_all(&kind.name().as_bytes()[..1])
+        .and_then(|_| stdout().flush());
+}
+
+struct Mixer<'a> {
+    action: PlayAction,
+    ad_frames: &'a [AudioFrame],
+    ad_iter: Box<dyn Iterator<Item = &'a AudioFrame> + 'a>,
+    cross_fade: &'a [CrossFadePair],
+    cf_iter: Box<dyn Iterator<Item = &'a CrossFadePair> + 'a>,
+    ad_segment: bool,
+}
+
+impl<'a> Mixer<'a> {
+    fn new(
+        action: PlayAction,
+        ad_frames: &'a [AudioFrame],
+        cross_fade: &'a [CrossFadePair],
+    ) -> Self {
+        Self {
+            action,
+            ad_frames,
+            ad_iter: Box::new(ad_frames.iter().cycle()),
+            cross_fade,
+            cf_iter: Box::new(cross_fade.iter().chain(repeat(&CrossFadePair::END))),
+            ad_segment: false,
+        }
+    }
+
+    fn start_ad_segment(&mut self) {
+        if !self.ad_segment {
+            self.ad_iter = Box::new(self.ad_frames.iter().cycle());
+            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.ad_segment = true;
+        }
+    }
+
+    fn stop_ad_segment(&mut self) {
+        if self.ad_segment {
+            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.ad_segment = false;
+        }
+    }
+
+    pub fn push(&mut self, frame: AudioFrame, kind: ContentKind) -> AudioFrame {
+        let pts = frame.pts();
+
+        match kind {
+            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => {
+                self.stop_ad_segment();
+
+                match self.action {
+                    PlayAction::Passthrough => frame,
+                    PlayAction::Silence => {
+                        let silence = codec::silence_frame(&frame);
+                        self.cf_iter.next().unwrap() * (&silence, &frame)
+                    }
+                    PlayAction::Lang(_) => {
+                        let cf = self.cf_iter.next().unwrap();
+                        let ad = if cf.fade_out() > 0.0 {
+                            self.ad_iter
+                                .next()
+                                .cloned()
+                                .unwrap_or_else(|| codec::silence_frame(&frame))
+                        } else {
+                            codec::silence_frame(&frame)
+                        };
+                        cf * (&ad, &frame)
+                    }
+                }
+            }
+            ContentKind::Advertisement => {
+                self.start_ad_segment();
+
+                match self.action {
+                    PlayAction::Passthrough => frame,
+                    PlayAction::Silence => {
+                        let cf = self.cf_iter.next().unwrap();
+                        let silence = codec::silence_frame(&frame);
+                        cf * (&silence, &frame)
+                    }
+                    PlayAction::Lang(_) => {
+                        let cf = self.cf_iter.next().unwrap();
+                        let ad = if cf.fade_in() > 0.0 {
+                            self.ad_iter
+                                .next()
+                                .cloned()
+                                .unwrap_or_else(|| codec::silence_frame(&frame))
+                        } else {
+                            codec::silence_frame(&frame)
+                        };
+                        cf * (&frame, &ad)
+                    }
+                }
+            }
+        }
+        .with_pts(pts)
+    }
 }
