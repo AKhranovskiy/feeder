@@ -56,8 +56,9 @@ impl<'a> Mixer<'a> {
                 match self.action {
                     PlayAction::Passthrough => frame,
                     PlayAction::Silence => {
+                        let cf = self.cf_iter.next().unwrap();
                         let silence = codec::silence_frame(&frame);
-                        self.cf_iter.next().unwrap() * (&silence, &frame)
+                        cf * (&silence, &frame)
                     }
                     PlayAction::Lang(_) => {
                         let cf = self.cf_iter.next().unwrap();
@@ -81,7 +82,7 @@ impl<'a> Mixer<'a> {
                     PlayAction::Silence => {
                         let cf = self.cf_iter.next().unwrap();
                         let silence = codec::silence_frame(&frame);
-                        cf * (&silence, &frame)
+                        cf * (&frame, &silence)
                     }
                     PlayAction::Lang(_) => {
                         let cf = self.cf_iter.next().unwrap();
@@ -106,8 +107,14 @@ impl<'a> Mixer<'a> {
 mod tests {
     use ac_ffmpeg::codec::audio::{AudioFrame, AudioFrameMut, ChannelLayout};
     use ac_ffmpeg::time::Timestamp;
+    use analyzer::ContentKind;
     use bytemuck::{cast_slice, cast_slice_mut};
+    use codec::dsp::{CrossFade, ParabolicCrossFade};
     use codec::SampleFormat;
+
+    use crate::play_params::PlayAction;
+
+    use super::Mixer;
 
     fn new_frame(pts: Timestamp, content: f32) -> AudioFrame {
         let mut frame = AudioFrameMut::silence(
@@ -124,12 +131,122 @@ mod tests {
         frame.freeze().with_pts(pts)
     }
 
+    fn new_frame_series(length: usize, start_pts: i64, content: f32) -> Vec<AudioFrame> {
+        (0..length)
+            .map(|i| new_frame(Timestamp::from_secs(start_pts + i as i64), content))
+            .collect()
+    }
+
     #[test]
     fn test_new_frame() {
         let frame = new_frame(Timestamp::from_secs(1), 0.3);
         assert_eq!(frame.samples(), 4);
         assert_eq!(frame.pts().as_secs().unwrap(), 1);
         assert_eq!(&frame.samples_as_vec(), &[0.3]);
+    }
+
+    #[test]
+    fn test_music_to_advertisement_with_silence() {
+        let advertisement = new_frame_series(10, 0, 0.9);
+        let music = new_frame_series(20, 10, 0.1);
+        let cross_fade = ParabolicCrossFade::generate(3);
+
+        let mut sut = Mixer::new(PlayAction::Silence, &advertisement, &cross_fade);
+
+        let mut output = vec![];
+
+        output.extend(
+            music
+                .iter()
+                .take(5)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Music)),
+        );
+        output.extend(
+            music
+                .iter()
+                .skip(5)
+                .take(10)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Advertisement)),
+        );
+        output.extend(
+            music
+                .iter()
+                .skip(15)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Music)),
+        );
+
+        let samples = output
+            .iter()
+            .flat_map(|frame| frame.samples_as_vec().into_iter())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            &samples,
+            &[
+                0.0, 0.025, 0.1, 0.1, 0.1, 0.1, 0.025, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.025, 0.1, 0.1, 0.1
+            ]
+        );
+
+        let timestamps = output
+            .iter()
+            .map(|frame| frame.pts().as_secs().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            timestamps,
+            &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+        );
+    }
+
+    #[test]
+    fn test_music_to_advertisement_with_lang() {
+        let advertisement = new_frame_series(10, 0, 0.5);
+        let music = new_frame_series(20, 10, 1.0);
+        let cross_fade = ParabolicCrossFade::generate(4);
+
+        let mut sut = Mixer::new(PlayAction::Lang("nl".into()), &advertisement, &cross_fade);
+
+        let mut output = vec![];
+
+        output.extend(
+            music
+                .iter()
+                .take(5)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Music)),
+        );
+        output.extend(
+            music
+                .iter()
+                .skip(5)
+                .take(10)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Advertisement)),
+        );
+        output.extend(
+            music
+                .iter()
+                .skip(15)
+                .map(|frame| sut.push(frame.clone(), ContentKind::Music)),
+        );
+
+        let samples = output
+            .iter()
+            .flat_map(|frame| frame.samples_as_vec().into_iter())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            &samples,
+            &[
+                0.5, 0.33333334, 0.6666667, 1.0, 1.0, 1.0, 0.6666667, 0.33333334, 0.5, 0.5, 0.5,
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.33333334, 0.6666667, 1.0, 1.0
+            ]
+        );
+
+        let timestamps = output
+            .iter()
+            .map(|frame| frame.pts().as_secs().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            timestamps,
+            &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+        );
     }
 
     trait SamplesAsVec<T> {

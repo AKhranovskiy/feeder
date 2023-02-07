@@ -87,6 +87,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
     let mut mixer = Mixer::new(action, &sample_audio_frames, &cf);
 
+    // TODO Add starting fade-in to hide mixer initialization.
     for frame in decoder {
         let frame = frame?;
         let kind = analyzer.push(frame.clone())?;
