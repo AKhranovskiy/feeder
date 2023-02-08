@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 #[cfg(test)]
 pub fn make_master_playlist() -> Vec<u8> {
     use hls_m3u8::tags::VariantStream;
@@ -26,6 +28,7 @@ pub fn make_master_playlist() -> Vec<u8> {
 }
 
 #[cfg(test)]
+#[derive(Debug, Copy, Clone)]
 pub enum SegmentOrder {
     Direct,
     Reversed,

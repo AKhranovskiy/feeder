@@ -5,9 +5,10 @@ use codec::{CodecParams, SampleFormat};
 use kdam::{tqdm, BarExt};
 use ndarray::{s, Array2, Axis};
 
-use mfcc::calculate_mfccs;
+use mfcc::{calculate_mfccs, Config};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use rusqlite::{params, Connection};
+use serde_pickle::SerOptions;
 
 fn main() -> anyhow::Result<()> {
     let db_path = Arc::new(
@@ -48,7 +49,7 @@ fn main() -> anyhow::Result<()> {
                 position = 0,
                 force_refresh = true
             );
-            std::thread::spawn(move || process(get_conn, "Advertisement", limit, pb))
+            std::thread::spawn(move || process(&get_conn, "Advertisement", limit, pb))
         },
         {
             let get_conn = get_conn.clone();
@@ -58,17 +59,16 @@ fn main() -> anyhow::Result<()> {
                 position = 1,
                 force_refresh = true
             );
-            std::thread::spawn(move || process(get_conn, "Music", limit, pb))
+            std::thread::spawn(move || process(&get_conn, "Music", limit, pb))
         },
         {
-            // let get_conn = get_conn.clone();
             let pb = tqdm!(
                 total = limit,
                 desc = "Talks",
                 position = 2,
                 force_refresh = true
             );
-            std::thread::spawn(move || process(get_conn, "Talk", limit, pb))
+            std::thread::spawn(move || process(&get_conn, "Talk", limit, pb))
         },
     ]
     .into_iter()
@@ -87,7 +87,7 @@ fn main() -> anyhow::Result<()> {
     serde_pickle::to_writer(
         &mut std::io::BufWriter::new(std::fs::File::create("./mfccs.pickle")?),
         &mfccs,
-        Default::default(),
+        SerOptions::default(),
     )?;
 
     println!("Done. {}ms", instant.elapsed().as_millis());
@@ -95,7 +95,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn process<F>(
-    get_conn: Arc<F>,
+    get_conn: &Arc<F>,
     kind: &str,
     limit: usize,
     pb: kdam::Bar,
@@ -125,13 +125,13 @@ where
             let data: Vec<f32> =
                 codec::resample(io, CodecParams::new(22050, SampleFormat::Flt, 1))?;
 
-            let mfccs = calculate_mfccs(data.as_slice(), Default::default())?;
+            let mfccs = calculate_mfccs(data.as_slice(), Config::default())?;
             pb.lock().unwrap().update(1);
             anyhow::Ok(mfccs)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let views = ads.iter().map(|a| a.view()).collect::<Vec<_>>();
+    let views = ads.iter().map(ndarray::ArrayBase::view).collect::<Vec<_>>();
 
     ndarray::concatenate(Axis(0), views.as_slice()).map_err(Into::into)
 }

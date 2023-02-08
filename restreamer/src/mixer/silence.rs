@@ -51,6 +51,7 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 

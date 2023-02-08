@@ -105,6 +105,6 @@ pub fn delete(endpoint: &Url, id: &Uuid) -> anyhow::Result<()> {
     ureq::delete(url.as_str())
         .set("authorization", BASIC_AUTH)
         .call()
-        .map_err(|e| e.into())
+        .map_err(std::convert::Into::into)
         .map(|_| ())
 }

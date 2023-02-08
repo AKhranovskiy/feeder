@@ -37,7 +37,9 @@ fn main() -> anyhow::Result<()> {
 #[cfg(feature = "parallel")]
 fn process(files: &[PathBuf]) -> anyhow::Result<()> {
     use codec::CodecParams;
+    use mfcc::Config;
     use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+    use serde_pickle::SerOptions;
 
     let mfccs = {
         let processed = files
@@ -46,7 +48,7 @@ fn process(files: &[PathBuf]) -> anyhow::Result<()> {
                 let io = std::io::BufReader::new(std::fs::File::open(path)?);
                 let data: Vec<f32> =
                     codec::resample(io, CodecParams::new(22050, codec::SampleFormat::Flt, 1))?;
-                calculate_mfccs(data.as_slice(), Default::default()).map_err(anyhow::Error::from)
+                calculate_mfccs(data.as_slice(), Config::default()).map_err(anyhow::Error::from)
             })
             .inspect(|v| {
                 if let Err(e) = v {
@@ -56,7 +58,10 @@ fn process(files: &[PathBuf]) -> anyhow::Result<()> {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
 
-        let views = processed.iter().map(|a| a.view()).collect::<Vec<_>>();
+        let views = processed
+            .iter()
+            .map(ndarray::ArrayBase::view)
+            .collect::<Vec<_>>();
         ndarray::concatenate(Axis(0), views.as_slice())?
     };
 
@@ -65,7 +70,7 @@ fn process(files: &[PathBuf]) -> anyhow::Result<()> {
         serde_pickle::to_writer(
             &mut std::io::BufWriter::new(std::fs::File::create("./mfccs.pickle")?),
             &mfccs,
-            Default::default(),
+            SerOptions::default(),
         )?;
     }
 

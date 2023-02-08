@@ -23,7 +23,7 @@ pub async fn serve(
 
         let handle = {
             let terminator = terminator.clone();
-            std::thread::spawn(move || analyze(params, writer, terminator))
+            std::thread::spawn(move || analyze(params, writer, &terminator))
         };
 
         let mut buf = [0u8;1024];
@@ -63,7 +63,9 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
     Ok(frames)
 }
 
-fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> anyhow::Result<()> {
+const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
+
+fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> anyhow::Result<()> {
     let action = params.action.unwrap_or(PlayAction::Passthrough);
 
     let input = unstreamer::Unstreamer::open(params.url)?;
@@ -72,7 +74,6 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
 
     let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
 
-    const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
     let cf = ParabolicCrossFade::generate(
         (CROSS_FADE_DURATION.as_millis() / sample_audio_frames[0].duration().as_millis()) as usize,
     );

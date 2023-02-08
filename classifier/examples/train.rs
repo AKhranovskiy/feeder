@@ -6,6 +6,7 @@ use classifier::{verify, Classifier};
 use ndarray_shuffle::NdArrayShuffleInplaceExt;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
+use serde_pickle::DeOptions;
 
 fn main() -> anyhow::Result<()> {
     println!("Loading data...");
@@ -32,7 +33,7 @@ fn main() -> anyhow::Result<()> {
         Axis(0),
         owned_results
             .iter()
-            .map(|v| v.view())
+            .map(ndarray::ArrayBase::view)
             .collect::<Vec<_>>()
             .as_ref(),
     )?;
@@ -51,7 +52,7 @@ where
     let f = std::fs::File::open(source)?;
     let reader = std::io::BufReader::new(f);
 
-    let data: ndarray::Array3<f64> = serde_pickle::from_reader(reader, Default::default())?;
+    let data: ndarray::Array3<f64> = serde_pickle::from_reader(reader, DeOptions::default())?;
     assert_eq!(3, data.shape()[0]);
     assert_eq!(39, data.shape()[2]);
 

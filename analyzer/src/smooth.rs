@@ -8,6 +8,7 @@ pub struct LabelSmoother {
 }
 
 impl LabelSmoother {
+    #[must_use]
     pub fn new(history_size: usize) -> Self {
         Self {
             size: history_size,
@@ -77,7 +78,7 @@ mod tests {
 
         let smoothed = sut.push(labels([0.6, 0.7, 0.8]));
 
-        assert_eq!(labels([0.46000004, 2.8 / 5.0, 3.3 / 5.0]), smoothed);
+        assert_eq!(labels([0.460_000_04, 2.8 / 5.0, 3.3 / 5.0]), smoothed);
     }
 
     fn labels(values: [f32; 3]) -> PredictedLabels {

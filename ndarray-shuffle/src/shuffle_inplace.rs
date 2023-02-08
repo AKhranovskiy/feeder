@@ -68,7 +68,7 @@ impl<A: Send + std::fmt::Debug, D: Dimension> NdArrayShuffleInplaceExt
             .enumerate()
             .for_each(|(idx, chunk)| {
                 let mut rng = SmallRng::from_seed(seeds[idx]);
-                permute_blocks(chunk, &mut rng, sub_block)
+                permute_blocks(chunk, &mut rng, sub_block);
             });
         Ok(())
     }

@@ -9,8 +9,8 @@ pub trait FrameDuration {
 impl FrameDuration for AudioFrame {
     fn duration(&self) -> Duration {
         let samples = self.samples() as f64;
-        let rate = self.sample_rate() as f64;
-        let channels = self.channel_layout().channels() as f64;
+        let rate = f64::from(self.sample_rate());
+        let channels = f64::from(self.channel_layout().channels());
         Duration::from_secs_f64(samples / channels / rate)
     }
 }

@@ -7,6 +7,7 @@ use crate::{CodecParams, Decoder};
 pub struct Resampler(AudioResampler);
 
 impl Resampler {
+    #[must_use]
     pub fn new(source: CodecParams, target: CodecParams) -> Self {
         Self(
             AudioResampler::builder()

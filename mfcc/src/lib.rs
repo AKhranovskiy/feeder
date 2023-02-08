@@ -5,6 +5,7 @@ use self::util::stepped_window_ranges;
 mod util;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub struct Config {
     pub sample_rate_hz: usize,
     pub num_coefficients: usize,

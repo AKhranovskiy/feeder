@@ -17,6 +17,7 @@ pub struct CodecParams {
 }
 
 impl CodecParams {
+    #[must_use]
     pub const fn new(sample_rate: u32, sample_format: SampleFormat, channels: u32) -> Self {
         Self {
             sample_rate,
@@ -27,26 +28,32 @@ impl CodecParams {
         }
     }
 
+    #[must_use]
     pub const fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
 
+    #[must_use]
     pub const fn sample_format(&self) -> SampleFormat {
         self.sample_format
     }
 
+    #[must_use]
     pub fn channel_layout(&self) -> ChannelLayout {
         ChannelLayout::from_channels(self.channels).expect("Valid channel layout")
     }
 
+    #[must_use]
     pub const fn bit_rate(&self) -> u64 {
         self.bit_rate
     }
 
+    #[must_use]
     pub const fn samples_per_frame(&self) -> Option<usize> {
         self.samples_per_frame
     }
 
+    #[must_use]
     pub const fn with_samples_per_frame(self, samples: usize) -> Self {
         Self {
             samples_per_frame: Some(samples),

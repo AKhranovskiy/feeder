@@ -131,6 +131,7 @@ fn extract_segments<'p>(playlist: &MediaPlaylist<'p>) -> anyhow::Result<Vec<Segm
         .collect()
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn get_best_media_playlist_url(master: MasterPlaylist) -> anyhow::Result<Url> {
     master
         .variant_streams

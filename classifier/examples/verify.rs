@@ -3,6 +3,7 @@ use std::path::Path;
 use ndarray::Axis;
 
 use classifier::{verify, Classifier};
+use serde_pickle::DeOptions;
 
 fn main() -> anyhow::Result<()> {
     println!("Loading data...");
@@ -26,7 +27,7 @@ fn main() -> anyhow::Result<()> {
         Axis(0),
         owned_results
             .iter()
-            .map(|v| v.view())
+            .map(ndarray::ArrayBase::view)
             .collect::<Vec<_>>()
             .as_ref(),
     )?;
@@ -47,7 +48,7 @@ where
     let f = std::fs::File::open(source)?;
     let reader = std::io::BufReader::new(f);
 
-    let data: Vec<Vec<f64>> = serde_pickle::from_reader(reader, Default::default())?;
+    let data: Vec<Vec<f64>> = serde_pickle::from_reader(reader, DeOptions::default())?;
     assert_eq!(2, data.len());
 
     let min_len = data.iter().map(Vec::len).min().unwrap();

@@ -251,7 +251,7 @@ mod tests {
 
         println!("{segments:#?}");
         assert_eq!(segments.len(), 5);
-        assert!(segments[0..4].iter().all(|v| v.is_ok()));
+        assert!(segments[0..4].iter().all(std::result::Result::is_ok));
         assert!(segments[4].is_err());
     }
 
@@ -282,7 +282,7 @@ mod tests {
 
         println!("REV {segments:?}");
         assert_eq!(segments.len(), 5);
-        assert!(segments[0..4].iter().all(|v| v.is_ok()));
+        assert!(segments[0..4].iter().all(Result::is_ok));
         assert!(segments[4].is_err());
     }
 }

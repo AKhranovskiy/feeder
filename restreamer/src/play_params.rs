@@ -19,7 +19,6 @@ pub enum PlayAction {
 
 static SUPPORTED_LANGUAGES: [&str; 3] = ["en", "nl", "fr"];
 
-#[inline(always)]
 fn is_lang_supported(lang: &str) -> bool {
     SUPPORTED_LANGUAGES.iter().any(|&v| v == lang)
 }

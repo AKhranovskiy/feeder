@@ -14,6 +14,7 @@ pub trait Mixer {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use ac_ffmpeg::codec::audio::{AudioFrame, AudioFrameMut, ChannelLayout};
     use ac_ffmpeg::time::Timestamp;

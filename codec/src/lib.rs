@@ -44,6 +44,7 @@ where
     Ok(output)
 }
 
+#[must_use]
 pub fn silence_frame(frame: &AudioFrame) -> AudioFrame {
     AudioFrameMut::silence(
         frame.channel_layout(),

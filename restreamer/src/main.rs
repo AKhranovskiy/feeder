@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 use analyzer::BufferedAnalyzer;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -32,6 +34,7 @@ async fn main() {
         .unwrap();
 }
 
+#[allow(clippy::unused_async)]
 async fn handle_error(_err: std::io::Error) -> impl IntoResponse {
     (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }

@@ -104,14 +104,16 @@ fn main() -> anyhow::Result<()> {
     }
 
     let pts_shift = Duration::from_nanos(
-        frames_in
+        (frames_in
             .last()
             .and_then(|f| f.pts().as_nanos())
-            .unwrap_or_default() as u64
+            .unwrap_or_default()
             - frames_out[cross_fade_frames]
                 .pts()
                 .as_nanos()
-                .unwrap_or_default() as u64,
+                .unwrap_or_default())
+        .max(0)
+        .unsigned_abs(),
     );
 
     for frame in &frames_out[cross_fade_frames..] {

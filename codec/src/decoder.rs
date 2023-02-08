@@ -29,6 +29,7 @@ impl<R: Read> Decoder<R> {
 }
 
 impl<T> Decoder<T> {
+    #[must_use]
     pub fn codec_parameters(&self) -> AudioCodecParameters {
         self.demuxer.streams()[0]
             .codec_parameters()
@@ -37,10 +38,12 @@ impl<T> Decoder<T> {
             .unwrap()
     }
 
+    #[must_use]
     pub fn codec_params(&self) -> CodecParams {
         CodecParams::from(&self.codec_parameters())
     }
 
+    #[must_use]
     pub fn resample(self, target: CodecParams) -> ResamplingDecoder<T> {
         ResamplingDecoder::new(self, target)
     }

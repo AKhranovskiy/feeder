@@ -8,15 +8,15 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
 
     c.bench_function("shuffle 1500x150x39, Axis 0", |b| {
-        b.iter(|| sut.shuffle_inplace(black_box(Axis(0))))
+        b.iter(|| sut.shuffle_inplace(black_box(Axis(0))));
     });
 
     c.bench_function("shuffle 1500x150x39, Axis 1", |b| {
-        b.iter(|| sut.shuffle_inplace(black_box(Axis(1))))
+        b.iter(|| sut.shuffle_inplace(black_box(Axis(1))));
     });
 
     c.bench_function("shuffle 1500x150x39, Axis 2", |b| {
-        b.iter(|| sut.shuffle_inplace(black_box(Axis(2))))
+        b.iter(|| sut.shuffle_inplace(black_box(Axis(2))));
     });
 }
 

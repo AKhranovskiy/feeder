@@ -19,7 +19,6 @@ pub(crate) fn stepped_windows(width: usize, window: usize, step: usize) -> (usiz
     )
 }
 
-#[inline(always)]
 pub(crate) fn stepped_window_ranges(width: usize, window: usize, step: usize) -> Vec<Range<usize>> {
     let (steps, _) = stepped_windows(width, window, step);
     (0..steps).map(|i| i * step..i * step + window).collect()
@@ -66,8 +65,8 @@ mod tests {
 
     #[test]
     fn test_stepped_windows_441_220_220239() {
-        assert_eq!((1000, 202), stepped_windows(220239, 441, 220));
-        assert_eq!((1001, 0), stepped_windows(220239 + 202, 441, 220));
+        assert_eq!((1000, 202), stepped_windows(220_239, 441, 220));
+        assert_eq!((1001, 0), stepped_windows(220_239 + 202, 441, 220));
     }
 
     #[test]

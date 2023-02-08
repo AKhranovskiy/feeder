@@ -36,7 +36,7 @@ impl TryFrom<&[u8]> for Tags {
             .tags()
             .iter()
             .flat_map(|tag| tag.items().map(key_value))
-            .filter_map(|v| v.transpose())
+            .filter_map(std::result::Result::transpose)
             .partition(Result::is_ok);
 
         let error: String = errs
@@ -87,14 +87,14 @@ fn tag_value(tag: &TagItem) -> Option<String> {
     let value = match tag.value() {
         ItemValue::Text(v) | ItemValue::Locator(v) => v.clone(),
         ItemValue::Binary(v) => std::str::from_utf8(v)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .unwrap_or_default(),
     };
     let value = value.trim();
 
-    if !value.is_empty() {
-        Some(value.to_string())
-    } else {
+    if value.is_empty() {
         None
+    } else {
+        Some(value.to_string())
     }
 }

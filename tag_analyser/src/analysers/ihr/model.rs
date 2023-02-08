@@ -336,10 +336,10 @@ mod tests {
         assert!(ihr.song_spot.contains(&SongSpot::M));
         assert!(ihr.spot_instance_id.contains(&IdOrUuid::INVALID));
         assert!(ihr.length.contains(&Length(Duration::from_secs(213))));
-        assert!(ihr.media_base_id.contains(&Id(1187579)));
+        assert!(ihr.media_base_id.contains(&Id(1_187_579)));
         assert!(ihr.ta_id.contains(&Id::ZERO));
-        assert!(ihr.tp_id.contains(&Id(8795354)));
-        assert!(ihr.cartcut_id.contains(&Id(744953)));
+        assert!(ihr.tp_id.contains(&Id(8_795_354)));
+        assert!(ihr.cartcut_id.contains(&Id(744_953)));
         assert!(ihr.amg_artwork_url.contains(&AmgArtworkUrl::Url(
             "http://image.iheart.com/ihr-ingestion-pipeline-production-sbmg/A10301A0000935626B_20180529180357702/495735.20126.jpg"
         )));

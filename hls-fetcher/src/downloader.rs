@@ -12,7 +12,7 @@ pub struct UReqDl;
 impl Downloader for UReqDl {
     async fn download(&self, source: String) -> anyhow::Result<(String, Vec<u8>)> {
         // TODO - extract to lib.
-        const MEBIBYTE: usize = 1048576;
+        const MEBIBYTE: usize = 1_048_576;
         let valid_length_range = 1..2 * MEBIBYTE;
 
         tokio::task::spawn_blocking(move || {
@@ -31,7 +31,7 @@ impl Downloader for UReqDl {
                             res.into_reader()
                                 .read_exact(&mut buf)
                                 .map(|_| (content_type, buf))
-                                .map_err(|e| e.into())
+                                .map_err(std::convert::Into::into)
                         })
                 })
         })
@@ -68,10 +68,9 @@ impl Downloader for TestDl {
                 "Fail to download, next={next}, content len={}",
                 self.contents.len()
             );
-        } else {
-            self.next.fetch_add(1, SeqCst);
-            Ok(self.contents[next].clone())
         }
+        self.next.fetch_add(1, SeqCst);
+        Ok(self.contents[next].clone())
     }
 }
 

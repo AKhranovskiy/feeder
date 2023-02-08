@@ -2,13 +2,13 @@ use tags::Tags;
 
 #[test]
 fn test_empty_file() {
-    assert!(Tags::try_from(&[]).unwrap().tags().is_empty())
+    assert!(Tags::try_from(&[]).unwrap().tags().is_empty());
 }
 
 #[test]
 fn test_file_without_tags() {
     let content = include_bytes!("assets/no_tags.mp3");
-    assert!(Tags::try_from(content).unwrap().tags().is_empty())
+    assert!(Tags::try_from(content).unwrap().tags().is_empty());
 }
 
 #[test]
