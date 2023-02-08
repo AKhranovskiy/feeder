@@ -4,7 +4,7 @@ use derive_builder::Builder;
 
 use crate::SampleFormat;
 
-#[derive(Debug, Copy, Clone, Builder)]
+#[derive(Debug, Copy, Clone, Builder, PartialEq, Eq)]
 pub struct CodecParams {
     pub(crate) sample_rate: u32,
     pub(crate) sample_format: SampleFormat,

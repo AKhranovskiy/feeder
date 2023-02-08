@@ -1,12 +1,16 @@
 use std::io::{Read, Write};
+use std::iter::repeat;
+use std::time::Duration;
 
 use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use async_stream::stream;
 use axum::body::StreamBody;
 use axum::extract::{Query, State};
-use codec::{AudioFrame, CodecParams, Decoder, Encoder, Resampler};
+use codec::dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, ToFadeInOut};
+use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
 use futures::Stream;
 
+use crate::mixer::{AdMixer, Mixer, PassthroughMixer, SilenceMixer};
 use crate::play_params::{PlayAction, PlayParams};
 use crate::terminate::Terminator;
 
@@ -68,37 +72,42 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
 
     let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
 
-    let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
+    const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
+    let cf = ParabolicCrossFade::generate(
+        (CROSS_FADE_DURATION.as_millis() / sample_audio_frames[0].duration().as_millis()) as usize,
+    );
+    eprintln!(
+        "Cross-fade {:0.1}s, {} frames",
+        CROSS_FADE_DURATION.as_secs_f32(),
+        cf.len()
+    );
 
+    let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
 
-    let mut iter = sample_audio_frames.iter().cycle();
+    let mut mixer: Box<dyn Mixer> = match action {
+        PlayAction::Passthrough => Box::new(PassthroughMixer),
+        PlayAction::Silence => Box::new(SilenceMixer::new(&cf)),
+        PlayAction::Lang(_) => Box::new(AdMixer::new(&sample_audio_frames, &cf)),
+    };
+
+    let entry_fade_in = LinearCrossFade::generate(cf.len()).to_fade_in();
+    let mut efi_iter = entry_fade_in.iter().chain(repeat(&CrossFadePair::END));
 
     for frame in decoder {
         let frame = frame?;
-
         let kind = analyzer.push(frame.clone())?;
 
         let frame = match kind {
-            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => {
-                iter = sample_audio_frames.iter().cycle();
-                frame
-            }
-            ContentKind::Advertisement => match action {
-                PlayAction::Passthrough => frame,
-                PlayAction::Silence => codec::silence_frame(&frame),
-                PlayAction::Lang(_) => iter
-                    .next()
-                    .cloned()
-                    .map(|f| f.with_pts(frame.pts()))
-                    .unwrap_or_else(|| codec::silence_frame(&frame)),
-            },
+            ContentKind::Advertisement => mixer.advertisement(&frame),
+            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(&frame),
         };
+
+        let frame = efi_iter.next().unwrap() * (&frame, &frame);
 
         encoder.push(frame)?;
 
-        std::io::stdout().write_all(&kind.name().as_bytes()[..1])?;
-        std::io::stdout().flush()?;
+        print_kind(kind);
 
         if terminator.is_terminated() {
             break;
@@ -111,4 +120,11 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: Terminator) -> a
     std::io::stdout().flush()?;
 
     Ok(())
+}
+
+fn print_kind(kind: ContentKind) {
+    use std::io::stdout;
+    let _ = stdout()
+        .write_all(&kind.name().as_bytes()[..1])
+        .and_then(|_| stdout().flush());
 }

@@ -8,6 +8,7 @@ use tower_http::services::ServeDir;
 mod terminate;
 use self::terminate::Terminator;
 
+mod mixer;
 mod play_params;
 mod route_play;
 

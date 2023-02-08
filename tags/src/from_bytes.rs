@@ -35,7 +35,7 @@ impl TryFrom<&[u8]> for Tags {
         let (oks, errs): (Vec<_>, Vec<_>) = tagged_file
             .tags()
             .iter()
-            .flat_map(|tag| tag.items().iter().map(key_value))
+            .flat_map(|tag| tag.items().map(key_value))
             .filter_map(|v| v.transpose())
             .partition(Result::is_ok);
 
