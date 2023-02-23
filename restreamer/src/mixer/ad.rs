@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
 use std::iter::repeat;
+use std::time::Duration;
 
 use codec::dsp::CrossFadePair;
-use codec::AudioFrame;
+use codec::{AudioFrame, FrameDuration, Timestamp};
 
 use super::Mixer;
 
@@ -12,6 +13,8 @@ pub struct AdMixer<'af, 'cf> {
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
     play_buffer: VecDeque<AudioFrame>,
+    pts: Timestamp,
+    duration: Duration,
 }
 
 struct AdsBox<'af> {
@@ -71,7 +74,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
             };
 
             (cf * (&ad, self.play_buffer.pop_front().as_ref().unwrap_or(frame)))
-                .with_pts(frame.pts())
+                .with_pts(self.pts())
         }
     }
 
@@ -91,7 +94,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
                 codec::silence_frame(frame)
             };
 
-            (cf * (frame, &ad)).with_pts(frame.pts())
+            (cf * (frame, &ad)).with_pts(self.pts())
         }
     }
 }
@@ -104,7 +107,15 @@ impl<'af, 'cf> AdMixer<'af, 'cf> {
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
             play_buffer: VecDeque::new(),
+            pts: Timestamp::new(0, ad_frames[0].time_base()),
+            duration: ad_frames[0].duration(),
         }
+    }
+
+    fn pts(&mut self) -> Timestamp {
+        let pts = self.pts;
+        self.pts += self.duration;
+        pts
     }
 
     fn start_ad_segment(&mut self) {
@@ -172,13 +183,7 @@ mod tests {
             .map(|frame| frame.pts().as_secs().unwrap())
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            timestamps,
-            &[
-                10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-                31, 32, 33, 34, 35
-            ]
-        );
+        assert_eq!(timestamps, (0..=25).collect::<Vec<_>>());
     }
 
     #[test]
@@ -221,12 +226,6 @@ mod tests {
             .map(|frame| frame.pts().as_secs().unwrap())
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            timestamps,
-            &[
-                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 15, 16, 17,
-                18, 19, 20, 21, 22, 23, 24, 25
-            ]
-        );
+        assert_eq!(timestamps, (0..=30).collect::<Vec<_>>());
     }
 }

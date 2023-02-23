@@ -3,6 +3,8 @@ use std::io::Read;
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 use ac_ffmpeg::codec::audio::AudioFrameMut;
 pub use ac_ffmpeg::packet::Packet;
+pub use ac_ffmpeg::time::Timestamp;
+
 use bytemuck::cast_slice;
 
 mod frame_ext;
