@@ -54,13 +54,21 @@ async fn fetch_impl(
                 .iter()
                 .filter(|s| s.sequence_number > last_sequence_number.load(Ordering::Relaxed))
                 .cloned()
-                .map(|s| async {
-                    dl.download(s.source.clone()).await
-                        .map(|(content_type, content)| {
-                            last_sequence_number.fetch_max(s.sequence_number, Ordering::SeqCst);
-                            Segment { content, content_type, duration: s.duration, source: s.source, comment: s.title}
-                        })
-                })
+                .map(|_|async {
+                        anyhow::Ok(Segment{
+                            content: vec![],
+                            content_type: String::default(),
+                            duration: Duration::default(),
+                            source: String::default(),
+                            comment: String::default()})
+                        }
+                    // TODO fix
+                    // async {dl.download(s.source.clone()).await
+                    //     .map(|(content_type, content)| {
+                    //         last_sequence_number.fetch_max(s.sequence_number, Ordering::SeqCst);
+                    //         Segment { content, content_type, duration: s.duration, source: s.source, comment: s.title}
+                    //     }) }
+                )
             ).await;
 
             for segment in segments {
@@ -71,6 +79,7 @@ async fn fetch_impl(
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct SegmentInfo {
     sequence_number: usize,
     duration: Duration,
