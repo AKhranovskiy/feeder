@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::iter::repeat;
 
 use codec::dsp::CrossFadePair;
@@ -6,11 +7,45 @@ use codec::AudioFrame;
 use super::Mixer;
 
 pub struct AdMixer<'af, 'cf> {
-    ad_frames: &'af [AudioFrame],
-    ad_iter: Box<dyn Iterator<Item = &'af AudioFrame> + 'af>,
+    ads: Box<AdsBox<'af>>,
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
+    _play_buffer: VecDeque<AudioFrame>,
+}
+
+struct AdsBox<'af> {
+    ad_frames: &'af [AudioFrame],
+    ad_iter: Box<dyn Iterator<Item = &'af AudioFrame> + 'af>,
+    played: usize,
+}
+
+impl<'af> AdsBox<'af> {
+    fn new(frames: &'af [AudioFrame]) -> Self {
+        Self {
+            ad_frames: frames,
+            ad_iter: Box::new(frames.iter()),
+            played: 0,
+        }
+    }
+
+    fn next(&mut self) -> Option<&'af AudioFrame> {
+        if self.played < self.ad_frames.len() {
+            self.played += 1;
+            self.ad_iter.next()
+        } else {
+            None
+        }
+    }
+
+    fn left(&self) -> usize {
+        self.ad_frames.len() - self.played
+    }
+
+    fn reset(&mut self) {
+        self.ad_iter = Box::new(self.ad_frames.iter());
+        self.played = 0;
+    }
 }
 
 impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
@@ -19,7 +54,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
 
         let cf = self.cf_iter.next().unwrap();
         let ad = if cf.fade_out() > 0.0 {
-            self.ad_iter
+            self.ads
                 .next()
                 .cloned()
                 .unwrap_or_else(|| codec::silence_frame(frame))
@@ -35,7 +70,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
 
         let cf = self.cf_iter.next().unwrap();
         let ad = if cf.fade_in() > 0.0 {
-            self.ad_iter
+            self.ads
                 .next()
                 .cloned()
                 .unwrap_or_else(|| codec::silence_frame(frame))
@@ -50,17 +85,17 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
 impl<'af, 'cf> AdMixer<'af, 'cf> {
     pub fn new(ad_frames: &'af [AudioFrame], cross_fade: &'cf [CrossFadePair]) -> Self {
         Self {
-            ad_frames,
-            ad_iter: Box::new(ad_frames.iter().cycle()),
+            ads: Box::new(AdsBox::new(ad_frames)),
             cross_fade,
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
+            _play_buffer: VecDeque::new(),
         }
     }
 
     fn start_ad_segment(&mut self) {
         if !self.ad_segment {
-            self.ad_iter = Box::new(self.ad_frames.iter().cycle());
+            self.ads.reset();
             self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
             self.ad_segment = true;
         }
@@ -68,6 +103,7 @@ impl<'af, 'cf> AdMixer<'af, 'cf> {
 
     fn stop_ad_segment(&mut self) {
         if self.ad_segment {
+            eprintln!("ADS left {} frames", self.ads.left());
             self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
             self.ad_segment = false;
         }
@@ -84,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_music_to_advertisement() {
-        let advertisement = new_frame_series(10, 0, 0.5);
+        let advertisement = new_frame_series(20, 0, 0.5);
         let music = new_frame_series(20, 10, 1.0);
         let cross_fade = ParabolicCrossFade::generate(4);
 
@@ -142,5 +178,7 @@ mod tests {
             timestamps,
             &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
         );
+
+        panic!("ddd")
     }
 }
