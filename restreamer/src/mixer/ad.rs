@@ -11,7 +11,7 @@ pub struct AdMixer<'af, 'cf> {
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
-    _play_buffer: VecDeque<AudioFrame>,
+    play_buffer: VecDeque<AudioFrame>,
 }
 
 struct AdsBox<'af> {
@@ -30,12 +30,11 @@ impl<'af> AdsBox<'af> {
     }
 
     fn next(&mut self) -> Option<&'af AudioFrame> {
-        if self.played < self.ad_frames.len() {
-            self.played += 1;
-            self.ad_iter.next()
-        } else {
-            None
+        if self.played == self.ad_frames.len() {
+            self.reset()
         }
+        self.played += 1;
+        self.ad_iter.next()
     }
 
     fn left(&self) -> usize {
@@ -46,19 +45,18 @@ impl<'af> AdsBox<'af> {
         self.ad_iter = Box::new(self.ad_frames.iter());
         self.played = 0;
     }
+
+    fn len(&self) -> usize {
+        self.ad_frames.len()
+    }
 }
 
 impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self._play_buffer.push_back(frame.clone());
+        self.play_buffer.push_back(frame.clone());
 
         if self.ad_segment && self.ads.left() > self.cross_fade.len() / 2 {
-            // continue playing ads to the end.
-            self.ads
-                .next()
-                .cloned()
-                .unwrap_or_else(|| codec::silence_frame(frame))
-                .with_pts(frame.pts())
+            self.advertisement(frame)
         } else {
             self.stop_ad_segment();
 
@@ -72,25 +70,29 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
                 codec::silence_frame(frame)
             };
 
-            (cf * (&ad, self._play_buffer.pop_front().as_ref().unwrap_or(frame)))
+            (cf * (&ad, self.play_buffer.pop_front().as_ref().unwrap_or(frame)))
                 .with_pts(frame.pts())
         }
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.start_ad_segment();
-
-        let cf = self.cf_iter.next().unwrap();
-        let ad = if cf.fade_in() > 0.0 {
-            self.ads
-                .next()
-                .cloned()
-                .unwrap_or_else(|| codec::silence_frame(frame))
+        if !self.ad_segment && self.play_buffer.len() > self.ads.len() {
+            self.content(frame)
         } else {
-            codec::silence_frame(frame)
-        };
+            self.start_ad_segment();
 
-        (cf * (frame, &ad)).with_pts(frame.pts())
+            let cf = self.cf_iter.next().unwrap();
+            let ad = if cf.fade_in() > 0.0 {
+                self.ads
+                    .next()
+                    .cloned()
+                    .unwrap_or_else(|| codec::silence_frame(frame))
+            } else {
+                codec::silence_frame(frame)
+            };
+
+            (cf * (frame, &ad)).with_pts(frame.pts())
+        }
     }
 }
 
@@ -101,7 +103,7 @@ impl<'af, 'cf> AdMixer<'af, 'cf> {
             cross_fade,
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
-            _play_buffer: VecDeque::new(),
+            play_buffer: VecDeque::new(),
         }
     }
 
@@ -130,7 +132,7 @@ mod tests {
     use crate::mixer::{AdMixer, Mixer};
 
     #[test]
-    fn test_mixer() {
+    fn test_one_ads_block_short_buffer() {
         let advertisement = new_frame_series(10, 0, 0.5);
         let music = new_frame_series(20, 10, 1.0);
         let silence = new_frame_series(6, 30, 0.0);
@@ -175,6 +177,55 @@ mod tests {
             &[
                 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
                 31, 32, 33, 34, 35
+            ]
+        );
+    }
+
+    #[test]
+    fn test_ads_blocks_overlaps() {
+        let advertisement = new_frame_series(10, 0, 0.5);
+        let cross_fade = ParabolicCrossFade::generate(4);
+        let mut sut = AdMixer::new(&advertisement, &cross_fade);
+
+        let music_block_a = new_frame_series(5, 0, 1.0).into_iter();
+        let music_block_b = new_frame_series(5, 5, 1.0).into_iter();
+        let music_block_c = new_frame_series(5, 10, 1.0).into_iter();
+        let music_block_d = new_frame_series(5, 10, 1.0).into_iter();
+
+        let silence = new_frame_series(11, 15, 0.0).into_iter();
+
+        let mut output = vec![];
+        output.extend(music_block_a.map(|frame| sut.content(&frame)));
+        output.extend(music_block_b.map(|frame| sut.advertisement(&frame)));
+        output.extend(music_block_c.map(|frame| sut.content(&frame)));
+        output.extend(music_block_d.map(|frame| sut.advertisement(&frame)));
+
+        output.extend(silence.map(|frame| sut.content(&frame)));
+
+        let samples = output
+            .iter()
+            .flat_map(|frame| frame.samples_as_vec().into_iter())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &samples,
+            &[
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6666667, 0.33333334, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.33333334, 0.6666667,
+                1.0, 1.0, 0.0
+            ]
+        );
+
+        let timestamps = output
+            .iter()
+            .map(|frame| frame.pts().as_secs().unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            timestamps,
+            &[
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19, 20, 21, 22, 23, 24, 25
             ]
         );
     }
