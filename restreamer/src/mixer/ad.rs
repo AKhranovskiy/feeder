@@ -50,19 +50,31 @@ impl<'af> AdsBox<'af> {
 
 impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.stop_ad_segment();
+        self._play_buffer.push_back(frame.clone());
 
-        let cf = self.cf_iter.next().unwrap();
-        let ad = if cf.fade_out() > 0.0 {
+        if self.ad_segment && self.ads.left() > self.cross_fade.len() / 2 {
+            // continue playing ads to the end.
             self.ads
                 .next()
                 .cloned()
                 .unwrap_or_else(|| codec::silence_frame(frame))
+                .with_pts(frame.pts())
         } else {
-            codec::silence_frame(frame)
-        };
+            self.stop_ad_segment();
 
-        (cf * (&ad, frame)).with_pts(frame.pts())
+            let cf = self.cf_iter.next().unwrap();
+            let ad = if cf.fade_out() > 0.0 {
+                self.ads
+                    .next()
+                    .cloned()
+                    .unwrap_or_else(|| codec::silence_frame(frame))
+            } else {
+                codec::silence_frame(frame)
+            };
+
+            (cf * (&ad, self._play_buffer.pop_front().as_ref().unwrap_or(frame)))
+                .with_pts(frame.pts())
+        }
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
@@ -103,7 +115,6 @@ impl<'af, 'cf> AdMixer<'af, 'cf> {
 
     fn stop_ad_segment(&mut self) {
         if self.ad_segment {
-            eprintln!("ADS left {} frames", self.ads.left());
             self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
             self.ad_segment = false;
         }
@@ -119,9 +130,11 @@ mod tests {
     use crate::mixer::{AdMixer, Mixer};
 
     #[test]
-    fn test_music_to_advertisement() {
-        let advertisement = new_frame_series(20, 0, 0.5);
+    fn test_mixer() {
+        let advertisement = new_frame_series(10, 0, 0.5);
         let music = new_frame_series(20, 10, 1.0);
+        let silence = new_frame_series(6, 30, 0.0);
+
         let cross_fade = ParabolicCrossFade::generate(4);
 
         let mut sut = AdMixer::new(&advertisement, &cross_fade);
@@ -133,10 +146,11 @@ mod tests {
             music
                 .iter()
                 .skip(5)
-                .take(10)
+                .take(5)
                 .map(|frame| sut.advertisement(frame)),
         );
-        output.extend(music.iter().skip(15).map(|frame| sut.content(frame)));
+        output.extend(music.iter().skip(10).map(|frame| sut.content(frame)));
+        output.extend(silence.iter().map(|frame| sut.content(frame)));
 
         let samples = output
             .iter()
@@ -146,26 +160,8 @@ mod tests {
         assert_eq!(
             &samples,
             &[
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                0.666_666_7,
-                0.333_333_34,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.5,
-                0.333_333_34,
-                0.666_666_7,
-                1.0,
-                1.0
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6666667, 0.33333334, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                0.5, 0.5, 0.33333334, 0.6666667, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0
             ]
         );
 
@@ -176,9 +172,10 @@ mod tests {
 
         assert_eq!(
             timestamps,
-            &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+            &[
+                10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32, 33, 34, 35
+            ]
         );
-
-        panic!("ddd")
     }
 }
