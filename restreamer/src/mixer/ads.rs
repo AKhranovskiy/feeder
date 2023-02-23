@@ -13,6 +13,7 @@ pub struct AdsMixer<'af, 'cf> {
     ad_segment: bool,
     play_buffer: VecDeque<AudioFrame>,
     pts: Pts,
+    drain_play_buffer: bool,
 }
 
 struct AdsBox<'af> {
@@ -77,12 +78,19 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        eprintln!("BUFFER {}", self.play_buffer.len());
-        if !self.ad_segment && self.play_buffer.len() > self.ads.len() {
-            eprintln!("SKIP ADS, {} left", self.play_buffer.len());
+        if self.play_buffer.is_empty() {
+            self.drain_play_buffer = false;
+        }
+
+        if !self.drain_play_buffer && !self.ad_segment {
+            self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
+        }
+
+        if self.drain_play_buffer {
             let last_frame = self.play_buffer.pop_back().unwrap();
             self.content(&last_frame)
         } else {
+            // TODO New add should not start if there is big enough play buffer.
             self.start_ad_segment();
 
             let cf = self.cf_iter.next().unwrap();
@@ -109,6 +117,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
             ad_segment: false,
             play_buffer: VecDeque::new(),
             pts: Pts::from(&ad_frames[0]),
+            drain_play_buffer: false,
         }
     }
 
@@ -237,7 +246,6 @@ mod tests {
         output.extend(stream.iter().map(|frame| sut.content(frame)));
         output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
         output.extend(stream.iter().map(|frame| sut.content(frame)));
-        // output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
 
         output.extend(silence.map(|frame| sut.content(&frame)));
 
@@ -255,7 +263,6 @@ mod tests {
         );
 
         let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
-
         assert_eq!(timestamps, pts_seq(25));
     }
 }
