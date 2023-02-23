@@ -1,10 +1,10 @@
 use codec::AudioFrame;
 
-mod ad;
+mod ads;
 mod passthrough;
 mod silence;
 
-pub(crate) use ad::AdMixer;
+pub(crate) use ads::AdsMixer;
 pub(crate) use passthrough::PassthroughMixer;
 pub(crate) use silence::SilenceMixer;
 

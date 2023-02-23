@@ -6,7 +6,7 @@ use codec::{AudioFrame, Pts};
 
 use super::Mixer;
 
-pub struct AdMixer<'af, 'cf> {
+pub struct AdsMixer<'af, 'cf> {
     ads: Box<AdsBox<'af>>,
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
@@ -52,7 +52,7 @@ impl<'af> AdsBox<'af> {
     }
 }
 
-impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
+impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.play_buffer.push_back(frame.clone());
 
@@ -97,7 +97,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
     }
 }
 
-impl<'af, 'cf> AdMixer<'af, 'cf> {
+impl<'af, 'cf> AdsMixer<'af, 'cf> {
     pub fn new(ad_frames: &'af [AudioFrame], cross_fade: &'cf [CrossFadePair]) -> Self {
         Self {
             ads: Box::new(AdsBox::new(ad_frames)),
@@ -131,7 +131,7 @@ mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
     use crate::mixer::tests::{new_frame_series, SamplesAsVec};
-    use crate::mixer::{AdMixer, Mixer};
+    use crate::mixer::{AdsMixer, Mixer};
 
     #[test]
     fn test_one_ads_block_short_buffer() {
@@ -141,7 +141,7 @@ mod tests {
 
         let cross_fade = ParabolicCrossFade::generate(4);
 
-        let mut sut = AdMixer::new(&advertisement, &cross_fade);
+        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
 
         let mut output = vec![];
 
@@ -181,7 +181,7 @@ mod tests {
     fn test_ads_blocks_overlaps() {
         let advertisement = new_frame_series(10, 0, 0.5);
         let cross_fade = ParabolicCrossFade::generate(4);
-        let mut sut = AdMixer::new(&advertisement, &cross_fade);
+        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
 
         let music_block_a = new_frame_series(5, 0, 1.0).into_iter();
         let music_block_b = new_frame_series(5, 5, 1.0).into_iter();
