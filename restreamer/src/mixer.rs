@@ -19,15 +19,20 @@ mod tests {
     use ac_ffmpeg::codec::audio::{AudioFrame, AudioFrameMut, ChannelLayout};
     use ac_ffmpeg::time::Timestamp;
     use bytemuck::{cast_slice, cast_slice_mut};
-    use codec::SampleFormat;
+    use codec::{Pts, SampleFormat};
 
-    pub(super) fn new_frame(pts: Timestamp, content: f32) -> AudioFrame {
-        let mut frame = AudioFrameMut::silence(
+    fn frame() -> AudioFrame {
+        AudioFrameMut::silence(
             ChannelLayout::from_channels(1).unwrap().as_ref(),
             SampleFormat::Flt.into(),
             4,
             4,
-        );
+        )
+        .freeze()
+    }
+
+    pub(super) fn new_frame(pts: Timestamp, content: f32) -> AudioFrame {
+        let mut frame = frame().into_mut();
 
         for plane in frame.planes_mut().iter_mut() {
             cast_slice_mut(plane.data_mut())[0] = content;
@@ -36,11 +41,33 @@ mod tests {
         frame.freeze().with_pts(pts)
     }
 
-    pub(super) fn new_frame_series(length: usize, start_pts: i64, content: f32) -> Vec<AudioFrame> {
+    pub(super) fn new_frame_series(
+        length: usize,
+        _start_pts: i64,
+        content: f32,
+    ) -> Vec<AudioFrame> {
+        let mut pts = Pts::from(&frame());
         (0..length)
-            .map(|i| new_frame(Timestamp::from_secs(start_pts + i as i64), content))
+            .map(|_| new_frame(pts.next(), content))
             .collect()
     }
+
+    pub(super) fn pts_seq(length: usize) -> Vec<Timestamp> {
+        let frame = AudioFrameMut::silence(
+            ChannelLayout::from_channels(1).unwrap().as_ref(),
+            SampleFormat::Flt.into(),
+            4,
+            4,
+        )
+        .freeze();
+
+        let mut pts = Pts::from(&frame);
+
+        (0..length).map(|_| pts.next()).collect()
+    }
+
+    // TODO add macro verify_pts
+    // TOOD add macro verify_frame_content
 
     #[test]
     fn test_new_frame() {

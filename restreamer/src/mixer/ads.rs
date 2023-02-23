@@ -130,7 +130,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
-    use crate::mixer::tests::{new_frame_series, SamplesAsVec};
+    use crate::mixer::tests::{new_frame_series, pts_seq, SamplesAsVec};
     use crate::mixer::{AdsMixer, Mixer};
 
     #[test]
@@ -169,12 +169,8 @@ mod tests {
             ]
         );
 
-        let timestamps = output
-            .iter()
-            .map(|frame| frame.pts().as_secs().unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(timestamps, (0..=25).collect::<Vec<_>>());
+        let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
+        assert_eq!(timestamps, pts_seq(26));
     }
 
     #[test]
@@ -212,11 +208,8 @@ mod tests {
             ]
         );
 
-        let timestamps = output
-            .iter()
-            .map(|frame| frame.pts().as_secs().unwrap())
-            .collect::<Vec<_>>();
+        let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
 
-        assert_eq!(timestamps, (0..=30).collect::<Vec<_>>());
+        assert_eq!(timestamps, pts_seq(31));
     }
 }

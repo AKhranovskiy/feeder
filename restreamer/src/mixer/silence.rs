@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use codec::dsp::CrossFadePair;
-use codec::AudioFrame;
+use codec::{AudioFrame, Pts, Timestamp};
 
 use super::Mixer;
 
@@ -9,6 +9,7 @@ pub struct SilenceMixer<'cf> {
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
+    pts: Option<Pts>,
 }
 
 impl<'cf> SilenceMixer<'cf> {
@@ -17,8 +18,18 @@ impl<'cf> SilenceMixer<'cf> {
             cross_fade,
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
+            pts: None,
         }
     }
+
+    fn pts(&mut self, frame: &AudioFrame) -> Timestamp {
+        if self.pts.is_none() {
+            self.pts = Some(Pts::from(frame));
+        }
+
+        self.pts.as_mut().unwrap().next()
+    }
+
     fn start_ad_segment(&mut self) {
         if !self.ad_segment {
             self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
@@ -39,14 +50,14 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
         self.stop_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(frame);
-        (cf * (&silence, frame)).with_pts(frame.pts())
+        (cf * (&silence, frame)).with_pts(self.pts(frame))
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.start_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(frame);
-        (cf * (frame, &silence)).with_pts(frame.pts())
+        (cf * (frame, &silence)).with_pts(self.pts(frame))
     }
 }
 
@@ -55,7 +66,7 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
-    use crate::mixer::tests::{new_frame_series, SamplesAsVec};
+    use crate::mixer::tests::{new_frame_series, pts_seq, SamplesAsVec};
     use crate::mixer::{Mixer, SilenceMixer};
 
     #[test]
@@ -90,14 +101,8 @@ mod tests {
             ]
         );
 
-        let timestamps = output
-            .iter()
-            .map(|frame| frame.pts().as_secs().unwrap())
-            .collect::<Vec<_>>();
+        let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
 
-        assert_eq!(
-            timestamps,
-            &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
-        );
+        assert_eq!(timestamps, pts_seq(20));
     }
 }

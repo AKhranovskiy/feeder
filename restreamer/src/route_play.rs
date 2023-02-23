@@ -87,7 +87,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
 
     let mut mixer: Box<dyn Mixer> = match action {
-        PlayAction::Passthrough => Box::new(PassthroughMixer),
+        PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(&cf)),
         PlayAction::Lang(_) => Box::new(AdsMixer::new(&sample_audio_frames, &cf)),
     };
