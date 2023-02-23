@@ -66,12 +66,12 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
-    use crate::mixer::tests::{new_frame_series, pts_seq, SamplesAsVec};
+    use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
     use crate::mixer::{Mixer, SilenceMixer};
 
     #[test]
     fn test_music_to_advertisement() {
-        let music = new_frame_series(20, 1.0);
+        let music = create_frames(20, 1.0);
         let cross_fade = ParabolicCrossFade::generate(3);
 
         let mut sut = SilenceMixer::new(&cross_fade);

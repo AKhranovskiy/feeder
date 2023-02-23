@@ -130,14 +130,14 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
-    use crate::mixer::tests::{new_frame_series, pts_seq, SamplesAsVec};
+    use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
     use crate::mixer::{AdsMixer, Mixer};
 
     #[test]
     fn test_one_ads_block_short_buffer() {
-        let advertisement = new_frame_series(10, 0.5);
-        let music = new_frame_series(20, 1.0);
-        let silence = new_frame_series(6, 0.0);
+        let advertisement = create_frames(10, 0.5);
+        let music = create_frames(20, 1.0);
+        let silence = create_frames(6, 0.0);
 
         let cross_fade = ParabolicCrossFade::generate(4);
 
@@ -175,16 +175,16 @@ mod tests {
 
     #[test]
     fn test_ads_blocks_overlaps() {
-        let advertisement = new_frame_series(10, 0.5);
+        let advertisement = create_frames(10, 0.5);
         let cross_fade = ParabolicCrossFade::generate(4);
         let mut sut = AdsMixer::new(&advertisement, &cross_fade);
 
-        let music_block_a = new_frame_series(5, 1.0).into_iter();
-        let music_block_b = new_frame_series(5, 1.0).into_iter();
-        let music_block_c = new_frame_series(5, 1.0).into_iter();
-        let music_block_d = new_frame_series(5, 1.0).into_iter();
+        let music_block_a = create_frames(5, 1.0).into_iter();
+        let music_block_b = create_frames(5, 1.0).into_iter();
+        let music_block_c = create_frames(5, 1.0).into_iter();
+        let music_block_d = create_frames(5, 1.0).into_iter();
 
-        let silence = new_frame_series(11, 0.0).into_iter();
+        let silence = create_frames(11, 0.0).into_iter();
 
         let mut output = vec![];
         output.extend(music_block_a.map(|frame| sut.content(&frame)));
