@@ -41,11 +41,7 @@ mod tests {
         frame.freeze().with_pts(pts)
     }
 
-    pub(super) fn new_frame_series(
-        length: usize,
-        _start_pts: i64,
-        content: f32,
-    ) -> Vec<AudioFrame> {
+    pub(super) fn new_frame_series(length: usize, content: f32) -> Vec<AudioFrame> {
         let mut pts = Pts::from(&frame());
         (0..length)
             .map(|_| new_frame(pts.next(), content))

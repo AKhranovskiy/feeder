@@ -135,9 +135,9 @@ mod tests {
 
     #[test]
     fn test_one_ads_block_short_buffer() {
-        let advertisement = new_frame_series(10, 0, 0.5);
-        let music = new_frame_series(20, 10, 1.0);
-        let silence = new_frame_series(6, 30, 0.0);
+        let advertisement = new_frame_series(10, 0.5);
+        let music = new_frame_series(20, 1.0);
+        let silence = new_frame_series(6, 0.0);
 
         let cross_fade = ParabolicCrossFade::generate(4);
 
@@ -175,16 +175,16 @@ mod tests {
 
     #[test]
     fn test_ads_blocks_overlaps() {
-        let advertisement = new_frame_series(10, 0, 0.5);
+        let advertisement = new_frame_series(10, 0.5);
         let cross_fade = ParabolicCrossFade::generate(4);
         let mut sut = AdsMixer::new(&advertisement, &cross_fade);
 
-        let music_block_a = new_frame_series(5, 0, 1.0).into_iter();
-        let music_block_b = new_frame_series(5, 5, 1.0).into_iter();
-        let music_block_c = new_frame_series(5, 10, 1.0).into_iter();
-        let music_block_d = new_frame_series(5, 10, 1.0).into_iter();
+        let music_block_a = new_frame_series(5, 1.0).into_iter();
+        let music_block_b = new_frame_series(5, 1.0).into_iter();
+        let music_block_c = new_frame_series(5, 1.0).into_iter();
+        let music_block_d = new_frame_series(5, 1.0).into_iter();
 
-        let silence = new_frame_series(11, 15, 0.0).into_iter();
+        let silence = new_frame_series(11, 0.0).into_iter();
 
         let mut output = vec![];
         output.extend(music_block_a.map(|frame| sut.content(&frame)));

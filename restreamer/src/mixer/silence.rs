@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_music_to_advertisement() {
-        let music = new_frame_series(20, 10, 1.0);
+        let music = new_frame_series(20, 1.0);
         let cross_fade = ParabolicCrossFade::generate(3);
 
         let mut sut = SilenceMixer::new(&cross_fade);
