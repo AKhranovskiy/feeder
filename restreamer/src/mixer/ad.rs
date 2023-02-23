@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 use std::iter::repeat;
-use std::time::Duration;
 
 use codec::dsp::CrossFadePair;
-use codec::{AudioFrame, FrameDuration, Timestamp};
+use codec::{AudioFrame, Pts};
 
 use super::Mixer;
 
@@ -13,8 +12,7 @@ pub struct AdMixer<'af, 'cf> {
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
     play_buffer: VecDeque<AudioFrame>,
-    pts: Timestamp,
-    duration: Duration,
+    pts: Pts,
 }
 
 struct AdsBox<'af> {
@@ -74,7 +72,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
             };
 
             (cf * (&ad, self.play_buffer.pop_front().as_ref().unwrap_or(frame)))
-                .with_pts(self.pts())
+                .with_pts(self.pts.next())
         }
     }
 
@@ -94,7 +92,7 @@ impl<'af, 'cf> Mixer for AdMixer<'af, 'cf> {
                 codec::silence_frame(frame)
             };
 
-            (cf * (frame, &ad)).with_pts(self.pts())
+            (cf * (frame, &ad)).with_pts(self.pts.next())
         }
     }
 }
@@ -107,15 +105,8 @@ impl<'af, 'cf> AdMixer<'af, 'cf> {
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
             play_buffer: VecDeque::new(),
-            pts: Timestamp::new(0, ad_frames[0].time_base()),
-            duration: ad_frames[0].duration(),
+            pts: Pts::from(&ad_frames[0]),
         }
-    }
-
-    fn pts(&mut self) -> Timestamp {
-        let pts = self.pts;
-        self.pts += self.duration;
-        pts
     }
 
     fn start_ad_segment(&mut self) {
