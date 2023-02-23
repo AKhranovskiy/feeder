@@ -77,8 +77,11 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
+        eprintln!("BUFFER {}", self.play_buffer.len());
         if !self.ad_segment && self.play_buffer.len() > self.ads.len() {
-            self.content(frame)
+            eprintln!("SKIP ADS, {} left", self.play_buffer.len());
+            let last_frame = self.play_buffer.pop_back().unwrap();
+            self.content(&last_frame)
         } else {
             self.start_ad_segment();
 
@@ -211,5 +214,48 @@ mod tests {
         let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
 
         assert_eq!(timestamps, pts_seq(31));
+    }
+
+    #[test]
+    fn test_filled_buffer_skips_ads() {
+        let advertisement = create_frames(4, 0.5);
+        let cross_fade = ParabolicCrossFade::generate(0);
+        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
+
+        let stream = create_frames(2, 1.0);
+
+        let silence = create_frames(5, 0.0).into_iter();
+
+        let mut output = vec![];
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
+        output.extend(stream.iter().map(|frame| sut.content(frame)));
+        // output.extend(stream.iter().map(|frame| sut.advertisement(frame)));
+
+        output.extend(silence.map(|frame| sut.content(&frame)));
+
+        let samples = output
+            .iter()
+            .flat_map(|frame| frame.samples_as_vec().into_iter())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            &samples,
+            &[
+                1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0,
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0
+            ]
+        );
+
+        let timestamps = output.iter().map(|frame| frame.pts()).collect::<Vec<_>>();
+
+        assert_eq!(timestamps, pts_seq(25));
     }
 }
