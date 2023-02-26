@@ -138,7 +138,11 @@ impl ToFadeInOut for Vec<CrossFadePair> {
 pub trait CrossFade {
     #[must_use]
     fn step(size: usize) -> f64 {
-        1.0f64 / (size - 1) as f64
+        if size > 0 {
+            1.0f64 / (size - 1) as f64
+        } else {
+            1.0
+        }
     }
 
     fn generate(size: usize) -> Vec<CrossFadePair> {

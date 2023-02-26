@@ -1,10 +1,11 @@
 use codec::AudioFrame;
 
-mod ad;
+mod ads;
+mod ads_provider;
 mod passthrough;
 mod silence;
 
-pub(crate) use ad::AdMixer;
+pub(crate) use ads::AdsMixer;
 pub(crate) use passthrough::PassthroughMixer;
 pub(crate) use silence::SilenceMixer;
 
@@ -19,34 +20,56 @@ mod tests {
     use ac_ffmpeg::codec::audio::{AudioFrame, AudioFrameMut, ChannelLayout};
     use ac_ffmpeg::time::Timestamp;
     use bytemuck::{cast_slice, cast_slice_mut};
-    use codec::SampleFormat;
+    use codec::{Pts, SampleFormat};
 
-    pub(super) fn new_frame(pts: Timestamp, content: f32) -> AudioFrame {
-        let mut frame = AudioFrameMut::silence(
+    fn empty_frame() -> AudioFrame {
+        AudioFrameMut::silence(
             ChannelLayout::from_channels(1).unwrap().as_ref(),
             SampleFormat::Flt.into(),
             4,
             4,
-        );
+        )
+        .freeze()
+    }
+
+    fn frame_with_content(content: f32) -> AudioFrame {
+        let mut frame = empty_frame().into_mut();
 
         for plane in frame.planes_mut().iter_mut() {
             cast_slice_mut(plane.data_mut())[0] = content;
         }
 
-        frame.freeze().with_pts(pts)
+        frame.freeze()
     }
 
-    pub(super) fn new_frame_series(length: usize, start_pts: i64, content: f32) -> Vec<AudioFrame> {
+    pub(super) fn create_frames(length: usize, content: f32) -> Vec<AudioFrame> {
+        let mut pts = Pts::from(&empty_frame());
         (0..length)
-            .map(|i| new_frame(Timestamp::from_secs(start_pts + i as i64), content))
+            .map(|_| frame_with_content(content).with_pts(pts.next()))
             .collect()
     }
 
+    pub(super) fn pts_seq(length: usize) -> Vec<Timestamp> {
+        let frame = AudioFrameMut::silence(
+            ChannelLayout::from_channels(1).unwrap().as_ref(),
+            SampleFormat::Flt.into(),
+            4,
+            4,
+        )
+        .freeze();
+
+        let mut pts = Pts::from(&frame);
+
+        (0..length).map(|_| pts.next()).collect()
+    }
+
+    // TODO add macro verify_pts
+    // TOOD add macro verify_frame_content
+
     #[test]
     fn test_new_frame() {
-        let frame = new_frame(Timestamp::from_secs(1), 0.3);
+        let frame = frame_with_content(0.3);
         assert_eq!(frame.samples(), 4);
-        assert_eq!(frame.pts().as_secs().unwrap(), 1);
         assert_eq!(&frame.samples_as_vec(), &[0.3]);
     }
 

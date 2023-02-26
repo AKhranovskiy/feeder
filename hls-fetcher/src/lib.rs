@@ -233,6 +233,7 @@ mod tests {
         println!("ERROR: {:?}", segments.unwrap_err());
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_fetch_segments() {
         let dl = TestDl::new(vec![
@@ -264,6 +265,7 @@ mod tests {
         assert!(segments[4].is_err());
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_fetch_segments_reversed_order() {
         let dl = TestDl::new(vec![

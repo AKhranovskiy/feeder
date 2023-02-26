@@ -3,6 +3,8 @@ use std::io::Read;
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 use ac_ffmpeg::codec::audio::AudioFrameMut;
 pub use ac_ffmpeg::packet::Packet;
+pub use ac_ffmpeg::time::Timestamp;
+
 use bytemuck::cast_slice;
 
 mod frame_ext;
@@ -24,6 +26,9 @@ mod codec_params;
 pub use codec_params::{CodecParams, CodecParamsBuilder};
 
 pub mod dsp;
+
+mod pts;
+pub use pts::Pts;
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>

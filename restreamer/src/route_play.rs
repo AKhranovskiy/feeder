@@ -10,7 +10,7 @@ use codec::dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, 
 use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
 use futures::Stream;
 
-use crate::mixer::{AdMixer, Mixer, PassthroughMixer, SilenceMixer};
+use crate::mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 use crate::play_params::{PlayAction, PlayParams};
 use crate::terminate::Terminator;
 
@@ -87,9 +87,9 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
 
     let mut mixer: Box<dyn Mixer> = match action {
-        PlayAction::Passthrough => Box::new(PassthroughMixer),
+        PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(&cf)),
-        PlayAction::Lang(_) => Box::new(AdMixer::new(&sample_audio_frames, &cf)),
+        PlayAction::Lang(_) => Box::new(AdsMixer::new(&sample_audio_frames, &cf)),
     };
 
     let entry_fade_in = LinearCrossFade::generate(cf.len()).to_fade_in();

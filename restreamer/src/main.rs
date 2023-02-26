@@ -1,8 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
 use analyzer::BufferedAnalyzer;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use axum::routing::{get, get_service};
 use axum::{Router, Server};
 use tower_http::services::ServeDir;
@@ -16,10 +14,9 @@ mod route_play;
 
 #[tokio::main]
 async fn main() {
-    let serve_dir = get_service(ServeDir::new("assets")).handle_error(handle_error);
+    let serve_dir = get_service(ServeDir::new("assets"));
     let terminator = Terminator::new();
 
-    // TODO warm up NN
     BufferedAnalyzer::warmup();
 
     let app = Router::new()
@@ -32,9 +29,4 @@ async fn main() {
         .with_graceful_shutdown(terminator.signal())
         .await
         .unwrap();
-}
-
-#[allow(clippy::unused_async)]
-async fn handle_error(_err: std::io::Error) -> impl IntoResponse {
-    (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong...")
 }
