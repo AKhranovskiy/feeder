@@ -16,7 +16,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut encoder = Encoder::opus(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
 
-    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
+    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5, 0));
 
     for frame in decoder {
         let frame = frame?;

@@ -84,7 +84,9 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     );
 
     let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
-    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5));
+
+    // Each prediction consumes 1.6-2.4s.
+    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(1, 2));
 
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
@@ -99,6 +101,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         let frame = frame?;
         let kind = analyzer.push(frame.clone())?;
 
+        // TODO Save original stream to file.
         let frame = match kind {
             ContentKind::Advertisement => mixer.advertisement(&frame),
             ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(&frame),
@@ -107,8 +110,6 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         let frame = efi_iter.next().unwrap() * (&frame, &frame);
 
         encoder.push(frame)?;
-
-        print_kind(kind);
 
         if terminator.is_terminated() {
             break;
@@ -121,11 +122,4 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     std::io::stdout().flush()?;
 
     Ok(())
-}
-
-fn print_kind(kind: ContentKind) {
-    use std::io::stdout;
-    let _ = stdout()
-        .write_all(&kind.name().as_bytes()[..1])
-        .and_then(|_| stdout().flush());
 }

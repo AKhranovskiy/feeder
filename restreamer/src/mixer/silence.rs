@@ -101,7 +101,10 @@ mod tests {
             ]
         );
 
-        let timestamps = output.iter().map(codec::AudioFrame::pts).collect::<Vec<_>>();
+        let timestamps = output
+            .iter()
+            .map(codec::AudioFrame::pts)
+            .collect::<Vec<_>>();
 
         assert_eq!(timestamps, pts_seq(20));
     }

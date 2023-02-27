@@ -13,5 +13,6 @@ codec = { workspace = true }
 mfcc = { workspace = true }
 ndarray = { workspace = true }
 ndarray-stats = { workspace = true }
+time = { workspace = true, features = ["formatting", "local-offset"] }
 unstreamer = { workspace = true }
 url = { workspace = true }

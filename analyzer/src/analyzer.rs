@@ -6,6 +6,7 @@ use bytemuck::cast_slice;
 use classifier::Classifier;
 use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
 use ndarray_stats::QuantileExt;
+use time::{format_description, macros::offset, Instant};
 
 use crate::{ContentKind, LabelSmoother};
 
@@ -14,6 +15,7 @@ pub struct BufferedAnalyzer {
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
+    prediction_timer: Instant,
 }
 
 impl BufferedAnalyzer {
@@ -28,6 +30,7 @@ impl BufferedAnalyzer {
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
             smoother,
             last_kind: ContentKind::Unknown,
+            prediction_timer: Instant::now(),
         }
     }
 
@@ -35,6 +38,7 @@ impl BufferedAnalyzer {
         if frame.samples() < 128 {
             return Ok(self.last_kind);
         }
+        let pts = frame.pts();
 
         let mut samples: Vec<f32> = vec![];
 
@@ -52,6 +56,7 @@ impl BufferedAnalyzer {
         self.queue.append(&mut mfccs);
 
         if self.queue.len() >= (150 * coeffs) {
+            // It takes around 2.35 to fill the first batch, and then 1.57s per batch.
             let data = self
                 .queue
                 .iter()
@@ -64,14 +69,28 @@ impl BufferedAnalyzer {
             self.queue.drain(..(100 * coeffs));
 
             let prediction = self.classifer.predict(&data)?;
-            let prediction = self.smoother.push(prediction);
-
-            self.last_kind = match prediction.argmax()?.1 {
-                0 => ContentKind::Advertisement,
-                1 => ContentKind::Music,
-                2 => ContentKind::Talk,
-                _ => unreachable!("Unexpected prediction shape"),
-            };
+            if let Some(prediction) = self.smoother.push(&prediction) {
+                self.last_kind = match prediction.argmax()?.1 {
+                    0 => ContentKind::Advertisement,
+                    1 => ContentKind::Music,
+                    2 => ContentKind::Talk,
+                    _ => unreachable!("Unexpected prediction shape"),
+                };
+            }
+            eprint!(
+                "\n{}, +{}ms, {:?}: {:#}",
+                time::OffsetDateTime::now_utc()
+                    .to_offset(offset!(+8))
+                    .format(
+                        &format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+                            .unwrap()
+                    )
+                    .unwrap(),
+                self.prediction_timer.elapsed().whole_milliseconds(),
+                pts,
+                self.last_kind
+            );
+            self.prediction_timer = Instant::now();
         }
 
         Ok(self.last_kind)
