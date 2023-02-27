@@ -56,8 +56,8 @@ impl<W: Write> Encoder<W> {
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<&mut Self> {
         for frame in self.resampler.push(frame)? {
             self.encoder.try_push(frame?)?;
-            while let Some(frame) = self.encoder.take()? {
-                self.muxer.push(frame)?;
+            while let Some(packet) = self.encoder.take()? {
+                self.muxer.push(packet)?;
             }
         }
 
@@ -67,8 +67,8 @@ impl<W: Write> Encoder<W> {
     pub fn flush(&mut self) -> anyhow::Result<&mut Self> {
         self.encoder.try_flush()?;
 
-        while let Some(frame) = self.encoder.take()? {
-            self.muxer.push(frame)?;
+        while let Some(packet) = self.encoder.take()? {
+            self.muxer.push(packet)?;
         }
 
         self.muxer.flush()?;

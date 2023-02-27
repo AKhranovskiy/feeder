@@ -8,10 +8,9 @@ pub trait FrameDuration {
 
 impl FrameDuration for AudioFrame {
     fn duration(&self) -> Duration {
-        let samples = self.samples() as f64;
+        let samples_per_channel = self.samples() as f64;
         let rate = f64::from(self.sample_rate());
-        let channels = f64::from(self.channel_layout().channels());
-        Duration::from_secs_f64(samples / channels / rate)
+        Duration::from_secs_f64(samples_per_channel / rate)
     }
 }
 
@@ -28,10 +27,10 @@ mod tests {
             &ChannelLayout::from_channels(2).unwrap(),
             SampleFormat::Flt.into(),
             44100,
-            1000,
+            2048,
         )
         .freeze();
 
-        assert_eq!(frame.duration().as_millis(), 11);
+        assert_eq!(frame.duration().as_millis(), 46);
     }
 }

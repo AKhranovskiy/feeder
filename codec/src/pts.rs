@@ -66,18 +66,18 @@ mod tests {
     }
 
     #[test]
-    fn test_1024_of_48_000() {
+    fn test_960_of_48_000() {
         let frame = AudioFrameMut::silence(
             ChannelLayout::from_channels(2).unwrap().as_ref(),
             SampleFormat::Flt.into(),
             48_000,
-            1024,
+            960,
         )
         .freeze();
 
         let mut pts = Pts::from(&frame);
         assert_eq!(pts.next().as_nanos(), Some(0));
-        assert_eq!(pts.next().as_nanos(), Some(10_666_000));
-        assert_eq!(pts.next().as_nanos(), Some(21_332_000));
+        assert_eq!(pts.next().as_nanos(), Some(20_000_000));
+        assert_eq!(pts.next().as_nanos(), Some(40_000_000));
     }
 }

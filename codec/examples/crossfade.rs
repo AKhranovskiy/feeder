@@ -6,7 +6,7 @@ use std::time::Duration;
 use anyhow::ensure;
 use bytemuck::{cast_slice, cast_slice_mut};
 use codec::dsp::{CrossFade, CrossFadePair, ParabolicCrossFade};
-use codec::{Decoder, Encoder};
+use codec::{Decoder, Encoder, FrameDuration};
 
 fn main() -> anyhow::Result<()> {
     let file_in = args().nth(1).expect("Expects file");
@@ -32,7 +32,8 @@ fn main() -> anyhow::Result<()> {
     // 576 samples per frame.
     // ~38 frames per second
     let spf = frames_in[0].samples();
-    let cross_fade_frames = ((2 * sr) as f64 / spf as f64).ceil().trunc() as usize;
+    let duration = frames_in[0].duration();
+    let cross_fade_frames = (2.0 / duration.as_secs_f64()).trunc().ceil() as usize;
 
     eprintln!(
         "left: {} frames, {} samples, {:0.03} secs",
