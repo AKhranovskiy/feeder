@@ -12,6 +12,7 @@ use futures::Stream;
 
 use crate::mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 use crate::play_params::{PlayAction, PlayParams};
+use crate::stream_saver::{Destination, StreamSaver};
 use crate::terminate::Terminator;
 
 pub async fn serve(
@@ -85,6 +86,8 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
     let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
 
+    let mut stream_saver = StreamSaver::new(decoder.codec_params())?;
+
     // Each prediction consumes 1.6-2.4s.
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(1, 2));
 
@@ -101,13 +104,16 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         let frame = frame?;
         let kind = analyzer.push(frame.clone())?;
 
-        // TODO Save original stream to file.
+        stream_saver.push(Destination::Original, frame.clone());
+
         let frame = match kind {
             ContentKind::Advertisement => mixer.advertisement(&frame),
             ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(&frame),
         };
 
         let frame = efi_iter.next().unwrap() * (&frame, &frame);
+
+        stream_saver.push(Destination::Processed, frame.clone());
 
         encoder.push(frame)?;
 
@@ -117,6 +123,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     }
 
     encoder.flush()?;
+    stream_saver.flush();
 
     std::io::stdout().write_all("\nTerminating analyzer".as_bytes())?;
     std::io::stdout().flush()?;

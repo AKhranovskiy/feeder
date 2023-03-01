@@ -11,6 +11,7 @@ use self::terminate::Terminator;
 mod mixer;
 mod play_params;
 mod route_play;
+mod stream_saver;
 
 #[tokio::main]
 async fn main() {

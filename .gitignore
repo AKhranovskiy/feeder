@@ -4,3 +4,4 @@ Cargo.lock
 *.sqlite
 */model
 *.mp3
+*.ogg
