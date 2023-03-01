@@ -7,10 +7,10 @@ edition = "2021"
 anyhow = { workspace = true }
 lazy_static = { workspace = true }
 ndarray = { workspace = true }
-ndarray-shuffle = { version = "*", path = "../ndarray-shuffle" }
+ndarray-shuffle = { workspace = true }
 ndarray-stats = { workspace = true }
 numpy = { workspace = true }
 pyo3 = { workspace = true }
-rand = { version = "0.8.5", features = ["small_rng"] }
+rand = { workspace = true }
 serde = { workspace = true }
 serde-pickle = { workspace = true }
