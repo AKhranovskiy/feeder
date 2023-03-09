@@ -1,3 +1,7 @@
+#![feature(const_trait_impl)]
+
+use std::time::Duration;
+
 use crate::util::stepped_windows;
 
 use self::util::stepped_window_ranges;
@@ -16,7 +20,15 @@ pub struct Config {
     pub extend_tail: bool,
 }
 
-impl Default for Config {
+impl Config {
+    #[must_use]
+    pub const fn frame_duration(&self) -> Duration {
+        let ms = self.frame_size * 1000 / self.sample_rate_hz;
+        Duration::from_millis(ms as u64)
+    }
+}
+
+impl const Default for Config {
     fn default() -> Self {
         Self {
             sample_rate_hz: 22050,

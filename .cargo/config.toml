@@ -1,6 +1,18 @@
 [env]
-FFMPEG_INCLUDE_DIR="/usr/include/x86_64-linux-gnu/"
-FFMPEG_LIB_DIR="/usr/lib/x86_64-linux-gnu/"
+FFMPEG_INCLUDE_DIR = "/usr/include/x86_64-linux-gnu/"
+FFMPEG_LIB_DIR = "/usr/lib/x86_64-linux-gnu/"
 
 [registries.crates-io]
 protocol = "sparse"
+
+[build]
+rustflags = [
+    "-Wclippy::all",
+    "-Wclippy::pedantic",
+    "-Aclippy::missing-panics-doc",
+    "-Aclippy::missing-errors-doc",
+    "-Aclippy::module-name-repetitions",
+    "-Aclippy::cast_precision_loss",
+    "-Aclippy::cast-possible-truncation",
+    "-Aclippy::cast-sign-loss",
+]

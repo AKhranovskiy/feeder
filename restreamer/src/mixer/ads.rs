@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::iter::repeat;
 
 use codec::dsp::CrossFadePair;
-use codec::{AudioFrame, Pts};
+use codec::{AudioFrame, Pts, Timestamp};
 
 use super::ads_provider::AdsProvider;
 use super::Mixer;
@@ -15,13 +15,22 @@ pub struct AdsMixer<'af, 'cf> {
     play_buffer: VecDeque<AudioFrame>,
     pts: Pts,
     drain_play_buffer: bool,
+    last_played_timestamp: Timestamp,
 }
 
 impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.play_buffer.push_back(frame.clone());
 
-        if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
+        // eprintln!(
+        //     "BUFFER content {:?}",
+        //     self.play_buffer
+        //         .iter()
+        //         .map(codec::AudioFrame::pts)
+        //         .collect::<Vec<_>>()
+        // );
+
+        let frame = if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
             self.advertisement(frame)
         } else {
             self.stop_ad_segment();
@@ -35,13 +44,22 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
             } else {
                 codec::silence_frame(frame)
             };
-
-            (cf * (&ad, self.play_buffer.pop_front().as_ref().unwrap_or(frame)))
-                .with_pts(self.pts.next())
-        }
+            let frame = self.play_buffer.pop_front().unwrap();
+            // eprintln!("CONTENT {:?}", frame.pts());
+            (cf * (&ad, &frame)).with_pts(self.pts.next())
+        };
+        self.check(frame)
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
+        // eprintln!(
+        //     "BUFFER ads {:?}",
+        //     self.play_buffer
+        //         .iter()
+        //         .map(codec::AudioFrame::pts)
+        //         .collect::<Vec<_>>()
+        // );
+
         if self.play_buffer.is_empty() {
             self.drain_play_buffer = false;
         }
@@ -50,11 +68,11 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
             self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
         }
 
-        if self.drain_play_buffer {
-            let last_frame = self.play_buffer.pop_back().unwrap();
-            self.content(&last_frame)
+        let frame = if self.drain_play_buffer {
+            let frame = self.play_buffer.pop_front().unwrap();
+            // eprintln!("DRAIN {:?}", frame.pts());
+            frame.with_pts(self.pts.next())
         } else {
-            // TODO New add should not start if there is big enough play buffer.
             self.start_ad_segment();
 
             let cf = self.cf_iter.next().unwrap();
@@ -68,7 +86,8 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
             };
 
             (cf * (frame, &ad)).with_pts(self.pts.next())
-        }
+        };
+        self.check(frame)
     }
 }
 
@@ -82,6 +101,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
             play_buffer: VecDeque::new(),
             pts: Pts::from(&ad_frames[0]),
             drain_play_buffer: false,
+            last_played_timestamp: ad_frames[0].pts(),
         }
     }
 
@@ -99,13 +119,25 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
             self.ad_segment = false;
         }
     }
+
+    fn check(&mut self, frame: AudioFrame) -> AudioFrame {
+        if frame.pts() < self.last_played_timestamp {
+            eprintln!(
+                "OUT OF ORDER: played {:?}, next {:?}",
+                self.last_played_timestamp,
+                frame.pts()
+            );
+        }
+        self.last_played_timestamp = frame.pts();
+        frame
+    }
 }
 
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
-    use codec::{AudioFrame, Timestamp};
+    use codec::{AudioFrame, Pts, Timestamp};
 
     use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
     use crate::mixer::{AdsMixer, Mixer};
@@ -242,20 +274,26 @@ mod tests {
         mixer: &'m mut AdsMixer<'af, 'cf>,
         frame: AudioFrame,
         output: Vec<AudioFrame>,
+        pts: Pts,
     }
 
     impl<'m, 'af, 'cf> Player<'m, 'af, 'cf> {
         fn new(mixer: &'m mut AdsMixer<'af, 'cf>) -> Self {
+            let frame = create_frames(1, 1.0)[0].clone();
+            let pts = Pts::from(&frame);
             Self {
                 mixer,
-                frame: create_frames(1, 1.0)[0].clone(),
+                frame,
                 output: vec![],
+                pts,
             }
         }
 
         fn content(&mut self, length: usize) -> &mut Self {
-            self.output
-                .extend((0..length).map(|_| self.mixer.content(&self.frame)));
+            self.output.extend((0..length).map(|_| {
+                self.mixer
+                    .content(&self.frame.clone().with_pts(self.pts.next()))
+            }));
             self
         }
 

@@ -8,13 +8,15 @@ use codec::{AudioFrame, CodecParams, Encoder};
 use time::{format_description, macros::offset, OffsetDateTime};
 
 const BASE_PATH: &str = "./recordings";
+
+#[derive(Debug, Clone, Copy)]
 pub enum Destination {
     Original,
     Processed,
 }
 
 impl Destination {
-    pub fn path(&self) -> PathBuf {
+    pub fn into_path(self) -> PathBuf {
         let format =
             format_description::parse("[year][month][day]-[hour][minute][second]").unwrap();
         let now = OffsetDateTime::now_utc()
@@ -27,9 +29,7 @@ impl Destination {
             Destination::Processed => "processed",
         };
 
-        Path::new(BASE_PATH)
-            .join(&format!("{}-{}.ogg", now, dest))
-            .to_owned()
+        Path::new(BASE_PATH).join(format!("{now}-{dest}.ogg"))
     }
 }
 
@@ -42,16 +42,16 @@ impl StreamSaver {
     pub fn new(codec_params: CodecParams) -> anyhow::Result<Self> {
         eprintln!(
             "Creating stream saver\n{}\n{}",
-            Destination::Original.path().display(),
-            Destination::Processed.path().display()
+            Destination::Original.into_path().display(),
+            Destination::Processed.into_path().display()
         );
 
         let original = {
-            let writer = BufWriter::new(File::create(Destination::Original.path())?);
+            let writer = BufWriter::new(File::create(Destination::Original.into_path())?);
             Encoder::opus(codec_params, writer)?
         };
         let processed = {
-            let writer = BufWriter::new(File::create(Destination::Processed.path())?);
+            let writer = BufWriter::new(File::create(Destination::Processed.into_path())?);
             Encoder::opus(codec_params, writer)?
         };
 
@@ -67,12 +67,12 @@ impl StreamSaver {
             Destination::Original => {
                 let pts = frame.pts();
                 if let Err(error) = self.original.push(frame) {
-                    eprintln!("Failed to save original frame {:?}: {error:#?}", pts);
+                    eprintln!("Failed to save original frame {pts:?}: {error:#?}");
                 }
             }
             Destination::Processed => {
                 if let Err(error) = self.processed.push(frame) {
-                    eprintln!("Failed to save procesed frame {:?}: {error:#?}", pts);
+                    eprintln!("Failed to save procesed frame {pts:?}: {error:#?}");
                 }
             }
         }

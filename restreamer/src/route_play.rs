@@ -61,6 +61,7 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
         }
     }
 
+    frames.truncate(100);
     Ok(frames)
 }
 
@@ -88,8 +89,10 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
     let mut stream_saver = StreamSaver::new(decoder.codec_params())?;
 
-    // Each prediction consumes 1.6-2.4s.
-    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(1, 2));
+    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
+        Duration::from_millis(1500),
+        Duration::from_millis(1000),
+    ));
 
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),

@@ -1,5 +1,6 @@
 use std::io::{BufWriter, Write};
 use std::str::FromStr;
+use std::time::Duration;
 
 use ac_ffmpeg::codec::audio::AudioFrameMut;
 use codec::{Decoder, Encoder};
@@ -16,7 +17,10 @@ fn main() -> anyhow::Result<()> {
 
     let mut encoder = Encoder::opus(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
 
-    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(5, 0));
+    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
+        Duration::from_secs(1),
+        Duration::from_secs(1),
+    ));
 
     for frame in decoder {
         let frame = frame?;

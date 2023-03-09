@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use anyhow::anyhow;
 
@@ -19,6 +19,10 @@ pub struct BufferedAnalyzer {
 }
 
 impl BufferedAnalyzer {
+    pub const DRAIN_DURATION: Duration = Duration::from_millis(300);
+    const DRAIN_COEFFS: usize = Self::DRAIN_DURATION.as_millis() as usize
+        / mfcc::Config::default().frame_duration().as_millis() as usize;
+
     pub fn warmup() {
         Classifier::new().expect("Empty model");
     }
@@ -56,7 +60,6 @@ impl BufferedAnalyzer {
         self.queue.append(&mut mfccs);
 
         if self.queue.len() >= (150 * coeffs) {
-            // It takes around 2.35 to fill the first batch, and then 1.57s per batch.
             let data = self
                 .queue
                 .iter()
@@ -66,19 +69,14 @@ impl BufferedAnalyzer {
 
             let data = ndarray::Array4::from_shape_vec((1, 150, coeffs, 1), data)?;
 
-            self.queue.drain(..(100 * coeffs));
+            // 1 coeff block is 20ms
+            // Drain 500ms
+            self.queue.drain(..Self::DRAIN_COEFFS * coeffs);
 
             let prediction = self.classifer.predict(&data)?;
-            if let Some(prediction) = self.smoother.push(&prediction) {
-                self.last_kind = match prediction.argmax()?.1 {
-                    0 => ContentKind::Advertisement,
-                    1 => ContentKind::Music,
-                    2 => ContentKind::Talk,
-                    _ => unreachable!("Unexpected prediction shape"),
-                };
-            }
+
             eprint!(
-                "\n{}, +{}ms, {:?}: {:#}",
+                "{}, {:03}ms, {:?}: ",
                 time::OffsetDateTime::now_utc()
                     .to_offset(offset!(+8))
                     .format(
@@ -87,9 +85,19 @@ impl BufferedAnalyzer {
                     )
                     .unwrap(),
                 self.prediction_timer.elapsed().whole_milliseconds(),
-                pts,
-                self.last_kind
+                pts
             );
+
+            if let Some(prediction) = self.smoother.push(prediction) {
+                self.last_kind = match prediction.argmax()?.1 {
+                    0 => ContentKind::Advertisement,
+                    1 => ContentKind::Music,
+                    2 => ContentKind::Talk,
+                    _ => unreachable!("Unexpected prediction shape"),
+                };
+            }
+            eprintln!(" {:#}", self.last_kind);
+
             self.prediction_timer = Instant::now();
         }
 

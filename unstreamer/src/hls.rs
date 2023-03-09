@@ -52,6 +52,7 @@ impl HLSUnstreamer {
             let playlist = match fetch_media_playlist(&source) {
                 Ok(playlist) => playlist,
                 Err(error) => {
+                    #[allow(clippy::let_underscore_untyped)]
                     let _ = error_tx.send(error);
                     break;
                 }
@@ -79,12 +80,14 @@ impl HLSUnstreamer {
                             );
                             data_tx.send(resp.into_reader())
                         }) {
+                            #[allow(clippy::let_underscore_untyped)]
                             let _ = error_tx.send(error.into());
                             break;
                         }
                     }
                 }
                 Err(error) => {
+                    #[allow(clippy::let_underscore_untyped)]
                     let _ = error_tx.send(error);
                     break;
                 }
