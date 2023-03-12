@@ -1,20 +1,18 @@
 [package]
-name = "mfcc"
-version = "0.3.0"
+name = "tools"
+version = "0.2.0"
 edition = "2021"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = { workspace = true }
-aubio = { workspace = true }
+classifier = { workspace = true }
 bincode = { workspace = true }
-bytemuck = { workspace = true }
+clap = { workspace = true }
 codec = { workspace = true }
-futures = { workspace = true, optional = true }
-kdam = { workspace = true }
 ndarray = { workspace = true }
 rayon = { workspace = true }
 rusqlite = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true, optional = true }
-
+ulid = { workspace = true }
+mfcc = { workspace = true }

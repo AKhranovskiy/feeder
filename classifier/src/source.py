@@ -3,12 +3,13 @@ from tensorflow import keras
 from keras import Sequential
 from keras import layers
 
+# TODO pass params from the caller
 INPUT_SHAPE = [150, 39, 1]
 CLASSES = 3
 TEST_SIZE = 0.25
 VALIDATION_SIZE = 0.2
-EPOCHS = 100
-BATCH = 32
+EPOCHS = 30
+BATCH = 64
 
 
 def define_model():

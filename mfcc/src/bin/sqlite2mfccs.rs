@@ -3,12 +3,11 @@ use std::time::Instant;
 
 use codec::{CodecParams, SampleFormat};
 use kdam::{tqdm, BarExt};
-use ndarray::{s, Array2, Axis};
+use ndarray::{Array2, ArrayBase, Axis};
 
 use mfcc::{calculate_mfccs, Config};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use rusqlite::{params, Connection};
-use serde_pickle::SerOptions;
 
 fn main() -> anyhow::Result<()> {
     let db_path = Arc::new(
@@ -21,97 +20,90 @@ fn main() -> anyhow::Result<()> {
         Connection::open(db_path.as_str()).expect("Expects a valid SQLite3 database")
     });
 
-    let limit: usize = get_conn()
-        .query_row(
+    let limits = get_conn()
+        .prepare(
             r#"
-                 SELECT MIN(c)
-                 FROM audio a
-                 INNER JOIN (
-                     SELECT kind,COUNT(*) AS c
-                     FROM audio
-                     GROUP BY kind
-                     ORDER BY kind
-                 ) b
-                 ON a.kind=b.kind"#,
-            [],
-            |row| row.get(0),
+                    SELECT kind,COUNT(*)
+                    FROM audio
+                    GROUP BY kind
+                    ORDER BY kind
+                 "#,
         )
-        .expect("Valid SQL query for min count");
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("Number of records per kind");
+
+    let limit_ads = limits[0];
+    let limit_music = limits[1];
+    // let limit_talk = limits[2];
 
     let instant = Instant::now();
 
     let lines = vec![
         {
-            let get_conn = get_conn.clone();
             let pb = tqdm!(
-                total = limit,
+                total = limit_ads,
                 desc = "Advertisement",
                 position = 0,
                 force_refresh = true
             );
-            std::thread::spawn(move || process(&get_conn, "Advertisement", limit, pb))
+            let get_conn = get_conn.clone();
+            std::thread::spawn(move || process(&get_conn, "Advertisement", pb))
         },
         {
-            let get_conn = get_conn.clone();
             let pb = tqdm!(
-                total = limit,
+                total = limit_music,
                 desc = "Music",
                 position = 1,
                 force_refresh = true
             );
-            std::thread::spawn(move || process(&get_conn, "Music", limit, pb))
+            // let get_conn = get_conn.clone();
+            std::thread::spawn(move || process(&get_conn, "Music", pb))
         },
-        {
-            let pb = tqdm!(
-                total = limit,
-                desc = "Talks",
-                position = 2,
-                force_refresh = true
-            );
-            std::thread::spawn(move || process(&get_conn, "Talk", limit, pb))
-        },
+        // TODO corrupted data
+        // {
+        //     let pb = tqdm!(
+        //         total = limit_talk,
+        //         desc = "Talks",
+        //         position = 2,
+        //         force_refresh = true
+        //     );
+        //     std::thread::spawn(move || process(&get_conn, "Talk", pb))
+        // },
     ]
     .into_iter()
     .map(|worker| worker.join().unwrap())
     .collect::<Result<Vec<Array2<f64>>, _>>()?;
 
-    let length: usize = lines.iter().map(|v| v.shape()[0]).min().unwrap();
+    println!("Processed, took {}min", instant.elapsed().as_secs() / 60);
 
-    let views = lines
-        .iter()
-        .map(|v| v.slice(s![0..length, ..]))
-        .collect::<Vec<_>>();
+    println!(
+        "{:?}",
+        lines.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
+    );
 
-    let mfccs = ndarray::stack(Axis(0), &views)?;
+    let writer = std::io::BufWriter::new(std::fs::File::create("./mfccs.bin")?);
+    bincode::serialize_into(writer, &lines)?;
 
-    serde_pickle::to_writer(
-        &mut std::io::BufWriter::new(std::fs::File::create("./mfccs.pickle")?),
-        &mfccs,
-        SerOptions::default(),
-    )?;
-
-    println!("Done. {}ms", instant.elapsed().as_millis());
+    println!("Done, took {}min", instant.elapsed().as_secs() / 60);
     Ok(())
 }
 
-fn process<F>(
-    get_conn: &Arc<F>,
-    kind: &str,
-    limit: usize,
-    pb: kdam::Bar,
-) -> anyhow::Result<ndarray::Array2<f64>>
+fn process<F>(get_conn: &Arc<F>, kind: &str, pb: kdam::Bar) -> anyhow::Result<ndarray::Array2<f64>>
 where
     F: Fn() -> Connection + Sync + Send,
 {
     let conn = get_conn();
     let mut stmt = conn
-        .prepare(r#"SELECT id FROM audio WHERE kind = ? ORDER BY RANDOM() LIMIT ?"#)
+        .prepare(r#"SELECT id FROM audio WHERE kind = ? ORDER BY RANDOM() LIMIT 2500"#)
         .expect("Valid SQL query for content");
 
     let pb = Arc::new(Mutex::new(pb));
 
-    let ads = stmt
-        .query_map(params![kind, limit], |row| row.get(0))?
+    let mfccs = stmt
+        .query_map(params![kind], |row| row.get(0))?
         .collect::<Result<Vec<i128>, _>>()?
         .into_par_iter()
         .map(|id| {
@@ -122,8 +114,13 @@ where
 
             let io = std::io::Cursor::new(content);
 
-            let data: Vec<f32> =
-                codec::resample(io, CodecParams::new(22050, SampleFormat::Flt, 1))?;
+            let data: Vec<i16> =
+                codec::resample(io, CodecParams::new(22050, SampleFormat::S16, 1))?;
+            let data: Vec<f32> = data.into_iter().map(f32::from).collect();
+
+            if data.len() < 1024 {
+                return Ok(Array2::<f64>::zeros((0, 0)));
+            }
 
             let mfccs = calculate_mfccs(data.as_slice(), Config::default())?;
             pb.lock().unwrap().update(1);
@@ -131,7 +128,10 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let views = ads.iter().map(ndarray::ArrayBase::view).collect::<Vec<_>>();
-
+    let views = mfccs
+        .iter()
+        .filter(|x| !x.is_empty())
+        .map(ArrayBase::view)
+        .collect::<Vec<_>>();
     ndarray::concatenate(Axis(0), views.as_slice()).map_err(Into::into)
 }

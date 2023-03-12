@@ -20,8 +20,11 @@ pub struct BufferedAnalyzer {
 
 impl BufferedAnalyzer {
     pub const DRAIN_DURATION: Duration = Duration::from_millis(300);
+
     const DRAIN_COEFFS: usize = Self::DRAIN_DURATION.as_millis() as usize
         / mfcc::Config::default().frame_duration().as_millis() as usize;
+
+    const COEFFS: usize = mfcc::Config::default().num_coefficients;
 
     pub fn warmup() {
         Classifier::new().expect("Empty model");
@@ -44,14 +47,7 @@ impl BufferedAnalyzer {
         }
         let pts = frame.pts();
 
-        let mut samples: Vec<f32> = vec![];
-
-        resample(frame)?.planes().iter().for_each(|plane| {
-            samples.extend_from_slice(cast_slice(plane.data()));
-        });
-
-        let coeffs = mfcc::Config::default().num_coefficients;
-
+        let samples: Vec<f32> = samples(frame)?;
         let mut mfccs = mfcc::calculate_mfccs(samples.as_slice(), mfcc::Config::default())?
             .into_iter()
             .map(f64::from)
@@ -59,24 +55,24 @@ impl BufferedAnalyzer {
 
         self.queue.append(&mut mfccs);
 
-        if self.queue.len() >= (150 * coeffs) {
+        if self.queue.len() >= (150 * Self::COEFFS) {
             let data = self
                 .queue
                 .iter()
-                .take(150 * coeffs)
+                .take(150 * Self::COEFFS)
                 .copied()
                 .collect::<Vec<_>>();
 
-            let data = ndarray::Array4::from_shape_vec((1, 150, coeffs, 1), data)?;
+            let data = ndarray::Array4::from_shape_vec((1, 150, Self::COEFFS, 1), data)?;
 
             // 1 coeff block is 20ms
             // Drain 500ms
-            self.queue.drain(..Self::DRAIN_COEFFS * coeffs);
+            self.queue.drain(..Self::DRAIN_COEFFS * Self::COEFFS);
 
             let prediction = self.classifer.predict(&data)?;
 
             eprint!(
-                "{}, {:03}ms, {:?}: ",
+                "{}, {:03}ms, {:?}:",
                 time::OffsetDateTime::now_utc()
                     .to_offset(offset!(+8))
                     .format(
@@ -105,14 +101,22 @@ impl BufferedAnalyzer {
     }
 }
 
-const MFCCS_CODEC_PARAMS: CodecParams = CodecParams::new(22050, SampleFormat::Flt, 1);
+fn samples(frame: AudioFrame) -> anyhow::Result<Vec<f32>> {
+    const MFCCS_CODEC_PARAMS: CodecParams = CodecParams::new(22050, SampleFormat::S16, 1);
 
-fn resample(frame: AudioFrame) -> anyhow::Result<AudioFrame> {
     let mut resampler = Resampler::new(CodecParams::from(&frame), MFCCS_CODEC_PARAMS);
 
-    resampler
+    let frame = resampler
         .push(frame)?
         .next()
         .transpose()?
-        .ok_or_else(|| anyhow!("Resampler returns no data"))
+        .ok_or_else(|| anyhow!("Resampler returns no data"))?;
+
+    let mut output: Vec<i16> = vec![];
+
+    frame.planes().iter().for_each(|plane| {
+        output.extend_from_slice(cast_slice(plane.data()));
+    });
+
+    Ok(output.into_iter().map(f32::from).collect())
 }

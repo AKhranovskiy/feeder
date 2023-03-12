@@ -5,3 +5,6 @@ Cargo.lock
 */model
 *.mp3
 *.ogg
+*.bin
+tools/audio
+artifacts

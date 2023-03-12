@@ -1,16 +1,14 @@
 [package]
 name = "classifier"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
 lazy_static = { workspace = true }
 ndarray = { workspace = true }
-ndarray-shuffle = { workspace = true }
 ndarray-stats = { workspace = true }
 numpy = { workspace = true }
 pyo3 = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-serde-pickle = { workspace = true }

@@ -2,10 +2,13 @@
 
 use std::time::Duration;
 
+use ndarray::{Array2, Axis};
+
 use crate::util::stepped_windows;
 
 use self::util::stepped_window_ranges;
 
+mod delta;
 mod util;
 
 #[allow(dead_code)]
@@ -15,9 +18,7 @@ pub struct Config {
     pub num_coefficients: usize,
     pub frame_size: usize,
     pub hop_length: usize,
-    pub filters: usize,
     pub deltas: bool,
-    pub extend_tail: bool,
 }
 
 impl Config {
@@ -36,47 +37,56 @@ impl const Default for Config {
             deltas: false,
             // FFT 512 is recommended by librosa for speech processing
             // FFT 2048 is used by PP CNN.
-            frame_size: 441, // 20ms
-            hop_length: 220, // 10ms
-            filters: 40,
-            extend_tail: false,
+            frame_size: 441,
+            hop_length: 220,
         }
     }
 }
 
+const FILTERS: usize = 40; // Aubio says it must be 40 for MFCC
+
 pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray::Array2<f64>> {
-    // let (_, tail) = stepped_windows(input.len(), config.frame_size, config.hop_length);
-    // let input = if tail != 0 {
-    //     let mut v = input.to_vec();
-    //     v.extend_from_within(v.len() - tail..);
-    //     v
-    // } else {
-    //     input.to_vec()
-    // };
+    assert!(
+        config.num_coefficients % 3 == 0,
+        "Coeff must be multipler of 3"
+    );
+
+    let coeff = config.num_coefficients;
 
     let (segments, _) = stepped_windows(input.len(), config.frame_size, config.hop_length);
 
-    let mut output = Vec::<f32>::with_capacity(segments * config.num_coefficients);
+    let mut pvoc = aubio::PVoc::new(config.frame_size, config.hop_length)?;
+    pvoc.set_window(aubio::WindowType::Hanningz)?;
+
     let mut mfcc = aubio::MFCC::new(
         config.frame_size,
-        config.filters,
-        config.num_coefficients,
+        FILTERS,
+        coeff,
         config.sample_rate_hz as u32,
     )?;
 
+    let mut output = Array2::<f64>::from_elem((segments, coeff), 0.0);
+
     for r in stepped_window_ranges(input.len(), config.frame_size, config.hop_length) {
         let chunk = &input[r];
-        let mut mfccs = Vec::<f32>::new();
-        mfccs.resize(config.num_coefficients, 0f32);
 
-        #[allow(clippy::needless_borrow)]
-        mfcc.do_(chunk, &mut mfccs)?;
+        // let mut fftgrain = vec![0.0f32; config.frame_size];
+        // pvoc.do_(chunk, fftgrain.as_mut_slice())?;
 
-        output.extend_from_slice(&mfccs);
+        let mut buf = vec![0f32; coeff];
+        mfcc.do_(chunk, buf.as_mut_slice())?;
+
+        assert!(buf.iter().all(|x| x.is_finite()), "MFCC are finite");
+
+        output.append(
+            Axis(0),
+            Array2::from_shape_vec((1, coeff), buf)?
+                .mapv(f64::from)
+                .view(),
+        )?;
     }
-
-    let output = output.into_iter().map(f64::from).collect();
-
-    let output = ndarray::Array2::from_shape_vec((segments, config.num_coefficients), output)?;
+    // let d = deltas(output);
+    // assert_eq!(config.num_coefficients, d.shape()[1]);
+    // Ok(d)
     Ok(output)
 }
