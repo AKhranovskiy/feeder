@@ -33,12 +33,12 @@ impl Destination {
     }
 }
 
-pub struct StreamSaver {
+pub struct Recorder {
     original: Encoder<BufWriter<File>>,
     processed: Encoder<BufWriter<File>>,
 }
 
-impl StreamSaver {
+impl Recorder {
     pub fn new(codec_params: CodecParams) -> anyhow::Result<Self> {
         eprintln!(
             "Creating stream saver\n{}\n{}",

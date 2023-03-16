@@ -10,10 +10,15 @@ use codec::dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, 
 use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
 use futures::Stream;
 
-use crate::mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
-use crate::play_params::{PlayAction, PlayParams};
-use crate::stream_saver::{Destination, StreamSaver};
 use crate::terminate::Terminator;
+
+mod mixer;
+mod params;
+mod recorder;
+
+use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
+use params::{PlayAction, PlayParams};
+use recorder::{Destination, Recorder};
 
 pub async fn serve(
     Query(params): Query<PlayParams>,
@@ -50,7 +55,7 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
     // TODO resample() does not work
     let params = params.with_samples_per_frame(2048); // for OGG
 
-    let sample_audio = include_bytes!("../sample.mp3");
+    let sample_audio = include_bytes!("../../sample.mp3");
     let decoder = Decoder::try_from(std::io::Cursor::new(sample_audio))?;
     let mut resampler = Resampler::new(decoder.codec_params(), params);
     let mut frames = vec![];
@@ -87,7 +92,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
     let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
 
-    let mut stream_saver = StreamSaver::new(decoder.codec_params())?;
+    let mut recorder = Recorder::new(decoder.codec_params())?;
 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
         Duration::from_millis(1500),
@@ -107,7 +112,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         let frame = frame?;
         let kind = analyzer.push(frame.clone())?;
 
-        stream_saver.push(Destination::Original, frame.clone());
+        recorder.push(Destination::Original, frame.clone());
 
         let frame = match kind {
             ContentKind::Advertisement => mixer.advertisement(&frame),
@@ -116,7 +121,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
         let frame = efi_iter.next().unwrap() * (&frame, &frame);
 
-        stream_saver.push(Destination::Processed, frame.clone());
+        recorder.push(Destination::Processed, frame.clone());
 
         encoder.push(frame)?;
 
@@ -126,7 +131,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     }
 
     encoder.flush()?;
-    stream_saver.flush();
+    recorder.flush();
 
     std::io::stdout().write_all("\nTerminating analyzer".as_bytes())?;
     std::io::stdout().flush()?;
