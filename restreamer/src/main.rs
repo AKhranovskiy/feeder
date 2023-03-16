@@ -18,6 +18,7 @@ async fn main() {
     let app = Router::new()
         .nest_service("/", serve_dir.clone())
         .route("/play", get(routes::play::serve))
+        .nest("/vast", routes::vast::routes(terminator.clone()))
         .with_state(terminator.clone());
 
     Server::bind(&"0.0.0.0:3000".parse().unwrap())
