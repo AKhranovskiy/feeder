@@ -1,24 +1,22 @@
-use axum::extract::State;
-use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
-use rand::Rng;
 
 use crate::terminate::Terminator;
 
-pub fn routes(terminator: Terminator) -> Router<Terminator> {
-    Router::new().route("/", get(root)).with_state(terminator)
-}
+mod collection;
+use collection::VastCollection;
 
-const VAST_FILES: &[&str] = &[include_str!("../../vast/one.xml")];
+mod state;
+use state::VastState;
 
-#[allow(clippy::unused_async)]
-async fn root(State(_terminator): State<Terminator>) -> impl IntoResponse {
-    let id = rand::thread_rng().gen_range(0..VAST_FILES.len());
-    let xml = VAST_FILES[id].replace("{{SERVER}}", "localhost:3000");
+mod root;
 
-    Response::builder()
-        .header(axum::http::header::CONTENT_TYPE, "application/xml")
-        .body(xml)
-        .unwrap()
+// Axum doc says it should be generic return type.
+pub fn routes<S>(server: &str, terminator: Terminator) -> Router<S> {
+    Router::new()
+        .route("/", get(root::serve))
+        .with_state(VastState {
+            collection: VastCollection::new(server),
+            terminator,
+        })
 }
