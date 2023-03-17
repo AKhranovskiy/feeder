@@ -21,7 +21,7 @@ aubio = { version = "0.2.1", features = ["pkg-config"] }
 bincode = "1.3.3"
 bson = "2.6.0"
 bytemuck = "1.13.1"
-clap = { version = "4.1.8", features = ["derive"] }
+clap = { version = "4.1.9", features = ["derive"] }
 criterion = "0.4.0"
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 flume = { version = "0.10.14", default-features = false }
