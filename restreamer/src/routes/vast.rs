@@ -1,7 +1,7 @@
 use axum::routing::get;
 use axum::Router;
 
-use crate::terminate::Terminator;
+use crate::GlobalState;
 
 mod collection;
 use collection::VastCollection;
@@ -12,11 +12,11 @@ use state::VastState;
 mod root;
 
 // Axum doc says it should be generic return type.
-pub fn routes<S>(server: &str, terminator: Terminator) -> Router<S> {
+pub(crate) fn routes<S>(server: &str, state: GlobalState) -> Router<S> {
     Router::new()
         .route("/", get(root::serve))
         .with_state(VastState {
             collection: VastCollection::new(server),
-            terminator,
+            terminator: state.terminator,
         })
 }

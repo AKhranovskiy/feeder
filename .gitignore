@@ -8,3 +8,4 @@ Cargo.lock
 *.bin
 tools/audio
 artifacts
+restreamer/assets/files

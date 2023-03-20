@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
-use std::cell::Cell;
 use std::fmt::Debug;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 mod entry;
 pub use entry::AdEntry;
@@ -10,7 +11,7 @@ pub use entry::AdEntry;
 #[derive(Debug, Clone)]
 pub struct AdBuffet {
     queue: Vec<AdEntry>,
-    pos: Cell<usize>,
+    pos: Arc<AtomicUsize>,
 }
 
 impl TryFrom<&[&Path]> for AdBuffet {
@@ -24,7 +25,7 @@ impl TryFrom<&[&Path]> for AdBuffet {
 
         Ok(Self {
             queue,
-            pos: Cell::default(),
+            pos: Arc::default(),
         })
     }
 }
@@ -35,11 +36,11 @@ impl AdBuffet {
             return None;
         }
 
-        let pos = self.pos.get();
-        assert!(pos < self.queue.len());
-        self.pos.set((pos + 1) % self.queue.len());
-
-        self.queue.get(pos)
+        self.pos
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some((x + 1) % self.queue.len())
+            })
+            .map_or(None, |pos| self.queue.get(pos))
     }
 }
 
@@ -75,7 +76,7 @@ mod tests {
         fn empty() -> Self {
             Self {
                 queue: Vec::default(),
-                pos: Cell::default(),
+                pos: Arc::default(),
             }
         }
     }
@@ -84,7 +85,7 @@ mod tests {
         fn from(names: [&str; N]) -> Self {
             Self {
                 queue: names.into_iter().map(AdEntry::from_name).collect(),
-                pos: Cell::default(),
+                pos: Arc::default(),
             }
         }
     }

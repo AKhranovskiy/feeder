@@ -11,6 +11,7 @@ use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler}
 use futures::Stream;
 
 use crate::terminate::Terminator;
+use crate::GlobalState;
 
 mod mixer;
 mod params;
@@ -20,15 +21,15 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 use params::{PlayAction, PlayParams};
 use recorder::{Destination, Recorder};
 
-pub async fn serve(
+pub(crate) async fn serve(
     Query(params): Query<PlayParams>,
-    State(terminator): State<Terminator>,
+    State(state): State<GlobalState>,
 ) -> StreamBody<impl Stream<Item = anyhow::Result<Vec<u8>>>> {
     stream! {
         let (mut reader, writer) = os_pipe::pipe()?;
 
         let handle = {
-            let terminator = terminator.clone();
+            let terminator = state.terminator.clone();
             std::thread::spawn(move || analyze(params, writer, &terminator))
         };
 
@@ -39,7 +40,7 @@ pub async fn serve(
                 handle.join().unwrap()?;
                 break;
             }
-            if terminator.is_terminated() {
+            if state.terminator.is_terminated() {
                 break;
             }
 
