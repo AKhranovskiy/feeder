@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
 use std::cell::Cell;
+use std::fmt::Debug;
+use std::path::Path;
+
+mod entry;
+pub use entry::AdEntry;
 
 #[derive(Debug, Clone)]
 pub struct AdBuffet {
@@ -8,25 +13,23 @@ pub struct AdBuffet {
     pos: Cell<usize>,
 }
 
-#[derive(Debug, Clone)]
-pub struct AdEntry {
-    pub name: String,
-}
+impl TryFrom<&[&Path]> for AdBuffet {
+    type Error = anyhow::Error;
 
-impl From<&str> for AdEntry {
-    fn from(name: &str) -> Self {
-        Self { name: name.into() }
+    fn try_from(paths: &[&Path]) -> Result<Self, Self::Error> {
+        let queue = paths
+            .iter()
+            .map(|&path| AdEntry::try_from(path))
+            .collect::<anyhow::Result<_>>()?;
+
+        Ok(Self {
+            queue,
+            pos: Cell::default(),
+        })
     }
 }
 
 impl AdBuffet {
-    pub fn new() -> Self {
-        Self {
-            queue: vec![],
-            pos: Cell::new(0),
-        }
-    }
-
     pub fn next(&self) -> Option<&AdEntry> {
         if self.queue.is_empty() {
             return None;
@@ -40,44 +43,49 @@ impl AdBuffet {
     }
 }
 
-impl FromIterator<AdEntry> for AdBuffet {
-    fn from_iter<T: IntoIterator<Item = AdEntry>>(iter: T) -> Self {
-        Self {
-            queue: Vec::from_iter(iter),
-            pos: Cell::new(0),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_empty() {
-        let sut = AdBuffet::new();
+        let sut = AdBuffet::empty();
         assert!(sut.next().is_none());
     }
 
     #[test]
     fn test_single() {
-        let sut = AdBuffet::from_iter([AdEntry::from("single")]);
-        assert_eq!(sut.next().map_or("", |a| &a.name), "single");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "single");
+        let sut = AdBuffet::from(["single"]);
+        assert_eq!(sut.next().map_or("", AdEntry::name), "single");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "single");
     }
 
     #[test]
     fn test_few() {
-        let sut = AdBuffet::from_iter([
-            AdEntry::from("first"),
-            AdEntry::from("second"),
-            AdEntry::from("third"),
-        ]);
-        assert_eq!(sut.next().map_or("", |a| &a.name), "first");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "second");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "third");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "first");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "second");
-        assert_eq!(sut.next().map_or("", |a| &a.name), "third");
+        let sut = AdBuffet::from(["first", "second", "third"]);
+        assert_eq!(sut.next().map_or("", AdEntry::name), "first");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "second");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "third");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "first");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "second");
+        assert_eq!(sut.next().map_or("", AdEntry::name), "third");
+    }
+
+    impl AdBuffet {
+        fn empty() -> Self {
+            Self {
+                queue: Vec::default(),
+                pos: Cell::default(),
+            }
+        }
+    }
+
+    impl<const N: usize> From<[&str; N]> for AdBuffet {
+        fn from(names: [&str; N]) -> Self {
+            Self {
+                queue: names.into_iter().map(AdEntry::from_name).collect(),
+                pos: Cell::default(),
+            }
+        }
     }
 }
