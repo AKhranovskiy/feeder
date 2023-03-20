@@ -18,7 +18,6 @@ mod routes;
 
 #[derive(Clone)]
 struct GlobalState {
-    #[allow(dead_code)]
     pub ad_buffet: Arc<AdBuffet>,
     pub terminator: Terminator,
 }
@@ -33,6 +32,8 @@ async fn main() {
         ad_buffet: Arc::new(load_ads()),
         terminator: Terminator::new(),
     };
+
+    eprintln!("AdBuffet loaded {} ads", state.ad_buffet.size());
 
     let app = Router::new()
         .nest_service("/", serve_dir.clone())

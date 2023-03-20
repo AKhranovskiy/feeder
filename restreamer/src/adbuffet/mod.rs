@@ -42,6 +42,10 @@ impl AdBuffet {
             })
             .map_or(None, |pos| self.queue.get(pos))
     }
+
+    pub fn size(&self) -> usize {
+        self.queue.len()
+    }
 }
 
 #[cfg(test)]
