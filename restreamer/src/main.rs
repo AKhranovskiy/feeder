@@ -3,6 +3,8 @@ use axum::routing::{get, get_service};
 use axum::{Router, Server};
 use tower_http::services::ServeDir;
 
+mod adbuffet;
+
 mod terminate;
 use terminate::Terminator;
 
