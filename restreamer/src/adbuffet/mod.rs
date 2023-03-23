@@ -8,8 +8,6 @@ use std::sync::Arc;
 mod entry;
 pub use entry::AdEntry;
 
-use self::entry::AdEntryRef;
-
 #[derive(Debug, Clone)]
 pub struct AdBuffet {
     queue: Vec<Arc<AdEntry>>,
@@ -33,7 +31,7 @@ impl TryFrom<&[&Path]> for AdBuffet {
 }
 
 impl AdBuffet {
-    pub fn next(&self) -> Option<AdEntryRef> {
+    pub fn next(&self) -> Option<Arc<AdEntry>> {
         if self.queue.is_empty() {
             return None;
         }
@@ -42,9 +40,7 @@ impl AdBuffet {
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
                 Some((x + 1) % self.queue.len())
             })
-            .map_or(None, |pos| {
-                self.queue.get(pos).cloned().map(AdEntryRef::from)
-            })
+            .map_or(None, |pos| self.queue.get(pos).cloned())
     }
 
     pub fn size(&self) -> usize {
@@ -56,10 +52,6 @@ impl AdBuffet {
 mod tests {
     use super::*;
 
-    fn entry_name(entry: &AdEntryRef) -> &str {
-        entry.name()
-    }
-
     #[test]
     fn test_empty() {
         let sut = AdBuffet::empty();
@@ -69,19 +61,19 @@ mod tests {
     #[test]
     fn test_single() {
         let sut = AdBuffet::from(["single"]);
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "single");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "single");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "single");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "single");
     }
 
     #[test]
     fn test_few() {
         let sut = AdBuffet::from(["first", "second", "third"]);
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "first");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "second");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "third");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "first");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "second");
-        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "third");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "first");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "second");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "third");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "first");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "second");
+        assert_eq!(sut.next().as_deref().map_or("", AdEntry::name), "third");
     }
 
     impl AdBuffet {

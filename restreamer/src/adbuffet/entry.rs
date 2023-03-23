@@ -2,7 +2,6 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -66,23 +65,17 @@ impl AdEntry {
             duration: Duration::ZERO,
         }
     }
-}
 
-pub struct AdEntryRef {
-    entry: Arc<AdEntry>,
-}
-
-impl AdEntryRef {
     pub fn name(&self) -> &str {
-        self.entry.name.as_ref()
+        self.name.as_ref()
     }
 
     pub fn frames(&self) -> &[AudioFrame] {
-        self.entry.frames.as_ref()
+        self.frames.as_ref()
     }
 
     pub fn duration(&self) -> Duration {
-        self.entry.duration
+        self.duration
     }
 }
 
@@ -105,7 +98,7 @@ impl<'entry> Iterator for AdEntryFrameIterator<'entry> {
     }
 }
 
-impl<'entry> IntoIterator for &'entry AdEntryRef {
+impl<'entry> IntoIterator for &'entry AdEntry {
     type Item = &'entry AudioFrame;
 
     type IntoIter = AdEntryFrameIterator<'entry>;
@@ -118,14 +111,3 @@ impl<'entry> IntoIterator for &'entry AdEntryRef {
     }
 }
 
-impl From<Arc<AdEntry>> for AdEntryRef {
-    fn from(entry: Arc<AdEntry>) -> Self {
-        Self { entry }
-    }
-}
-
-impl AsRef<AdEntry> for AdEntryRef {
-    fn as_ref(&self) -> &AdEntry {
-        self.entry.as_ref()
-    }
-}
