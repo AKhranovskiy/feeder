@@ -2,19 +2,22 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use codec::{AudioFrame, Decoder, FrameDuration};
-use time::macros::offset;
+
+use super::listener::PlayEventListener;
 
 #[derive(Clone)]
 pub struct AdEntry {
-    name: String,
-    frames: Vec<AudioFrame>,
-    duration: Duration,
-    event_listener: PlayEventListener,
+    pub(super) name: String,
+    pub(super) frames: Vec<AudioFrame>,
+    pub(super) duration: Duration,
+    pub(super) event_listener: PlayEventListener,
+    pub(super) next_player_id: Arc<AtomicUsize>,
 }
 
 impl Debug for AdEntry {
@@ -23,6 +26,10 @@ impl Debug for AdEntry {
             .field("name", &self.name)
             .field("frames", &self.frames.len())
             .field("duration", &self.duration)
+            .field(
+                "next_player_id",
+                &self.next_player_id.load(Ordering::Relaxed),
+            )
             .field("events", &self.event_listener.events().len())
             .finish()
     }
@@ -59,6 +66,7 @@ impl TryFrom<&Path> for AdEntry {
             frames,
             duration,
             event_listener,
+            next_player_id: Arc::new(AtomicUsize::new(1)),
         })
     }
 }
@@ -71,6 +79,7 @@ impl AdEntry {
             frames: vec![],
             duration: Duration::ZERO,
             event_listener: PlayEventListener::new(0),
+            next_player_id: Arc::new(AtomicUsize::new(1)),
         }
     }
 
@@ -80,86 +89,6 @@ impl AdEntry {
 
     pub fn duration(&self) -> Duration {
         self.duration
-    }
-}
-
-pub struct AdEntryFrameIterator<'entry> {
-    entry: &'entry AdEntry,
-    frames: &'entry [AudioFrame],
-    pos: usize,
-    listener: &'entry PlayEventListener,
-}
-
-impl<'entry> Iterator for AdEntryFrameIterator<'entry> {
-    type Item = &'entry AudioFrame;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let pos = self.pos;
-
-        if pos < self.frames.len() {
-            self.pos += 1;
-            self.listener.notify(self.pos);
-            self.frames.get(pos)
-        } else {
-            None
-        }
-    }
-}
-
-impl<'entry> IntoIterator for &'entry AdEntry {
-    type Item = &'entry AudioFrame;
-
-    type IntoIter = AdEntryFrameIterator<'entry>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            entry: self,
-            frames: &self.frames,
-            pos: 0_usize,
-            listener: &self.event_listener,
-        }
-    }
-}
-
-#[derive(Clone)]
-struct PlayEventListener {
-    total: usize,
-    events: Arc<Mutex<Vec<time::OffsetDateTime>>>,
-}
-
-impl PlayEventListener {
-    fn new(total: usize) -> Self {
-        Self {
-            total,
-            events: Arc::default(),
-        }
-    }
-
-    fn notify(&self, position: usize) {
-        let quarter = self.total / 4;
-
-        let time = time::OffsetDateTime::now_utc().to_offset(offset!(+7));
-
-        if position == 1 {
-            self.events.lock().unwrap().push(time);
-            eprintln!("START");
-        } else if position == quarter {
-            self.events.lock().unwrap().push(time);
-            eprintln!("FIRST QUARTER");
-        } else if position == (quarter * 2) {
-            self.events.lock().unwrap().push(time);
-            eprintln!("MEDIAN");
-        } else if position == (quarter * 3) {
-            self.events.lock().unwrap().push(time);
-            eprintln!("THIRD QUARTER");
-        } else if position == self.total {
-            self.events.lock().unwrap().push(time);
-            eprintln!("END");
-        }
-    }
-
-    pub fn events(&self) -> Vec<time::OffsetDateTime> {
-        self.events.lock().unwrap().clone()
     }
 }
 

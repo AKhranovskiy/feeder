@@ -6,6 +6,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 mod entry;
+mod events;
+mod iter;
+mod listener;
+
 pub use entry::AdEntry;
 
 #[derive(Debug, Clone)]
