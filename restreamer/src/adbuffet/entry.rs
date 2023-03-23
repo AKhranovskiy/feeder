@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -65,16 +66,66 @@ impl AdEntry {
             duration: Duration::ZERO,
         }
     }
+}
 
+pub struct AdEntryRef {
+    entry: Arc<AdEntry>,
+}
+
+impl AdEntryRef {
     pub fn name(&self) -> &str {
-        self.name.as_ref()
+        self.entry.name.as_ref()
     }
 
     pub fn frames(&self) -> &[AudioFrame] {
-        self.frames.as_ref()
+        self.entry.frames.as_ref()
     }
 
     pub fn duration(&self) -> Duration {
-        self.duration
+        self.entry.duration
+    }
+}
+
+pub struct AdEntryFrameIterator<'entry> {
+    entry: &'entry [AudioFrame],
+    pos: usize,
+}
+
+impl<'entry> Iterator for AdEntryFrameIterator<'entry> {
+    type Item = &'entry AudioFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let pos = self.pos;
+        if pos < self.entry.len() {
+            self.pos += 1;
+            self.entry.get(pos)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'entry> IntoIterator for &'entry AdEntryRef {
+    type Item = &'entry AudioFrame;
+
+    type IntoIter = AdEntryFrameIterator<'entry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            entry: self.frames(),
+            pos: 0_usize,
+        }
+    }
+}
+
+impl From<Arc<AdEntry>> for AdEntryRef {
+    fn from(entry: Arc<AdEntry>) -> Self {
+        Self { entry }
+    }
+}
+
+impl AsRef<AdEntry> for AdEntryRef {
+    fn as_ref(&self) -> &AdEntry {
+        self.entry.as_ref()
     }
 }

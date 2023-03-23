@@ -8,9 +8,11 @@ use std::sync::Arc;
 mod entry;
 pub use entry::AdEntry;
 
+use self::entry::AdEntryRef;
+
 #[derive(Debug, Clone)]
 pub struct AdBuffet {
-    queue: Vec<AdEntry>,
+    queue: Vec<Arc<AdEntry>>,
     pos: Arc<AtomicUsize>,
 }
 
@@ -20,7 +22,7 @@ impl TryFrom<&[&Path]> for AdBuffet {
     fn try_from(paths: &[&Path]) -> Result<Self, Self::Error> {
         let queue = paths
             .iter()
-            .map(|&path| AdEntry::try_from(path))
+            .map(|&path| AdEntry::try_from(path).map(Arc::new))
             .collect::<anyhow::Result<_>>()?;
 
         Ok(Self {
@@ -31,7 +33,7 @@ impl TryFrom<&[&Path]> for AdBuffet {
 }
 
 impl AdBuffet {
-    pub fn next(&self) -> Option<&AdEntry> {
+    pub fn next(&self) -> Option<AdEntryRef> {
         if self.queue.is_empty() {
             return None;
         }
@@ -40,7 +42,9 @@ impl AdBuffet {
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
                 Some((x + 1) % self.queue.len())
             })
-            .map_or(None, |pos| self.queue.get(pos))
+            .map_or(None, |pos| {
+                self.queue.get(pos).cloned().map(AdEntryRef::from)
+            })
     }
 
     pub fn size(&self) -> usize {
@@ -52,6 +56,10 @@ impl AdBuffet {
 mod tests {
     use super::*;
 
+    fn entry_name(entry: &AdEntryRef) -> &str {
+        entry.name()
+    }
+
     #[test]
     fn test_empty() {
         let sut = AdBuffet::empty();
@@ -61,19 +69,19 @@ mod tests {
     #[test]
     fn test_single() {
         let sut = AdBuffet::from(["single"]);
-        assert_eq!(sut.next().map_or("", AdEntry::name), "single");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "single");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "single");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "single");
     }
 
     #[test]
     fn test_few() {
         let sut = AdBuffet::from(["first", "second", "third"]);
-        assert_eq!(sut.next().map_or("", AdEntry::name), "first");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "second");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "third");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "first");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "second");
-        assert_eq!(sut.next().map_or("", AdEntry::name), "third");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "first");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "second");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "third");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "first");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "second");
+        assert_eq!(sut.next().as_ref().map_or("", AdEntryRef::name), "third");
     }
 
     impl AdBuffet {
@@ -88,7 +96,11 @@ mod tests {
     impl<const N: usize> From<[&str; N]> for AdBuffet {
         fn from(names: [&str; N]) -> Self {
             Self {
-                queue: names.into_iter().map(AdEntry::from_name).collect(),
+                queue: names
+                    .into_iter()
+                    .map(AdEntry::from_name)
+                    .map(Arc::new)
+                    .collect(),
                 pos: Arc::default(),
             }
         }
