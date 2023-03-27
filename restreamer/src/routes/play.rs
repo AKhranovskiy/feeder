@@ -7,9 +7,10 @@ use async_stream::stream;
 use axum::body::StreamBody;
 use axum::extract::{Query, State};
 use codec::dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, ToFadeInOut};
-use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
+use codec::{AudioFrame, CodecParams, Decoder, Encoder, Resampler};
 use futures::Stream;
 
+use crate::adbuffet::AdBuffet;
 use crate::terminate::Terminator;
 use crate::GlobalState;
 
@@ -30,7 +31,8 @@ pub(crate) async fn serve(
 
         let handle = {
             let terminator = state.terminator.clone();
-            std::thread::spawn(move || analyze(params, writer, &terminator))
+            let buffet = state.ad_buffet.clone();
+            std::thread::spawn(move || analyze(params, writer, &terminator, &buffet))
         };
 
         let mut buf = [0u8;1024];
@@ -73,18 +75,21 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
 
 const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 
-fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> anyhow::Result<()> {
+fn analyze<W: Write>(
+    params: PlayParams,
+    writer: W,
+    terminator: &Terminator,
+    buffet: &AdBuffet,
+) -> anyhow::Result<()> {
     let action = params.action.unwrap_or(PlayAction::Passthrough);
 
     let input = unstreamer::Unstreamer::open(params.url)?;
 
     let decoder = Decoder::try_from(input)?;
 
-    let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
+    // let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
 
-    let cf = ParabolicCrossFade::generate(
-        (CROSS_FADE_DURATION.as_millis() / sample_audio_frames[0].duration().as_millis()) as usize,
-    );
+    let cf = ParabolicCrossFade::generate((CROSS_FADE_DURATION.as_micros() / 42_666) as usize);
     eprintln!(
         "Cross-fade {:0.1}s, {} frames",
         CROSS_FADE_DURATION.as_secs_f32(),
@@ -103,7 +108,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(&cf)),
-        PlayAction::Lang(_) => Box::new(AdsMixer::new(&sample_audio_frames, &cf)),
+        PlayAction::Lang(_) => Box::new(AdsMixer::new(buffet, &cf)),
     };
 
     let entry_fade_in = LinearCrossFade::generate(cf.len()).to_fade_in();
@@ -116,8 +121,8 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         recorder.push(Destination::Original, frame.clone());
 
         let frame = match kind {
-            ContentKind::Advertisement => mixer.advertisement(&frame),
-            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(&frame),
+            ContentKind::Advertisement => mixer.advertisement(frame),
+            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(frame),
         };
 
         let frame = efi_iter.next().unwrap() * (&frame, &frame);

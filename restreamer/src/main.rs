@@ -5,6 +5,7 @@ use std::sync::Arc;
 use analyzer::BufferedAnalyzer;
 use axum::routing::{get, get_service};
 use axum::{Router, Server};
+use rand::seq::SliceRandom;
 use tower_http::services::ServeDir;
 
 mod adbuffet;
@@ -52,10 +53,13 @@ async fn main() {
 }
 
 fn load_ads() -> AdBuffet {
-    let list = include_str!("../assets/files/list.txt")
+    let mut list = include_str!("../assets/files/list.txt")
         .lines()
         .map(PathBuf::from)
         .collect::<Vec<_>>();
+
+    list.shuffle(&mut rand::thread_rng());
+
     let refs = list.iter().map(AsRef::as_ref).collect::<Vec<_>>();
 
     AdBuffet::try_from(refs.as_slice()).expect("Should load all ads")

@@ -2,29 +2,26 @@ use codec::{AudioFrame, Pts, Timestamp};
 
 use super::Mixer;
 
-pub struct PassthroughMixer(Option<Pts>);
+pub struct PassthroughMixer(Pts);
 
 impl PassthroughMixer {
     pub fn new() -> Self {
-        Self(None)
+        Self(Pts::new(2048, 48_000))
     }
 }
 
 impl PassthroughMixer {
-    fn pts(&mut self, frame: &AudioFrame) -> Timestamp {
-        if self.0.is_none() {
-            self.0 = Some(Pts::from(frame));
-        }
-
-        self.0.as_mut().unwrap().next()
+    fn pts(&mut self) -> Timestamp {
+        self.0.next()
     }
 }
-impl Mixer for PassthroughMixer {
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        frame.clone().with_pts(self.pts(frame))
+
+impl Mixer<'_> for PassthroughMixer {
+    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
+        frame.with_pts(self.pts())
     }
 
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        frame.clone().with_pts(self.pts(frame))
+    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
+        frame.with_pts(self.pts())
     }
 }

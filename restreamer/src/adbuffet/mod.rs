@@ -11,6 +11,7 @@ mod iter;
 mod listener;
 
 pub use entry::AdEntry;
+pub use iter::AdEntryFrameIterator;
 
 #[derive(Debug, Clone)]
 pub struct AdBuffet {
@@ -81,7 +82,7 @@ mod tests {
     }
 
     impl AdBuffet {
-        fn empty() -> Self {
+        pub(crate) fn empty() -> Self {
             Self {
                 queue: Vec::default(),
                 pos: Arc::default(),

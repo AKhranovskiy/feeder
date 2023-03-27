@@ -9,7 +9,7 @@ pub struct SilenceMixer<'cf> {
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
-    pts: Option<Pts>,
+    pts: Pts,
 }
 
 impl<'cf> SilenceMixer<'cf> {
@@ -18,16 +18,12 @@ impl<'cf> SilenceMixer<'cf> {
             cross_fade,
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
-            pts: None,
+            pts: Pts::new(2048, 48_000),
         }
     }
 
-    fn pts(&mut self, frame: &AudioFrame) -> Timestamp {
-        if self.pts.is_none() {
-            self.pts = Some(Pts::from(frame));
-        }
-
-        self.pts.as_mut().unwrap().next()
+    fn pts(&mut self) -> Timestamp {
+        self.pts.next()
     }
 
     fn start_ad_segment(&mut self) {
@@ -45,19 +41,19 @@ impl<'cf> SilenceMixer<'cf> {
     }
 }
 
-impl<'cf> Mixer for SilenceMixer<'cf> {
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
+impl<'cf> Mixer<'_> for SilenceMixer<'cf> {
+    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
         self.stop_ad_segment();
         let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (&silence, frame)).with_pts(self.pts(frame))
+        let silence = codec::silence_frame(&frame);
+        (cf * (&silence, &frame)).with_pts(self.pts())
     }
 
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
+    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
         self.start_ad_segment();
         let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (frame, &silence)).with_pts(self.pts(frame))
+        let silence = codec::silence_frame(&frame);
+        (cf * (&frame, &silence)).with_pts(self.pts())
     }
 }
 
@@ -78,15 +74,28 @@ mod tests {
 
         let mut output = vec![];
 
-        output.extend(music.iter().take(5).map(|frame| sut.content(frame)));
+        output.extend(
+            music
+                .iter()
+                .take(5)
+                .cloned()
+                .map(|frame| sut.content(frame)),
+        );
         output.extend(
             music
                 .iter()
                 .skip(5)
                 .take(10)
+                .cloned()
                 .map(|frame| sut.advertisement(frame)),
         );
-        output.extend(music.iter().skip(15).map(|frame| sut.content(frame)));
+        output.extend(
+            music
+                .iter()
+                .skip(15)
+                .cloned()
+                .map(|frame| sut.content(frame)),
+        );
 
         let samples = output
             .iter()

@@ -1,38 +1,53 @@
+use std::sync::Arc;
+
 use codec::AudioFrame;
 
-pub struct AdsProvider<'af> {
-    ad_frames: &'af [AudioFrame],
-    ad_iter: Box<dyn Iterator<Item = &'af AudioFrame> + 'af>,
+use crate::adbuffet::{AdBuffet, AdEntry, AdEntryFrameIterator};
+
+pub struct AdsProvider<'ad> {
+    buffet: &'ad AdBuffet,
+    current_entry: Option<Arc<AdEntry>>,
+    ad_iter: Option<AdEntryFrameIterator<'ad>>,
+    total: usize,
     played: usize,
 }
 
-impl<'af> AdsProvider<'af> {
-    pub fn new(frames: &'af [AudioFrame]) -> Self {
+impl<'ad> AdsProvider<'ad> {
+    pub fn new(buffet: &'ad AdBuffet) -> Self {
         Self {
-            ad_frames: frames,
-            ad_iter: Box::new(frames.iter()),
+            buffet,
+            current_entry: None,
+            ad_iter: None,
+            total: 0,
             played: 0,
         }
     }
 
-    pub fn next(&mut self) -> Option<&'af AudioFrame> {
-        if self.played == self.ad_frames.len() {
-            self.restart();
+    pub fn next(&mut self) -> Option<&'ad AudioFrame> {
+        let frame = self.ad_iter.as_mut().and_then(|x| x.next());
+        if frame.is_some() {
+            self.played += 1;
         }
-        self.played += 1;
-        self.ad_iter.next()
+        frame
     }
 
     pub fn remains(&self) -> usize {
-        self.ad_frames.len() - self.played
+        self.total - self.played
     }
 
-    pub fn restart(&mut self) {
-        self.ad_iter = Box::new(self.ad_frames.iter());
+    pub fn start<'a: 'ad>(&'a mut self) {
+        self.current_entry = self.buffet.next();
+        self.ad_iter = self.current_entry.as_ref().map(|x| x.into_iter());
+
+        self.total = self
+            .current_entry
+            .as_deref()
+            .map(|x| x.num_of_frames())
+            .unwrap_or_default();
         self.played = 0;
     }
 
     pub fn len(&self) -> usize {
-        self.ad_frames.len()
+        self.total
     }
 }

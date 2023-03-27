@@ -90,6 +90,10 @@ impl AdEntry {
     pub fn duration(&self) -> Duration {
         self.duration
     }
+
+    pub fn num_of_frames(&self) -> usize {
+        self.frames.len()
+    }
 }
 
 #[cfg(test)]
