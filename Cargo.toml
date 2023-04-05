@@ -13,27 +13,27 @@ exclude = ["mongodb2sqlite"]
 
 [workspace.dependencies]
 ac-ffmpeg = "0.18.1"
-anyhow = "1.0.69"
+anyhow = "1.0.70"
 async-stream = "0.3.4"
-async-trait = "0.1.66"
-axum = { version = "0.6.10" }
+async-trait = "0.1.68"
+axum = { version = "0.6.12" }
 aubio = { version = "0.2.1", features = ["pkg-config"] }
 bincode = "1.3.3"
-bson = "2.5.0"
+bson = "2.6.1"
 bytemuck = "1.13.1"
-clap = { version = "4.1.8", features = ["derive"] }
+clap = { version = "4.2.1", features = ["derive"] }
 criterion = "0.4.0"
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 flume = { version = "0.10.14", default-features = false }
-futures = { version = "0.3.27" }
+futures = { version = "0.3.28" }
 hls_m3u8 = "0.4.1"
 humansize = { version = "2.1.3", features = ["impl_style"] }
 itertools = "0.10.5"
 kdam = "0.3.0"
 lazy_static = "1.4.0"
-lofty = "0.11.0"
+lofty = "0.12.0"
 log = "0.4.17"
-mime = "0.3.16"
+mime = "0.3.17"
 mongodb = { version = "2.4.0", features = ["bson-uuid-0_8", "bson-chrono-0_4"] }
 multipart = { version = "0.18.0", default-features = false, features = ["client"] }
 ndarray = { version = "0.15.6", features = ["serde"] }
@@ -41,18 +41,18 @@ ndarray-shuffle = { version = "*", git = "https://github.com/AKhranovskiy/ndarra
 ndarray-stats = "0.5.1"
 numpy = "0.18.0"
 os_pipe = "1.1.3"
-pyo3 = { version = "0.18.1", features = ["auto-initialize"] }
+pyo3 = { version = "0.18.2", features = ["auto-initialize"] }
 rand = { version = "0.8.5", features = ["small_rng", "simd_support"] }
 rayon = { version = "1.7.0" }
-regex = "1.7.1"
-rusqlite = { version = "0.28.0", features = ["bundled", "blob", "i128_blob", "time"] }
-serde = { version = "1.0.155", features = ["derive"] }
+regex = "1.7.3"
+rusqlite = { version = "0.29.0", features = ["bundled", "blob", "i128_blob", "time"] }
+serde = { version = "1.0.159", features = ["derive"] }
 serde-pickle = "1.1.1"
-serde_json = "1.0.94"
+serde_json = "1.0.95"
 serde_with = "2.3.1"
-thiserror = "1.0.39"
+thiserror = "1.0.40"
 time = { version = "0.3.20", features = ["formatting", "local-offset"] }
-tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread", "fs", "signal"] }
+tokio = { version = "1.27.0", features = ["macros", "rt-multi-thread", "fs", "signal"] }
 tower = "0.4.13"
 tower-http = { version = "0.4.0", features = ["full"] }
 ulid = "1.0.0"
