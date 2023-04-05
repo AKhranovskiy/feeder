@@ -10,11 +10,8 @@ aubio = { workspace = true }
 bincode = { workspace = true }
 bytemuck = { workspace = true }
 codec = { workspace = true }
-futures = { workspace = true, optional = true }
 kdam = { workspace = true }
-ndarray = { workspace = true }
 rayon = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true, optional = true }
 
