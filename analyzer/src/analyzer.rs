@@ -11,7 +11,7 @@ use time::{format_description, macros::offset, Instant};
 use crate::{ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
-    queue: VecDeque<f64>,
+    queue: VecDeque<f32>,
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
@@ -50,8 +50,7 @@ impl BufferedAnalyzer {
         let samples: Vec<f32> = samples(frame)?;
         let mut mfccs = mfcc::calculate_mfccs(samples.as_slice(), mfcc::Config::default())?
             .into_iter()
-            .map(f64::from)
-            .collect::<VecDeque<_>>();
+            .collect();
 
         self.queue.append(&mut mfccs);
 
