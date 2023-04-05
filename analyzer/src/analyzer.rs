@@ -20,9 +20,11 @@ pub struct BufferedAnalyzer {
 }
 
 impl BufferedAnalyzer {
-    pub const DRAIN_DURATION: Duration = mfcc::Config::default().frame_duration();
+    const MFCCS: mfcc::Config = mfcc::Config::default();
 
-    const COEFFS: usize = mfcc::Config::default().num_coefficients;
+    pub const DRAIN_DURATION: Duration = Self::MFCCS.frame_duration();
+
+    const COEFFS: usize = Self::MFCCS.num_coefficients;
 
     pub fn warmup() {
         Classifier::new().expect("Empty model");
@@ -31,7 +33,7 @@ impl BufferedAnalyzer {
     #[must_use]
     pub fn new(smoother: LabelSmoother) -> Self {
         Self {
-            queue: VecDeque::with_capacity(150 * 39 * 2),
+            queue: VecDeque::with_capacity(2 * 150 * Self::MFCCS.frame_size),
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
             smoother,
             last_kind: ContentKind::Unknown,
@@ -47,27 +49,30 @@ impl BufferedAnalyzer {
         let samples: Vec<i16> = samples(frame)?;
         self.queue.extend(samples.into_iter());
 
-        if self.queue.len() >= 150 * CONFIG.frame_size {
+        if self.queue.len() >= 76 * CONFIG.frame_size {
             let samples = self
                 .queue
                 .iter()
-                .take(150 * CONFIG.frame_size)
+                .take(76 * CONFIG.frame_size)
                 .copied()
                 .map(f32::from)
                 .collect::<Vec<_>>();
 
             self.queue.drain(0..CONFIG.frame_size);
 
-            let mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;
-            assert_eq!(150 * Self::COEFFS, mfccs.len(),);
-            let mfccs = Array4::from_shape_vec((1, 150, Self::COEFFS, 1), mfccs)?;
+            let mfccs = {
+                let mut mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;
+                mfccs.truncate(150 * Self::COEFFS);
+                assert_eq!(150 * Self::COEFFS, mfccs.len(),);
+                Array4::from_shape_vec((1, 150, Self::COEFFS, 1), mfccs)?
+            };
 
             let prediction = self.classifer.predict(&mfccs)?;
 
             eprint!(
-                "{}, {:03}ms, {:?}:",
+                "{}, {:3}ms, {:?}:",
                 time::OffsetDateTime::now_utc()
-                    .to_offset(offset!(+8))
+                    .to_offset(offset!(+7))
                     .format(
                         &format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
                             .unwrap()

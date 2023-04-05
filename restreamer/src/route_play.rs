@@ -90,8 +90,8 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
     let mut stream_saver = StreamSaver::new(decoder.codec_params())?;
 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
-        Duration::from_millis(1500),
-        Duration::from_millis(1000),
+        Duration::from_millis(300),
+        Duration::from_millis(100),
     ));
 
     let mut mixer: Box<dyn Mixer> = match action {

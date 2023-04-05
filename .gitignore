@@ -9,3 +9,4 @@ Cargo.lock
 tools/audio
 artifacts
 restreamer
+classifier/model*

@@ -49,7 +49,7 @@ impl LabelSmoother {
             .buffer
             .iter()
             .map(MaxOutExt::max_out)
-            .filter(|x| (x[(0, 1)] - 1.0).abs() < f32::EPSILON)
+            .filter(|x| (x[(0, 0)] - 1.0).abs() < f32::EPSILON)
             .count();
 
         // TODO count talks
