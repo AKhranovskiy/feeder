@@ -76,7 +76,7 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
 
         assert!(buf.iter().all(|x| x.is_finite()), "MFCC are finite");
 
-        output.copy_from_slice(&buf);
+        output.extend_from_slice(&buf);
     }
 
     Ok(output)
