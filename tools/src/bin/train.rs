@@ -1,3 +1,4 @@
+use std::env::args;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -9,8 +10,10 @@ use classifier::{verify, Classifier};
 const BLOCK: usize = 150 * 39;
 
 fn main() -> anyhow::Result<()> {
-    println!("Loading data...");
-    let (data, labels) = prepare_data(&["./ads.bin", "./music.bin"])?;
+    let bindir = Path::new(&args().nth(1).expect("Path to bin dir")).to_owned();
+
+    println!("Loading data from {}", bindir.display());
+    let (data, labels) = prepare_data(bindir)?;
 
     println!("Training...");
     let mut classifier = Classifier::new()?;
@@ -43,14 +46,17 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn prepare_data<P>(sources: &[P]) -> anyhow::Result<(ndarray::Array4<f32>, ndarray::Array1<u32>)>
+fn prepare_data<P>(bindir: P) -> anyhow::Result<(ndarray::Array4<f32>, ndarray::Array1<u32>)>
 where
     P: AsRef<Path>,
 {
-    let data: Vec<Vec<f32>> = sources
-        .iter()
-        .map(|source| bincode::deserialize_from(BufReader::new(File::open(source)?)))
-        .collect::<Result<_, _>>()?;
+    let data: Vec<Vec<f32>> = [
+        bindir.as_ref().join("ads.bin"),
+        bindir.as_ref().join("music.bin"),
+    ]
+    .iter()
+    .map(|source| bincode::deserialize_from(BufReader::new(File::open(source)?)))
+    .collect::<Result<_, _>>()?;
 
     let data = data
         .into_iter()
