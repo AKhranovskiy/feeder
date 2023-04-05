@@ -1,48 +1,24 @@
-use std::io::{BufWriter, Write};
-use std::str::FromStr;
 use std::time::Duration;
 
-use ac_ffmpeg::codec::audio::AudioFrameMut;
-use codec::{Decoder, Encoder};
+use codec::Decoder;
 
+use analyzer::BufferedAnalyzer;
 use analyzer::LabelSmoother;
-use analyzer::{BufferedAnalyzer, ContentKind};
 
 fn main() -> anyhow::Result<()> {
-    let url = url::Url::from_str(&std::env::args().nth(1).expect("Expects URL"))?;
-
-    let input = unstreamer::Unstreamer::open(url)?;
+    let file = std::env::args().nth(1).expect("Expects path");
+    let input = std::fs::File::open(file).expect("Valid file path");
 
     let decoder = Decoder::try_from(input)?;
 
-    let mut encoder = Encoder::opus(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
-
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
-        Duration::from_secs(1),
-        Duration::from_secs(1),
+        Duration::from_millis(200),
+        Duration::from_millis(100),
     ));
 
     for frame in decoder {
-        let frame = frame?;
-
-        let kind = analyzer.push(frame.clone())?;
-        if kind == ContentKind::Advertisement {
-            let silence = AudioFrameMut::silence(
-                frame.channel_layout(),
-                frame.sample_format(),
-                frame.sample_rate(),
-                frame.samples(),
-            )
-            .freeze();
-            encoder.push(silence)?;
-        } else {
-            encoder.push(frame)?;
-        }
-
-        std::io::stderr().write_all(&kind.name().as_bytes()[..1])?;
+        let _ = analyzer.push(frame?)?;
     }
-
-    encoder.flush()?;
 
     Ok(())
 }
