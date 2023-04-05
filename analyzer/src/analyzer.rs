@@ -1,17 +1,18 @@
 use std::{collections::VecDeque, time::Duration};
 
 use anyhow::anyhow;
-
 use bytemuck::cast_slice;
-use classifier::Classifier;
-use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
+use ndarray::Array4;
 use ndarray_stats::QuantileExt;
 use time::{format_description, macros::offset, Instant};
+
+use classifier::Classifier;
+use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
 
 use crate::{ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
-    queue: VecDeque<f32>,
+    queue: VecDeque<i16>,
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
@@ -20,9 +21,6 @@ pub struct BufferedAnalyzer {
 
 impl BufferedAnalyzer {
     pub const DRAIN_DURATION: Duration = Duration::from_millis(300);
-
-    const DRAIN_COEFFS: usize = Self::DRAIN_DURATION.as_millis() as usize
-        / mfcc::Config::default().frame_duration().as_millis() as usize;
 
     const COEFFS: usize = mfcc::Config::default().num_coefficients;
 
@@ -42,33 +40,29 @@ impl BufferedAnalyzer {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<ContentKind> {
-        if frame.samples() < 128 {
-            return Ok(self.last_kind);
-        }
+        const CONFIG: mfcc::Config = mfcc::Config::default();
+
         let pts = frame.pts();
 
-        let samples: Vec<f32> = samples(frame)?;
-        let mut mfccs = mfcc::calculate_mfccs(samples.as_slice(), mfcc::Config::default())?
-            .into_iter()
-            .collect();
+        let samples: Vec<i16> = samples(frame)?;
+        self.queue.extend(samples.into_iter());
 
-        self.queue.append(&mut mfccs);
-
-        if self.queue.len() >= (150 * Self::COEFFS) {
-            let data = self
+        if self.queue.len() >= 150 * CONFIG.frame_size {
+            let samples = self
                 .queue
                 .iter()
-                .take(150 * Self::COEFFS)
+                .take(150 * CONFIG.frame_size)
                 .copied()
+                .map(f32::from)
                 .collect::<Vec<_>>();
 
-            let data = ndarray::Array4::from_shape_vec((1, 150, Self::COEFFS, 1), data)?;
+            self.queue.drain(0..CONFIG.frame_size);
 
-            // 1 coeff block is 20ms
-            // Drain 500ms
-            self.queue.drain(..Self::DRAIN_COEFFS * Self::COEFFS);
+            let mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;
+            assert_eq!(150 * Self::COEFFS, mfccs.len(),);
+            let mfccs = Array4::from_shape_vec((1, 150, Self::COEFFS, 1), mfccs)?;
 
-            let prediction = self.classifer.predict(&data)?;
+            let prediction = self.classifer.predict(&mfccs)?;
 
             eprint!(
                 "{}, {:03}ms, {:?}:",
@@ -100,7 +94,7 @@ impl BufferedAnalyzer {
     }
 }
 
-fn samples(frame: AudioFrame) -> anyhow::Result<Vec<f32>> {
+fn samples(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
     const MFCCS_CODEC_PARAMS: CodecParams = CodecParams::new(22050, SampleFormat::S16, 1);
 
     let mut resampler = Resampler::new(CodecParams::from(&frame), MFCCS_CODEC_PARAMS);
@@ -117,5 +111,5 @@ fn samples(frame: AudioFrame) -> anyhow::Result<Vec<f32>> {
         output.extend_from_slice(cast_slice(plane.data()));
     });
 
-    Ok(output.into_iter().map(f32::from).collect())
+    Ok(output)
 }
