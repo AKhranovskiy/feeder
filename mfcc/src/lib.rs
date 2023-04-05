@@ -53,8 +53,8 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
 
     let (segments, _) = stepped_windows(input.len(), config.frame_size, config.hop_length);
 
-    // let mut pvoc = aubio::PVoc::new(config.frame_size, config.hop_length)?;
-    // pvoc.set_window(aubio::WindowType::Hanningz)?;
+    let mut pvoc = aubio::PVoc::new(config.frame_size, config.hop_length)?;
+    pvoc.set_window(aubio::WindowType::Hanningz)?;
 
     let mut mfcc = aubio::MFCC::new(
         config.frame_size,
@@ -68,11 +68,11 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
     for r in stepped_window_ranges(input.len(), config.frame_size, config.hop_length) {
         let chunk = &input[r];
 
-        // let mut fftgrain = vec![0.0f32; config.frame_size];
-        // pvoc.do_(chunk, fftgrain.as_mut_slice())?;
+        let mut fftgrain = vec![0.0f32; config.frame_size];
+        pvoc.do_(chunk, fftgrain.as_mut_slice())?;
 
         let mut buf = vec![0f32; coeff];
-        mfcc.do_(chunk, buf.as_mut_slice())?;
+        mfcc.do_(fftgrain, buf.as_mut_slice())?;
 
         assert!(buf.iter().all(|x| x.is_finite()), "MFCC are finite");
 

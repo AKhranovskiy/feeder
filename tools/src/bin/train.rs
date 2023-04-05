@@ -6,6 +6,9 @@ use std::path::Path;
 use ndarray::{concatenate, Array1, Array4, ArrayBase, Axis};
 
 use classifier::{verify, Classifier};
+use ndarray_shuffle::NdArrayShuffleInplaceExt;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 const BLOCK: usize = 150 * 39;
 
@@ -75,7 +78,7 @@ where
         data.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
     );
 
-    let labels = data
+    let mut labels = data
         .iter()
         .enumerate()
         .map(|x| Array1::<u32>::from_elem(x.1.shape()[0], x.0 as u32))
@@ -85,7 +88,7 @@ where
         });
     println!("labels={:?}", labels.shape());
 
-    let data = concatenate(
+    let mut data = concatenate(
         Axis(0),
         data.iter()
             .map(ArrayBase::view)
@@ -95,10 +98,10 @@ where
     println!("data={:?}", data.shape());
 
     assert!(data.iter().all(|x| x.is_finite()));
-    // println!("Sort labels...");
-    // labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
-    // println!("Sort data...");
-    // data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
+    println!("Sort labels...");
+    labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
+    println!("Sort data...");
+    data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
 
     println!("Done");
 

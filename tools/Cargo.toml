@@ -12,6 +12,8 @@ classifier = { workspace = true }
 codec = { workspace = true }
 mfcc = { workspace = true }
 ndarray = { workspace = true }
+ndarray-shuffle = { workspace = true }
+rand = { workspace = true }
 rayon = { workspace = true }
 rusqlite = { workspace = true }
 ulid = { workspace = true }

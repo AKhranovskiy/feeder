@@ -22,7 +22,10 @@ pub struct BufferedAnalyzer {
 impl BufferedAnalyzer {
     const MFCCS: mfcc::Config = mfcc::Config::default();
 
-    pub const DRAIN_DURATION: Duration = Self::MFCCS.frame_duration();
+    const DRAIN: usize = 1;
+
+    pub const DRAIN_DURATION: Duration =
+        Duration::from_millis(Self::MFCCS.frame_duration().as_millis() as u64 * Self::DRAIN as u64);
 
     const COEFFS: usize = Self::MFCCS.num_coefficients;
 
@@ -58,7 +61,7 @@ impl BufferedAnalyzer {
                 .map(f32::from)
                 .collect::<Vec<_>>();
 
-            self.queue.drain(0..CONFIG.frame_size);
+            self.queue.drain(0..Self::DRAIN * CONFIG.frame_size);
 
             let mfccs = {
                 let mut mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;
