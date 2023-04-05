@@ -20,7 +20,7 @@ pub struct BufferedAnalyzer {
 }
 
 impl BufferedAnalyzer {
-    pub const DRAIN_DURATION: Duration = Duration::from_millis(300);
+    pub const DRAIN_DURATION: Duration = mfcc::Config::default().frame_duration();
 
     const COEFFS: usize = mfcc::Config::default().num_coefficients;
 
