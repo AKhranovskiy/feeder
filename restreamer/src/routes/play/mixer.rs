@@ -2,7 +2,6 @@ use analyzer::ContentKind;
 use codec::AudioFrame;
 
 mod ads;
-mod ads_provider;
 mod passthrough;
 mod silence;
 

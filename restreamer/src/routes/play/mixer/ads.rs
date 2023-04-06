@@ -1,24 +1,19 @@
 use std::collections::VecDeque;
-use std::iter::repeat;
 
-use codec::dsp::CrossFadePair;
-use codec::{AudioFrame, Pts, Timestamp};
+use codec::dsp::CrossFader;
+use codec::{AudioFrame, Pts};
 
-use super::ads_provider::AdsProvider;
 use super::Mixer;
 
-pub struct AdsMixer<'af, 'cf> {
-    ads: Box<AdsProvider<'af>>,
-    cross_fade: &'cf [CrossFadePair],
-    cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
+pub struct AdsMixer {
+    ads: Vec<AudioFrame>,
+    cross_fader: CrossFader,
     ad_segment: bool,
     play_buffer: VecDeque<AudioFrame>,
     pts: Pts,
-    drain_play_buffer: bool,
-    last_played_timestamp: Timestamp,
 }
 
-impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
+impl Mixer for AdsMixer {
     fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
         match kind {
             analyzer::ContentKind::Advertisement => self.advertisement(frame),
@@ -29,79 +24,64 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
     }
 }
 
-impl<'af, 'cf> AdsMixer<'af, 'cf> {
-    pub fn new(ad_frames: &'af [AudioFrame], cross_fade: &'cf [CrossFadePair]) -> Self {
+impl AdsMixer {
+    pub fn new(ad_frames: Vec<AudioFrame>, cross_fader: CrossFader) -> Self {
         Self {
-            ads: Box::new(AdsProvider::new(ad_frames)),
-            cross_fade,
-            cf_iter: Box::new(repeat(&CrossFadePair::END)),
+            ads: ad_frames,
+            cross_fader,
             ad_segment: false,
             play_buffer: VecDeque::new(),
             pts: Pts::new(2_048, 48_000),
-            drain_play_buffer: false,
-            last_played_timestamp: ad_frames[0].pts(),
         }
     }
 
     fn start_ad_segment(&mut self) {
         if !self.ad_segment {
-            self.ads.restart();
-            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.cross_fader.reset();
             self.ad_segment = true;
+            self.play_buffer.extend(self.ads.clone());
         }
     }
 
     fn stop_ad_segment(&mut self) {
         if self.ad_segment {
-            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.cross_fader.reset();
             self.ad_segment = false;
         }
     }
 
-    fn check(&mut self, frame: AudioFrame) -> AudioFrame {
-        if frame.pts() < self.last_played_timestamp {
-            eprintln!(
-                "OUT OF ORDER: played {:?}, next {:?}",
-                self.last_played_timestamp,
-                frame.pts()
-            );
-        }
-        self.last_played_timestamp = frame.pts();
-        frame
-    }
-
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
+        self.stop_ad_segment();
+
         self.play_buffer.push_back(frame.clone());
 
-        // eprintln!(
-        //     "BUFFER content {:?}",
-        //     self.play_buffer
-        //         .iter()
-        //         .map(codec::AudioFrame::pts)
-        //         .collect::<Vec<_>>()
-        // );
-
-        let frame = if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
-            self.advertisement(frame)
-        } else {
-            self.stop_ad_segment();
-
-            let cf = self.cf_iter.next().unwrap();
-            let ad = if cf.fade_out() > 0.0 {
-                self.ads
-                    .next()
-                    .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(frame))
-            } else {
-                codec::silence_frame(frame)
-            };
-            let frame = self.play_buffer.pop_front().unwrap();
-            (cf * (&ad, &frame)).with_pts(self.pts.next())
-        };
-        self.check(frame)
+        // let frame = if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
+        //     self.advertisement(frame)
+        // } else {
+        //     self.stop_ad_segment();
+        //
+        //     let cf = self.cf_iter.next().unwrap();
+        //     let ad = if cf.fade_out() > 0.0 {
+        //         self.ads
+        //             .next()
+        //             .cloned()
+        //             .unwrap_or_else(|| codec::silence_frame(frame))
+        //     } else {
+        //         codec::silence_frame(frame)
+        //     };
+        //     let frame = self.play_buffer.pop_front().unwrap();
+        //     (cf * (&ad, &frame)).with_pts(self.pts.next())
+        // };
+        // self.check(frame)
+        self.play_buffer
+            .pop_front()
+            .unwrap()
+            .with_pts(self.pts.next())
     }
 
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
+    fn advertisement(&mut self, _frame: &AudioFrame) -> AudioFrame {
+        self.start_ad_segment();
+
         // eprintln!(
         //     "BUFFER ads {:?}",
         //     self.play_buffer
@@ -110,34 +90,39 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
         //         .collect::<Vec<_>>()
         // );
 
+        // if self.play_buffer.is_empty() {
+        //     self.drain_play_buffer = false;
+        // }
+        //
+        // if !self.drain_play_buffer && !self.ad_segment {
+        //     self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
+        // }
+        //
+        // let frame = if self.drain_play_buffer {
+        //     let frame = self.play_buffer.pop_front().unwrap();
+        //     // eprintln!("DRAIN {:?}", frame.pts());
+        //     frame.with_pts(self.pts.next())
+        // } else {
+        //     self.start_ad_segment();
+        //
+        //     let cf = self.cf_iter.next().unwrap();
+        //     let ad = if cf.fade_in() > 0.0 {
+        //         self.ads
+        //             .next()
+        //             .cloned()
+        //             .unwrap_or_else(|| codec::silence_frame(frame))
+        //     } else {
+        //         codec::silence_frame(frame)
+        //     };
+        //
+        //     (cf * (frame, &ad)).with_pts(self.pts.next())
+        // };
+        // self.check(frame)
         if self.play_buffer.is_empty() {
-            self.drain_play_buffer = false;
+            self.play_buffer.extend(self.ads.clone());
         }
 
-        if !self.drain_play_buffer && !self.ad_segment {
-            self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
-        }
-
-        let frame = if self.drain_play_buffer {
-            let frame = self.play_buffer.pop_front().unwrap();
-            // eprintln!("DRAIN {:?}", frame.pts());
-            frame.with_pts(self.pts.next())
-        } else {
-            self.start_ad_segment();
-
-            let cf = self.cf_iter.next().unwrap();
-            let ad = if cf.fade_in() > 0.0 {
-                self.ads
-                    .next()
-                    .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(frame))
-            } else {
-                codec::silence_frame(frame)
-            };
-
-            (cf * (frame, &ad)).with_pts(self.pts.next())
-        };
-        self.check(frame)
+        self.play_buffer.pop_back().unwrap()
     }
 }
 
@@ -145,7 +130,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
 #[allow(clippy::float_cmp)]
 mod tests {
     use analyzer::ContentKind;
-    use codec::dsp::{CrossFade, ParabolicCrossFade};
+    use codec::dsp::{CrossFader, ParabolicCrossFade};
     use codec::{AudioFrame, Timestamp};
 
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
@@ -155,10 +140,10 @@ mod tests {
     #[test]
     fn test_one_ads_block_short_buffer() {
         let advertisement = create_frames(10, 0.5);
-        let cross_fade = ParabolicCrossFade::generate(4);
-        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
-
-        let mut player = Player::new(&mut sut);
+        let mut player = Player::new(AdsMixer::new(
+            advertisement,
+            CrossFader::exact::<ParabolicCrossFade>(4),
+        ));
         player.content(5).advertisement(5).content(10).silence(6);
 
         assert_eq!(
@@ -198,10 +183,10 @@ mod tests {
 
     #[test]
     fn test_ads_blocks_overlaps() {
-        let advertisement = create_frames(10, 0.5);
-        let cross_fade = ParabolicCrossFade::generate(4);
-        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
-        let mut player = Player::new(&mut sut);
+        let mut player = Player::new(AdsMixer::new(
+            create_frames(10, 0.5),
+            CrossFader::exact::<ParabolicCrossFade>(4),
+        ));
 
         player
             .content(5)
@@ -252,11 +237,10 @@ mod tests {
 
     #[test]
     fn test_filled_buffer_skips_ads() {
-        let advertisement = create_frames(5, 0.5);
-        let cross_fade = ParabolicCrossFade::generate(2);
-
-        let mut sut = AdsMixer::new(&advertisement, &cross_fade);
-        let mut player = Player::new(&mut sut);
+        let mut player = Player::new(AdsMixer::new(
+            create_frames(5, 0.5),
+            CrossFader::exact::<ParabolicCrossFade>(2),
+        ));
 
         player
             .content(1)
@@ -280,14 +264,14 @@ mod tests {
         assert_eq!(player.timestamps(), pts_seq(26));
     }
 
-    struct Player<'m, 'af, 'cf> {
-        mixer: &'m mut AdsMixer<'af, 'cf>,
+    struct Player {
+        mixer: AdsMixer,
         frame: AudioFrame,
         output: Vec<AudioFrame>,
     }
 
-    impl<'m, 'af, 'cf> Player<'m, 'af, 'cf> {
-        fn new(mixer: &'m mut AdsMixer<'af, 'cf>) -> Self {
+    impl Player {
+        fn new(mixer: AdsMixer) -> Self {
             let frame = create_frames(1, 1.0)[0].clone();
             Self {
                 mixer,

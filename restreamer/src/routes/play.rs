@@ -110,14 +110,15 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         sample_audio_frames[0].duration(),
     );
 
+    let entry =
+        CrossFader::new::<LinearCrossFade>(CROSS_FADE_DURATION, sample_audio_frames[0].duration());
+
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
-        PlayAction::Lang(_) => Box::new(AdsMixer::new(&sample_audio_frames, &cf)),
+        PlayAction::Lang(_) => Box::new(AdsMixer::new(sample_audio_frames, cross_fader)),
     };
 
-    let entry =
-        CrossFader::new::<LinearCrossFade>(CROSS_FADE_DURATION, sample_audio_frames[0].duration());
 
     for frame in decoder {
         let frame = frame?;
