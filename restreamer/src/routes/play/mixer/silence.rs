@@ -1,22 +1,19 @@
-use std::iter::repeat;
-
-use codec::dsp::CrossFadePair;
 use codec::{AudioFrame, Pts};
+
+use crate::routes::play::cross_fader::CrossFader;
 
 use super::Mixer;
 
-pub struct SilenceMixer<'cf> {
-    cross_fade: &'cf [CrossFadePair],
-    cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
+pub struct SilenceMixer {
+    cross_fader: CrossFader,
     ad_segment: bool,
     pts: Pts,
 }
 
-impl<'cf> SilenceMixer<'cf> {
-    pub fn new(cross_fade: &'cf [CrossFadePair]) -> Self {
+impl SilenceMixer {
+    pub fn new(cross_fader: CrossFader) -> Self {
         Self {
-            cross_fade,
-            cf_iter: Box::new(repeat(&CrossFadePair::END)),
+            cross_fader,
             ad_segment: false,
             pts: Pts::new(2_048, 48_000),
         }
@@ -24,40 +21,41 @@ impl<'cf> SilenceMixer<'cf> {
 
     fn start_ad_segment(&mut self) {
         if !self.ad_segment {
-            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.cross_fader.reset();
             self.ad_segment = true;
         }
     }
 
     fn stop_ad_segment(&mut self) {
         if self.ad_segment {
-            self.cf_iter = Box::new(self.cross_fade.iter().chain(repeat(&CrossFadePair::END)));
+            self.cross_fader.reset();
             self.ad_segment = false;
         }
     }
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.stop_ad_segment();
-        let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (&silence, frame)).with_pts(self.pts.next())
-    }
-
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.start_ad_segment();
-        let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (frame, &silence)).with_pts(self.pts.next())
-    }
 }
 
-impl<'cf> Mixer for SilenceMixer<'cf> {
+impl Mixer for SilenceMixer {
     fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
-        match kind {
-            analyzer::ContentKind::Advertisement => self.advertisement(frame),
+        let silence = codec::silence_frame(frame);
+
+        let (fade_out, fade_in) = match kind {
+            analyzer::ContentKind::Advertisement => {
+                self.start_ad_segment();
+
+                (frame, &silence)
+            }
             analyzer::ContentKind::Music
             | analyzer::ContentKind::Talk
-            | analyzer::ContentKind::Unknown => self.content(frame),
-        }
+            | analyzer::ContentKind::Unknown => {
+                self.stop_ad_segment();
+
+                (&silence, frame)
+            }
+        };
+
+        self.cross_fader
+            .apply(fade_out, fade_in)
+            .with_pts(self.pts.next())
     }
 }
 
@@ -65,19 +63,21 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
 #[allow(clippy::float_cmp)]
 mod tests {
     use analyzer::ContentKind;
-    use codec::dsp::{CrossFade, ParabolicCrossFade};
+    use codec::dsp::ParabolicCrossFade;
 
+    use crate::routes::play::mixer::silence::CrossFader;
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
 
     use super::Mixer;
     use super::SilenceMixer;
 
+    impl CrossFader {}
+
     #[test]
     fn test_music_to_advertisement() {
         let music = create_frames(20, 1.0);
-        let cross_fade = ParabolicCrossFade::generate(3);
 
-        let mut sut = SilenceMixer::new(&cross_fade);
+        let mut sut = SilenceMixer::new(CrossFader::exact::<ParabolicCrossFade>(3));
 
         let mut output = vec![];
 
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(
             &samples,
             &[
-                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.25, 1.0, 1.0, 1.0, 1.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.25, 1.0, 1.0, 1.0
             ]
         );

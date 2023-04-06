@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use std::iter::repeat;
 use std::time::Duration;
 
 use async_stream::stream;
@@ -11,9 +10,11 @@ use futures::Stream;
 
 use analyzer::{BufferedAnalyzer, LabelSmoother};
 use codec::{
-    dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, ToFadeInOut},
+    dsp::{CrossFade, LinearCrossFade, ParabolicCrossFade},
     AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
 };
+
+mod cross_fader;
 
 mod play_params;
 use play_params::{PlayAction, PlayParams};
@@ -21,6 +22,7 @@ use play_params::{PlayAction, PlayParams};
 mod mixer;
 use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
+use crate::routes::play::cross_fader::CrossFader;
 use crate::{
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
@@ -105,14 +107,19 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         Duration::from_millis(100),
     ));
 
+    let cross_fader = CrossFader::new::<ParabolicCrossFade>(
+        CROSS_FADE_DURATION,
+        sample_audio_frames[0].duration(),
+    );
+
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
-        PlayAction::Silence => Box::new(SilenceMixer::new(&cf)),
+        PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
         PlayAction::Lang(_) => Box::new(AdsMixer::new(&sample_audio_frames, &cf)),
     };
 
-    let entry_fade_in = LinearCrossFade::generate(cf.len()).to_fade_in();
-    let mut efi_iter = entry_fade_in.iter().chain(repeat(&CrossFadePair::END));
+    let entry =
+        CrossFader::new::<LinearCrossFade>(CROSS_FADE_DURATION, sample_audio_frames[0].duration());
 
     for frame in decoder {
         let frame = frame?;
@@ -121,7 +128,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
         stream_saver.push(Destination::Original, frame.clone());
 
         let frame = mixer.push(kind, &frame);
-        let frame = efi_iter.next().unwrap() * (&frame, &frame);
+        let frame = entry.apply(&frame, &frame);
 
         stream_saver.push(Destination::Processed, frame.clone());
 
