@@ -19,83 +19,12 @@ pub struct AdsMixer<'af, 'cf> {
 }
 
 impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.play_buffer.push_back(frame.clone());
-
-        // eprintln!(
-        //     "BUFFER content {:?}",
-        //     self.play_buffer
-        //         .iter()
-        //         .map(codec::AudioFrame::pts)
-        //         .collect::<Vec<_>>()
-        // );
-
-        let frame = if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
-            self.advertisement(frame)
-        } else {
-            self.stop_ad_segment();
-
-            let cf = self.cf_iter.next().unwrap();
-            let ad = if cf.fade_out() > 0.0 {
-                self.ads
-                    .next()
-                    .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(frame))
-            } else {
-                codec::silence_frame(frame)
-            };
-            let frame = self.play_buffer.pop_front().unwrap();
-            // eprintln!("CONTENT {:?}", frame.pts());
-            (cf * (&ad, &frame)).with_pts(self.pts.next())
-        };
-        self.check(frame)
-    }
-
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        // eprintln!(
-        //     "BUFFER ads {:?}",
-        //     self.play_buffer
-        //         .iter()
-        //         .map(codec::AudioFrame::pts)
-        //         .collect::<Vec<_>>()
-        // );
-
-        if self.play_buffer.is_empty() {
-            self.drain_play_buffer = false;
-        }
-
-        if !self.drain_play_buffer && !self.ad_segment {
-            self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
-        }
-
-        let frame = if self.drain_play_buffer {
-            let frame = self.play_buffer.pop_front().unwrap();
-            // eprintln!("DRAIN {:?}", frame.pts());
-            frame.with_pts(self.pts.next())
-        } else {
-            self.start_ad_segment();
-
-            let cf = self.cf_iter.next().unwrap();
-            let ad = if cf.fade_in() > 0.0 {
-                self.ads
-                    .next()
-                    .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(frame))
-            } else {
-                codec::silence_frame(frame)
-            };
-
-            (cf * (frame, &ad)).with_pts(self.pts.next())
-        };
-        self.check(frame)
-    }
-
     fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
         match kind {
-            analyzer::ContentKind::Advertisement => self.advertisement(&frame),
+            analyzer::ContentKind::Advertisement => self.advertisement(frame),
             analyzer::ContentKind::Music
             | analyzer::ContentKind::Talk
-            | analyzer::ContentKind::Unknown => self.content(&frame),
+            | analyzer::ContentKind::Unknown => self.content(frame),
         }
     }
 }
@@ -140,11 +69,83 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
         self.last_played_timestamp = frame.pts();
         frame
     }
+
+    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
+        self.play_buffer.push_back(frame.clone());
+
+        // eprintln!(
+        //     "BUFFER content {:?}",
+        //     self.play_buffer
+        //         .iter()
+        //         .map(codec::AudioFrame::pts)
+        //         .collect::<Vec<_>>()
+        // );
+
+        let frame = if self.ad_segment && self.ads.remains() > self.cross_fade.len() / 2 {
+            self.advertisement(frame)
+        } else {
+            self.stop_ad_segment();
+
+            let cf = self.cf_iter.next().unwrap();
+            let ad = if cf.fade_out() > 0.0 {
+                self.ads
+                    .next()
+                    .cloned()
+                    .unwrap_or_else(|| codec::silence_frame(&frame))
+            } else {
+                codec::silence_frame(&frame)
+            };
+            let frame = self.play_buffer.pop_front().unwrap();
+            // eprintln!("CONTENT {:?}", frame.pts());
+            (cf * (&ad, &frame)).with_pts(self.pts.next())
+        };
+        self.check(frame)
+    }
+
+    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
+        // eprintln!(
+        //     "BUFFER ads {:?}",
+        //     self.play_buffer
+        //         .iter()
+        //         .map(codec::AudioFrame::pts)
+        //         .collect::<Vec<_>>()
+        // );
+
+        if self.play_buffer.is_empty() {
+            self.drain_play_buffer = false;
+        }
+
+        if !self.drain_play_buffer && !self.ad_segment {
+            self.drain_play_buffer = self.play_buffer.len() > self.ads.len();
+        }
+
+        let frame = if self.drain_play_buffer {
+            let frame = self.play_buffer.pop_front().unwrap();
+            // eprintln!("DRAIN {:?}", frame.pts());
+            frame.with_pts(self.pts.next())
+        } else {
+            self.start_ad_segment();
+
+            let cf = self.cf_iter.next().unwrap();
+            let ad = if cf.fade_in() > 0.0 {
+                self.ads
+                    .next()
+                    .cloned()
+                    .unwrap_or_else(|| codec::silence_frame(&frame))
+            } else {
+                codec::silence_frame(&frame)
+            };
+
+            (cf * (&frame, &ad)).with_pts(self.pts.next())
+        };
+        self.check(frame)
+    }
 }
 
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
+    use analyzer::ContentKind;
     use codec::dsp::{CrossFade, ParabolicCrossFade};
     use codec::{AudioFrame, Pts, Timestamp};
 
@@ -300,15 +301,19 @@ mod tests {
 
         fn content(&mut self, length: usize) -> &mut Self {
             self.output.extend((0..length).map(|_| {
-                self.mixer
-                    .content(&self.frame.clone().with_pts(self.pts.next()))
+                self.mixer.push(
+                    ContentKind::Music,
+                    self.frame.clone().with_pts(self.pts.next()),
+                )
             }));
             self
         }
 
         fn advertisement(&mut self, length: usize) -> &mut Self {
-            self.output
-                .extend((0..length).map(|_| self.mixer.advertisement(&self.frame)));
+            self.output.extend((0..length).map(|_| {
+                self.mixer
+                    .push(ContentKind::Advertisement, self.frame.clone())
+            }));
             self
         }
 
@@ -316,7 +321,7 @@ mod tests {
             self.output.extend(
                 create_frames(length, 0.0)
                     .into_iter()
-                    .map(|frame| self.mixer.content(&frame)),
+                    .map(|frame| self.mixer.push(ContentKind::Music, frame)),
             );
             self
         }

@@ -20,15 +20,8 @@ impl PassthroughMixer {
     }
 }
 impl Mixer for PassthroughMixer {
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        frame.clone().with_pts(self.pts(frame))
-    }
-
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        frame.clone().with_pts(self.pts(frame))
-    }
-
     fn push(&mut self, _kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
-        frame
+        let pts = self.pts(&frame);
+        frame.with_pts(pts)
     }
 }

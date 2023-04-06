@@ -43,29 +43,28 @@ impl<'cf> SilenceMixer<'cf> {
             self.ad_segment = false;
         }
     }
+    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
+        self.stop_ad_segment();
+        let cf = self.cf_iter.next().unwrap();
+        let silence = codec::silence_frame(&frame);
+        (cf * (&silence, &frame)).with_pts(self.pts(&frame))
+    }
+
+    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
+        self.start_ad_segment();
+        let cf = self.cf_iter.next().unwrap();
+        let silence = codec::silence_frame(&frame);
+        (cf * (&frame, &silence)).with_pts(self.pts(&frame))
+    }
 }
 
 impl<'cf> Mixer for SilenceMixer<'cf> {
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.stop_ad_segment();
-        let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (&silence, frame)).with_pts(self.pts(frame))
-    }
-
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
-        self.start_ad_segment();
-        let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(frame);
-        (cf * (frame, &silence)).with_pts(self.pts(frame))
-    }
-
     fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
         match kind {
-            analyzer::ContentKind::Advertisement => self.advertisement(&frame),
+            analyzer::ContentKind::Advertisement => self.advertisement(frame),
             analyzer::ContentKind::Music
             | analyzer::ContentKind::Talk
-            | analyzer::ContentKind::Unknown => self.content(&frame),
+            | analyzer::ContentKind::Unknown => self.content(frame),
         }
     }
 }
@@ -73,6 +72,7 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
+    use analyzer::ContentKind;
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
     use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
@@ -87,15 +87,28 @@ mod tests {
 
         let mut output = vec![];
 
-        output.extend(music.iter().take(5).map(|frame| sut.content(frame)));
+        output.extend(
+            music
+                .iter()
+                .take(5)
+                .cloned()
+                .map(|frame| sut.push(ContentKind::Music, frame)),
+        );
         output.extend(
             music
                 .iter()
                 .skip(5)
                 .take(10)
-                .map(|frame| sut.advertisement(frame)),
+                .cloned()
+                .map(|frame| sut.push(ContentKind::Advertisement, frame)),
         );
-        output.extend(music.iter().skip(15).map(|frame| sut.content(frame)));
+        output.extend(
+            music
+                .iter()
+                .skip(15)
+                .cloned()
+                .map(|frame| sut.push(ContentKind::Music, frame)),
+        );
 
         let samples = output
             .iter()
