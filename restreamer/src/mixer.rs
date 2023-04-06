@@ -11,7 +11,7 @@ pub(crate) use passthrough::PassthroughMixer;
 pub(crate) use silence::SilenceMixer;
 
 pub trait Mixer {
-    fn push(&mut self, kind: ContentKind, frame: AudioFrame) -> AudioFrame;
+    fn push(&mut self, kind: ContentKind, frame: &AudioFrame) -> AudioFrame;
 }
 
 #[cfg(test)]

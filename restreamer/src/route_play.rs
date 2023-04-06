@@ -116,7 +116,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
         stream_saver.push(Destination::Original, frame.clone());
 
-        let frame = mixer.push(kind, frame);
+        let frame = mixer.push(kind, &frame);
         let frame = efi_iter.next().unwrap() * (&frame, &frame);
 
         stream_saver.push(Destination::Processed, frame.clone());

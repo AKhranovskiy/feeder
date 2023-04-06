@@ -35,14 +35,14 @@ impl<'cf> SilenceMixer<'cf> {
             self.ad_segment = false;
         }
     }
-    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
+    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.stop_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(&frame);
         (cf * (&silence, &frame)).with_pts(self.pts.next())
     }
 
-    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
+    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.start_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(&frame);
@@ -51,7 +51,7 @@ impl<'cf> SilenceMixer<'cf> {
 }
 
 impl<'cf> Mixer for SilenceMixer<'cf> {
-    fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
+    fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
         match kind {
             analyzer::ContentKind::Advertisement => self.advertisement(frame),
             analyzer::ContentKind::Music
@@ -83,23 +83,20 @@ mod tests {
             music
                 .iter()
                 .take(5)
-                .cloned()
-                .map(|frame| sut.push(ContentKind::Music, frame)),
+                .map(|frame| sut.push(ContentKind::Music, &frame)),
         );
         output.extend(
             music
                 .iter()
                 .skip(5)
                 .take(10)
-                .cloned()
-                .map(|frame| sut.push(ContentKind::Advertisement, frame)),
+                .map(|frame| sut.push(ContentKind::Advertisement, &frame)),
         );
         output.extend(
             music
                 .iter()
                 .skip(15)
-                .cloned()
-                .map(|frame| sut.push(ContentKind::Music, frame)),
+                .map(|frame| sut.push(ContentKind::Music, &frame)),
         );
 
         let samples = output

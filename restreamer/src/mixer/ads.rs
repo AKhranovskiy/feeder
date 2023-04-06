@@ -19,7 +19,7 @@ pub struct AdsMixer<'af, 'cf> {
 }
 
 impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
-    fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
+    fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
         match kind {
             analyzer::ContentKind::Advertisement => self.advertisement(frame),
             analyzer::ContentKind::Music
@@ -70,7 +70,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
         frame
     }
 
-    fn content(&mut self, frame: AudioFrame) -> AudioFrame {
+    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.play_buffer.push_back(frame.clone());
 
         // eprintln!(
@@ -91,19 +91,17 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
                 self.ads
                     .next()
                     .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(&frame))
+                    .unwrap_or_else(|| codec::silence_frame(frame))
             } else {
-                codec::silence_frame(&frame)
+                codec::silence_frame(frame)
             };
             let frame = self.play_buffer.pop_front().unwrap();
-            // eprintln!("CONTENT {:?}", frame.pts());
             (cf * (&ad, &frame)).with_pts(self.pts.next())
         };
         self.check(frame)
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
+    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
         // eprintln!(
         //     "BUFFER ads {:?}",
         //     self.play_buffer
@@ -132,12 +130,12 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
                 self.ads
                     .next()
                     .cloned()
-                    .unwrap_or_else(|| codec::silence_frame(&frame))
+                    .unwrap_or_else(|| codec::silence_frame(frame))
             } else {
-                codec::silence_frame(&frame)
+                codec::silence_frame(frame)
             };
 
-            (cf * (&frame, &ad)).with_pts(self.pts.next())
+            (cf * (frame, &ad)).with_pts(self.pts.next())
         };
         self.check(frame)
     }
@@ -148,7 +146,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
 mod tests {
     use analyzer::ContentKind;
     use codec::dsp::{CrossFade, ParabolicCrossFade};
-    use codec::{AudioFrame, Pts, Timestamp};
+    use codec::{AudioFrame, Timestamp};
 
     use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
     use crate::mixer::{AdsMixer, Mixer};
@@ -285,36 +283,28 @@ mod tests {
         mixer: &'m mut AdsMixer<'af, 'cf>,
         frame: AudioFrame,
         output: Vec<AudioFrame>,
-        pts: Pts,
     }
 
     impl<'m, 'af, 'cf> Player<'m, 'af, 'cf> {
         fn new(mixer: &'m mut AdsMixer<'af, 'cf>) -> Self {
             let frame = create_frames(1, 1.0)[0].clone();
-            let pts = Pts::new(4, 4);
             Self {
                 mixer,
                 frame,
                 output: vec![],
-                pts,
             }
         }
 
         fn content(&mut self, length: usize) -> &mut Self {
-            self.output.extend((0..length).map(|_| {
-                self.mixer.push(
-                    ContentKind::Music,
-                    self.frame.clone().with_pts(self.pts.next()),
-                )
-            }));
+            self.output
+                .extend((0..length).map(|_| self.mixer.push(ContentKind::Music, &self.frame)));
             self
         }
 
         fn advertisement(&mut self, length: usize) -> &mut Self {
-            self.output.extend((0..length).map(|_| {
-                self.mixer
-                    .push(ContentKind::Advertisement, self.frame.clone())
-            }));
+            self.output.extend(
+                (0..length).map(|_| self.mixer.push(ContentKind::Advertisement, &self.frame)),
+            );
             self
         }
 
@@ -322,7 +312,7 @@ mod tests {
             self.output.extend(
                 create_frames(length, 0.0)
                     .into_iter()
-                    .map(|frame| self.mixer.push(ContentKind::Music, frame)),
+                    .map(|frame| self.mixer.push(ContentKind::Music, &frame)),
             );
             self
         }

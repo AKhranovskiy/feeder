@@ -11,7 +11,7 @@ impl PassthroughMixer {
 }
 
 impl Mixer for PassthroughMixer {
-    fn push(&mut self, _kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
-        frame.with_pts(self.0.next())
+    fn push(&mut self, _kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
+        frame.clone().with_pts(self.0.next())
     }
 }
