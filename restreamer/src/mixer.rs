@@ -43,23 +43,14 @@ mod tests {
     }
 
     pub(super) fn create_frames(length: usize, content: f32) -> Vec<AudioFrame> {
-        let mut pts = Pts::from(&empty_frame());
+        let mut pts = Pts::new(4, 4);
         (0..length)
             .map(|_| frame_with_content(content).with_pts(pts.next()))
             .collect()
     }
 
     pub(super) fn pts_seq(length: usize) -> Vec<Timestamp> {
-        let frame = AudioFrameMut::silence(
-            ChannelLayout::from_channels(1).unwrap().as_ref(),
-            SampleFormat::Flt.into(),
-            4,
-            4,
-        )
-        .freeze();
-
-        let mut pts = Pts::from(&frame);
-
+        let mut pts = Pts::new(2_048, 48_000);
         (0..length).map(|_| pts.next()).collect()
     }
 

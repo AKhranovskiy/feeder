@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use codec::dsp::CrossFadePair;
-use codec::{AudioFrame, Pts, Timestamp};
+use codec::{AudioFrame, Pts};
 
 use super::Mixer;
 
@@ -9,7 +9,7 @@ pub struct SilenceMixer<'cf> {
     cross_fade: &'cf [CrossFadePair],
     cf_iter: Box<dyn Iterator<Item = &'cf CrossFadePair> + 'cf>,
     ad_segment: bool,
-    pts: Option<Pts>,
+    pts: Pts,
 }
 
 impl<'cf> SilenceMixer<'cf> {
@@ -18,16 +18,8 @@ impl<'cf> SilenceMixer<'cf> {
             cross_fade,
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
-            pts: None,
+            pts: Pts::new(2_048, 48_000),
         }
-    }
-
-    fn pts(&mut self, frame: &AudioFrame) -> Timestamp {
-        if self.pts.is_none() {
-            self.pts = Some(Pts::from(frame));
-        }
-
-        self.pts.as_mut().unwrap().next()
     }
 
     fn start_ad_segment(&mut self) {
@@ -47,14 +39,14 @@ impl<'cf> SilenceMixer<'cf> {
         self.stop_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(&frame);
-        (cf * (&silence, &frame)).with_pts(self.pts(&frame))
+        (cf * (&silence, &frame)).with_pts(self.pts.next())
     }
 
     fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
         self.start_ad_segment();
         let cf = self.cf_iter.next().unwrap();
         let silence = codec::silence_frame(&frame);
-        (cf * (&frame, &silence)).with_pts(self.pts(&frame))
+        (cf * (&frame, &silence)).with_pts(self.pts.next())
     }
 }
 

@@ -37,7 +37,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
             cf_iter: Box::new(repeat(&CrossFadePair::END)),
             ad_segment: false,
             play_buffer: VecDeque::new(),
-            pts: Pts::from(&ad_frames[0]),
+            pts: Pts::new(2_048, 48_000),
             drain_play_buffer: false,
             last_played_timestamp: ad_frames[0].pts(),
         }
@@ -102,6 +102,7 @@ impl<'af, 'cf> AdsMixer<'af, 'cf> {
         self.check(frame)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn advertisement(&mut self, frame: AudioFrame) -> AudioFrame {
         // eprintln!(
         //     "BUFFER ads {:?}",
@@ -290,7 +291,7 @@ mod tests {
     impl<'m, 'af, 'cf> Player<'m, 'af, 'cf> {
         fn new(mixer: &'m mut AdsMixer<'af, 'cf>) -> Self {
             let frame = create_frames(1, 1.0)[0].clone();
-            let pts = Pts::from(&frame);
+            let pts = Pts::new(4, 4);
             Self {
                 mixer,
                 frame,
