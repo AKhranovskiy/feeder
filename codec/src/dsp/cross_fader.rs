@@ -1,8 +1,9 @@
 use std::cell::Cell;
 use std::time::Duration;
 
-use codec::dsp::{CrossFade, CrossFadePair};
-use codec::AudioFrame;
+use crate::AudioFrame;
+
+use super::{CrossFade, CrossFadePair};
 
 pub struct CrossFader {
     values: Vec<CrossFadePair>,
@@ -10,6 +11,7 @@ pub struct CrossFader {
 }
 
 impl CrossFader {
+    #[must_use]
     pub fn new<CF: CrossFade>(cf_duration: Duration, frame_duration: Duration) -> Self {
         let values = CF::generate((cf_duration.as_millis() / frame_duration.as_millis()) as usize);
 
@@ -26,6 +28,7 @@ impl CrossFader {
     }
 
     #[allow(dead_code)]
+    #[must_use]
     pub fn exact<CF: CrossFade>(length: usize) -> Self {
         let values = CF::generate(length);
         Self {

@@ -6,6 +6,7 @@ use axum::{
     body::StreamBody,
     extract::{Query, State},
 };
+use codec::dsp::CrossFader;
 use futures::Stream;
 
 use analyzer::{BufferedAnalyzer, LabelSmoother};
@@ -14,15 +15,12 @@ use codec::{
     AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
 };
 
-mod cross_fader;
-
 mod play_params;
 use play_params::{PlayAction, PlayParams};
 
 mod mixer;
 use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
-use crate::routes::play::cross_fader::CrossFader;
 use crate::{
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,

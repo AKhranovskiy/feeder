@@ -1,6 +1,4 @@
-use codec::{AudioFrame, Pts};
-
-use crate::routes::play::cross_fader::CrossFader;
+use codec::{dsp::CrossFader, AudioFrame, Pts};
 
 use super::Mixer;
 
@@ -70,8 +68,6 @@ mod tests {
 
     use super::Mixer;
     use super::SilenceMixer;
-
-    impl CrossFader {}
 
     #[test]
     fn test_music_to_advertisement() {
