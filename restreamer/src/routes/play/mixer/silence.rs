@@ -38,15 +38,15 @@ impl<'cf> SilenceMixer<'cf> {
     fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.stop_ad_segment();
         let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(&frame);
-        (cf * (&silence, &frame)).with_pts(self.pts.next())
+        let silence = codec::silence_frame(frame);
+        (cf * (&silence, frame)).with_pts(self.pts.next())
     }
 
     fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.start_ad_segment();
         let cf = self.cf_iter.next().unwrap();
-        let silence = codec::silence_frame(&frame);
-        (cf * (&frame, &silence)).with_pts(self.pts.next())
+        let silence = codec::silence_frame(frame);
+        (cf * (frame, &silence)).with_pts(self.pts.next())
     }
 }
 
@@ -67,8 +67,10 @@ mod tests {
     use analyzer::ContentKind;
     use codec::dsp::{CrossFade, ParabolicCrossFade};
 
-    use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
-    use crate::mixer::{Mixer, SilenceMixer};
+    use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
+
+    use super::Mixer;
+    use super::SilenceMixer;
 
     #[test]
     fn test_music_to_advertisement() {
@@ -83,20 +85,20 @@ mod tests {
             music
                 .iter()
                 .take(5)
-                .map(|frame| sut.push(ContentKind::Music, &frame)),
+                .map(|frame| sut.push(ContentKind::Music, frame)),
         );
         output.extend(
             music
                 .iter()
                 .skip(5)
                 .take(10)
-                .map(|frame| sut.push(ContentKind::Advertisement, &frame)),
+                .map(|frame| sut.push(ContentKind::Advertisement, frame)),
         );
         output.extend(
             music
                 .iter()
                 .skip(15)
-                .map(|frame| sut.push(ContentKind::Music, &frame)),
+                .map(|frame| sut.push(ContentKind::Music, frame)),
         );
 
         let samples = output

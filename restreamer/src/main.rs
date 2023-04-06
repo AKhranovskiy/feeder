@@ -6,11 +6,9 @@ use axum::{Router, Server};
 use tower_http::services::ServeDir;
 
 mod terminate;
-use self::terminate::Terminator;
+use terminate::Terminator;
 
-mod mixer;
-mod play_params;
-mod route_play;
+mod routes;
 mod stream_saver;
 
 #[tokio::main]
@@ -22,7 +20,7 @@ async fn main() {
 
     let app = Router::new()
         .nest_service("/", serve_dir.clone())
-        .route("/play", get(route_play::serve))
+        .route("/play", get(routes::play::serve))
         .with_state(terminator.clone());
 
     Server::bind(&"0.0.0.0:3000".parse().unwrap())

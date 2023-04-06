@@ -15,9 +15,13 @@ use codec::{
     AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
 };
 
+mod play_params;
+use play_params::{PlayAction, PlayParams};
+
+mod mixer;
+use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
+
 use crate::{
-    mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer},
-    play_params::{PlayAction, PlayParams},
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
 };
@@ -57,7 +61,7 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
     // TODO resample() does not work
     let params = params.with_samples_per_frame(2048); // for OGG
 
-    let sample_audio = include_bytes!("../sample.mp3");
+    let sample_audio = include_bytes!("../../sample.mp3");
     let decoder = Decoder::try_from(std::io::Cursor::new(sample_audio))?;
     let mut resampler = Resampler::new(decoder.codec_params(), params);
     let mut frames = vec![];

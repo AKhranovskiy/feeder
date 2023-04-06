@@ -148,8 +148,9 @@ mod tests {
     use codec::dsp::{CrossFade, ParabolicCrossFade};
     use codec::{AudioFrame, Timestamp};
 
-    use crate::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
-    use crate::mixer::{AdsMixer, Mixer};
+    use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
+
+    use super::{AdsMixer, Mixer};
 
     #[test]
     fn test_one_ads_block_short_buffer() {
