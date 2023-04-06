@@ -89,6 +89,15 @@ impl<'af, 'cf> Mixer for AdsMixer<'af, 'cf> {
         };
         self.check(frame)
     }
+
+    fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
+        match kind {
+            analyzer::ContentKind::Advertisement => self.advertisement(&frame),
+            analyzer::ContentKind::Music
+            | analyzer::ContentKind::Talk
+            | analyzer::ContentKind::Unknown => self.content(&frame),
+        }
+    }
 }
 
 impl<'af, 'cf> AdsMixer<'af, 'cf> {

@@ -2,18 +2,25 @@ use std::io::{Read, Write};
 use std::iter::repeat;
 use std::time::Duration;
 
-use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use async_stream::stream;
-use axum::body::StreamBody;
-use axum::extract::{Query, State};
-use codec::dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, ToFadeInOut};
-use codec::{AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler};
+use axum::{
+    body::StreamBody,
+    extract::{Query, State},
+};
 use futures::Stream;
 
-use crate::mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
-use crate::play_params::{PlayAction, PlayParams};
-use crate::stream_saver::{Destination, StreamSaver};
-use crate::terminate::Terminator;
+use analyzer::{BufferedAnalyzer, LabelSmoother};
+use codec::{
+    dsp::{CrossFade, CrossFadePair, LinearCrossFade, ParabolicCrossFade, ToFadeInOut},
+    AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
+};
+
+use crate::{
+    mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer},
+    play_params::{PlayAction, PlayParams},
+    stream_saver::{Destination, StreamSaver},
+    terminate::Terminator,
+};
 
 pub async fn serve(
     Query(params): Query<PlayParams>,
@@ -109,11 +116,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
         stream_saver.push(Destination::Original, frame.clone());
 
-        let frame = match kind {
-            ContentKind::Advertisement => mixer.advertisement(&frame),
-            ContentKind::Music | ContentKind::Talk | ContentKind::Unknown => mixer.content(&frame),
-        };
-
+        let frame = mixer.push(kind, frame);
         let frame = efi_iter.next().unwrap() * (&frame, &frame);
 
         stream_saver.push(Destination::Processed, frame.clone());

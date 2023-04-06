@@ -59,6 +59,15 @@ impl<'cf> Mixer for SilenceMixer<'cf> {
         let silence = codec::silence_frame(frame);
         (cf * (frame, &silence)).with_pts(self.pts(frame))
     }
+
+    fn push(&mut self, kind: analyzer::ContentKind, frame: AudioFrame) -> AudioFrame {
+        match kind {
+            analyzer::ContentKind::Advertisement => self.advertisement(&frame),
+            analyzer::ContentKind::Music
+            | analyzer::ContentKind::Talk
+            | analyzer::ContentKind::Unknown => self.content(&frame),
+        }
+    }
 }
 
 #[cfg(test)]
