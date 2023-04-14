@@ -35,8 +35,6 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
-        let dim = labels.dim();
-
         self.buffer.push_back(labels);
 
         if self.buffer.len() < self.ahead {
@@ -47,23 +45,35 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
+        let ads = self
+            .buffer
+            .iter()
+            .map(MaxOutExt::max_out)
+            .filter(|x| (x[(0, 0)] - 1.0).abs() < f32::EPSILON)
+            .count();
+
+        // TODO count talks
+        let ads_ratio = ads as f32 / self.buffer.len() as f32;
+
         eprint!(
-            "{}",
+            "{} {:.2}",
             self.buffer
                 .iter()
                 .map(|item| { "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_') })
-                .collect::<String>()
+                .collect::<String>(),
+            ads_ratio
         );
 
-        // TODO handle -#-#-#-#
-        // TODO add timings - music cannot be shorter than X, ads can not be shorter then Y
-        Some(
-            self.buffer
-                .iter()
-                .fold(PredictedLabels::zeros(dim), |acc, v| acc + v)
-                .max_out(),
-        )
+        if ads_ratio > 0.66 {
+            Some(make_labels(1.0, 0.0))
+        } else {
+            Some(make_labels(0.0, 1.0))
+        }
     }
+}
+
+fn make_labels(ads: f32, music: f32) -> PredictedLabels {
+    PredictedLabels::from_shape_vec((1, 3), vec![ads, music, 0.0]).unwrap()
 }
 
 trait MaxOutExt {
@@ -84,48 +94,44 @@ impl MaxOutExt for PredictedLabels {
 mod tests {
     use std::time::Duration;
 
-    use classifier::PredictedLabels;
-
+    use super::make_labels;
     use super::LabelSmoother;
 
-    const BEHIND: Duration = Duration::from_millis(1000);
-    const AHEAD: Duration = Duration::from_millis(1000);
+    const BEHIND: Duration = Duration::from_millis(40);
+    const AHEAD: Duration = Duration::from_millis(20);
 
     #[test]
     fn test_short() {
         let mut sut = LabelSmoother::new(BEHIND, AHEAD);
 
-        assert!(sut.push(labels([0.1, 0.2, 0.3])).is_none());
+        assert_eq!(
+            sut.push(make_labels(0.6, 0.4)).unwrap(),
+            make_labels(1.0, 0.0)
+        );
     }
 
     #[test]
     fn test_exact() {
         let mut sut = LabelSmoother::new(BEHIND, AHEAD);
 
-        sut.push(labels([0.1, 0.2, 0.3]));
-        sut.push(labels([0.2, 0.3, 0.4]));
-        sut.push(labels([0.3, 0.4, 0.5]));
-        let smoothed = sut.push(labels([0.6, 0.7, 0.8])).unwrap();
+        sut.push(make_labels(0.6, 0.4));
+        sut.push(make_labels(0.2, 0.8));
+        let smoothed = sut.push(make_labels(0.4, 0.6)).unwrap();
 
-        assert_eq!(labels([0.0, 0.0, 1.0]), smoothed);
+        assert_eq!(make_labels(0.0, 1.0), smoothed);
     }
 
     #[test]
     fn test_long_history() {
         let mut sut = LabelSmoother::new(BEHIND, AHEAD);
 
-        // Fill the history to threshold
-        sut.push(labels([0.1, 0.2, 0.3]));
-        sut.push(labels([0.2, 0.3, 0.4]));
-        sut.push(labels([0.3, 0.4, 0.5]));
-        sut.push(labels([0.4, 0.5, 0.6]));
+        sut.push(make_labels(0.4, 0.6));
+        sut.push(make_labels(0.4, 0.6));
+        sut.push(make_labels(0.4, 0.6));
+        sut.push(make_labels(0.6, 0.6));
 
-        let smoothed = sut.push(labels([0.6, 0.7, 0.8])).unwrap();
+        let smoothed = sut.push(make_labels(0.6, 0.4)).unwrap();
 
-        assert_eq!(labels([0.0, 0.0, 1.0]), smoothed);
-    }
-
-    fn labels(values: [f32; 3]) -> PredictedLabels {
-        PredictedLabels::from_shape_vec((1, 3), values.to_vec()).unwrap()
+        assert_eq!(make_labels(1.0, 0.0), smoothed);
     }
 }

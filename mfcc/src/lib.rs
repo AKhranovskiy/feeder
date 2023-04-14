@@ -2,8 +2,6 @@
 
 use std::time::Duration;
 
-use ndarray::{Array2, Axis};
-
 use crate::util::stepped_windows;
 
 use self::util::stepped_window_ranges;
@@ -45,7 +43,7 @@ impl const Default for Config {
 
 const FILTERS: usize = 40; // Aubio says it must be 40 for MFCC
 
-pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray::Array2<f64>> {
+pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>> {
     assert!(
         config.num_coefficients % 3 == 0,
         "Coeff must be multipler of 3"
@@ -65,28 +63,21 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<ndarray:
         config.sample_rate_hz as u32,
     )?;
 
-    let mut output = Array2::<f64>::from_elem((segments, coeff), 0.0);
+    let mut output = Vec::with_capacity(segments * coeff);
 
     for r in stepped_window_ranges(input.len(), config.frame_size, config.hop_length) {
         let chunk = &input[r];
 
-        // let mut fftgrain = vec![0.0f32; config.frame_size];
-        // pvoc.do_(chunk, fftgrain.as_mut_slice())?;
+        let mut fftgrain = vec![0.0f32; config.frame_size];
+        pvoc.do_(chunk, fftgrain.as_mut_slice())?;
 
         let mut buf = vec![0f32; coeff];
-        mfcc.do_(chunk, buf.as_mut_slice())?;
+        mfcc.do_(fftgrain, buf.as_mut_slice())?;
 
         assert!(buf.iter().all(|x| x.is_finite()), "MFCC are finite");
 
-        output.append(
-            Axis(0),
-            Array2::from_shape_vec((1, coeff), buf)?
-                .mapv(f64::from)
-                .view(),
-        )?;
+        output.extend_from_slice(&buf);
     }
-    // let d = deltas(output);
-    // assert_eq!(config.num_coefficients, d.shape()[1]);
-    // Ok(d)
+
     Ok(output)
 }

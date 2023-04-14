@@ -4,11 +4,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::Parser;
-use codec::CodecParams;
-use ndarray::{Array2, Axis};
 use rayon::prelude::ParallelIterator;
 use rayon::slice::ParallelSlice;
 
+use codec::CodecParams;
 use mfcc::calculate_mfccs;
 
 #[derive(Debug, Parser)]
@@ -64,13 +63,10 @@ fn main() -> anyhow::Result<()> {
                 Ok(coeffs) => Some(coeffs),
                 Err(err) => panic!("Failed to process chunk: {err:#}"),
             })
-            .reduce(
-                || Array2::<f64>::zeros((0_usize, args.coeffs as usize)),
-                |mut acc, x| {
-                    acc.append(Axis(0), x.view()).expect("Extened array");
-                    acc
-                },
-            )
+            .reduce(Vec::new, |mut acc, mut x| {
+                acc.append(&mut x);
+                acc
+            })
     };
 
     println!("Processed in {:.02}s", instant.elapsed().as_secs_f32());
@@ -79,7 +75,7 @@ fn main() -> anyhow::Result<()> {
         println!("Writing output...");
         bincode::serialize_into(BufWriter::new(File::create(output)?), &coeffs)?;
     } else {
-        println!("{coeffs:#}");
+        println!("{coeffs:?}");
     }
 
     Ok(())

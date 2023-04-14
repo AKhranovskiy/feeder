@@ -1,13 +1,12 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use codec::{CodecParams, SampleFormat};
 use kdam::{tqdm, BarExt};
-use ndarray::{Array2, ArrayBase, Axis};
-
-use mfcc::{calculate_mfccs, Config};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use rusqlite::{params, Connection};
+
+use codec::{CodecParams, SampleFormat};
+use mfcc::{calculate_mfccs, Config};
 
 fn main() -> anyhow::Result<()> {
     let db_path = Arc::new(
@@ -41,7 +40,7 @@ fn main() -> anyhow::Result<()> {
 
     let instant = Instant::now();
 
-    let lines = vec![
+    let result = vec![
         {
             let pb = tqdm!(
                 total = limit_ads,
@@ -75,23 +74,21 @@ fn main() -> anyhow::Result<()> {
     ]
     .into_iter()
     .map(|worker| worker.join().unwrap())
-    .collect::<Result<Vec<Array2<f64>>, _>>()?;
+    .collect::<Result<Vec<Vec<f32>>, _>>()?
+    .into_iter()
+    .flat_map(IntoIterator::into_iter)
+    .collect::<Vec<f32>>();
 
     println!("Processed, took {}min", instant.elapsed().as_secs() / 60);
 
-    println!(
-        "{:?}",
-        lines.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
-    );
-
     let writer = std::io::BufWriter::new(std::fs::File::create("./mfccs.bin")?);
-    bincode::serialize_into(writer, &lines)?;
+    bincode::serialize_into(writer, &result)?;
 
     println!("Done, took {}min", instant.elapsed().as_secs() / 60);
     Ok(())
 }
 
-fn process<F>(get_conn: &Arc<F>, kind: &str, pb: kdam::Bar) -> anyhow::Result<ndarray::Array2<f64>>
+fn process<F>(get_conn: &Arc<F>, kind: &str, pb: kdam::Bar) -> anyhow::Result<Vec<f32>>
 where
     F: Fn() -> Connection + Sync + Send,
 {
@@ -116,22 +113,21 @@ where
 
             let data: Vec<i16> =
                 codec::resample(io, CodecParams::new(22050, SampleFormat::S16, 1))?;
+
             let data: Vec<f32> = data.into_iter().map(f32::from).collect();
 
             if data.len() < 1024 {
-                return Ok(Array2::<f64>::zeros((0, 0)));
+                return Ok(vec![]);
             }
 
             let mfccs = calculate_mfccs(data.as_slice(), Config::default())?;
             pb.lock().unwrap().update(1);
             anyhow::Ok(mfccs)
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flat_map(IntoIterator::into_iter)
+        .collect::<Vec<f32>>();
 
-    let views = mfccs
-        .iter()
-        .filter(|x| !x.is_empty())
-        .map(ArrayBase::view)
-        .collect::<Vec<_>>();
-    ndarray::concatenate(Axis(0), views.as_slice()).map_err(Into::into)
+    Ok(mfccs)
 }

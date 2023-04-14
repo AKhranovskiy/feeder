@@ -1,16 +1,22 @@
+use std::env::args;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use ndarray::{s, Array1, Array2, Axis};
+use ndarray::{concatenate, Array1, Array4, ArrayBase, Axis};
 
 use classifier::{verify, Classifier};
+use ndarray_shuffle::NdArrayShuffleInplaceExt;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
-const BLOCK: usize = 150;
+const BLOCK: usize = 150 * 39;
 
 fn main() -> anyhow::Result<()> {
-    println!("Loading data...");
-    let (data, labels) = prepare_data(&["./ads.bin", "./music.bin"])?;
+    let bindir = Path::new(&args().nth(1).expect("Path to bin dir")).to_owned();
+
+    println!("Loading data from {}", bindir.display());
+    let (data, labels) = prepare_data(bindir)?;
 
     println!("Training...");
     let mut classifier = Classifier::new()?;
@@ -27,7 +33,7 @@ fn main() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let predicted = ndarray::concatenate(
+    let predicted = concatenate(
         Axis(0),
         owned_results
             .iter()
@@ -43,33 +49,36 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn prepare_data<P>(sources: &[P]) -> anyhow::Result<(ndarray::Array4<f64>, ndarray::Array1<u32>)>
+fn prepare_data<P>(bindir: P) -> anyhow::Result<(ndarray::Array4<f32>, ndarray::Array1<u32>)>
 where
     P: AsRef<Path>,
 {
-    let data: Vec<Array2<f64>> = sources
-        .iter()
-        .map(|source| bincode::deserialize_from(BufReader::new(File::open(source)?)))
-        .collect::<Result<_, _>>()?;
+    let data: Vec<Vec<f32>> = [
+        bindir.as_ref().join("ads.bin"),
+        bindir.as_ref().join("music.bin"),
+    ]
+    .iter()
+    .map(|source| bincode::deserialize_from(BufReader::new(File::open(source)?)))
+    .collect::<Result<_, _>>()?;
 
-    let views = data
-        .iter()
-        .map(|x| {
-            let len = x.shape()[0];
+    let data = data
+        .into_iter()
+        .map(|mut v| {
+            let len = v.len();
             let len = len - (len % BLOCK);
             assert_eq!(0, len % BLOCK);
-            println!("{:?}->{:?}", x.shape(), (len, x.shape()[1]));
-            x.slice(s![0..len, ..])
-                .into_shape((len / BLOCK, BLOCK, 39, 1))
+            println!("{:?}->{:?}", v.len(), len);
+            v.truncate(len);
+            Array4::from_shape_vec((len / BLOCK, BLOCK / 39, 39, 1), v)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
     println!(
         "Loaded {:?} images",
-        views.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
+        data.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
     );
 
-    let labels = views
+    let mut labels = data
         .iter()
         .enumerate()
         .map(|x| Array1::<u32>::from_elem(x.1.shape()[0], x.0 as u32))
@@ -79,14 +88,20 @@ where
         });
     println!("labels={:?}", labels.shape());
 
-    let data = ndarray::concatenate(Axis(0), views.as_slice())?;
+    let mut data = concatenate(
+        Axis(0),
+        data.iter()
+            .map(ArrayBase::view)
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
     println!("data={:?}", data.shape());
 
     assert!(data.iter().all(|x| x.is_finite()));
-    // println!("Sort labels...");
-    // labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
-    // println!("Sort data...");
-    // data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
+    println!("Sort labels...");
+    labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
+    println!("Sort data...");
+    data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
 
     println!("Done");
 
