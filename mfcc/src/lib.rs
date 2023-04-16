@@ -1,5 +1,3 @@
-#![feature(const_trait_impl)]
-
 use std::time::Duration;
 
 use crate::util::stepped_windows;
@@ -25,10 +23,8 @@ impl Config {
         let ms = self.frame_size * 1000 / self.sample_rate_hz;
         Duration::from_millis(ms as u64)
     }
-}
 
-impl const Default for Config {
-    fn default() -> Self {
+    pub const fn const_default() -> Self {
         Self {
             sample_rate_hz: 22050,
             num_coefficients: 39,
@@ -38,6 +34,12 @@ impl const Default for Config {
             frame_size: 441,
             hop_length: 220,
         }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::const_default()
     }
 }
 

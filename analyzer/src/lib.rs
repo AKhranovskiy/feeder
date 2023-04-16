@@ -1,5 +1,3 @@
-#![feature(const_trait_impl)]
-
 mod analyzer;
 mod content_kind;
 mod smooth;

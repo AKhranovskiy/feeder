@@ -20,7 +20,7 @@ pub struct BufferedAnalyzer {
 }
 
 impl BufferedAnalyzer {
-    const MFCCS: mfcc::Config = mfcc::Config::default();
+    const MFCCS: mfcc::Config = mfcc::Config::const_default();
 
     const DRAIN: usize = 1;
 
@@ -45,23 +45,23 @@ impl BufferedAnalyzer {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<ContentKind> {
-        const CONFIG: mfcc::Config = mfcc::Config::default();
+        let config = mfcc::Config::default();
 
         let pts = frame.pts();
 
         let samples: Vec<i16> = samples(frame)?;
         self.queue.extend(samples.into_iter());
 
-        if self.queue.len() >= 76 * CONFIG.frame_size {
+        if self.queue.len() >= 76 * config.frame_size {
             let samples = self
                 .queue
                 .iter()
-                .take(76 * CONFIG.frame_size)
+                .take(76 * config.frame_size)
                 .copied()
                 .map(f32::from)
                 .collect::<Vec<_>>();
 
-            self.queue.drain(0..Self::DRAIN * CONFIG.frame_size);
+            self.queue.drain(0..Self::DRAIN * config.frame_size);
 
             let mfccs = {
                 let mut mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;

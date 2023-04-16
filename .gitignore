@@ -3,10 +3,10 @@ Cargo.lock
 *.pickle
 *.sqlite
 */model
-*.mp3
 *.ogg
 *.bin
 tools/audio
 artifacts
 classifier/model*
 restreamer/assets/files/
+.env

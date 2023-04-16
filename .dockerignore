@@ -1,0 +1,11 @@
+.git/
+.env/
+artifacts/
+tools/audio/
+restreamer/assets/files/
+target/
+**/*.wav
+**/*.ogg
+**/*.aac
+**/*.bin
+**/*.sqlite

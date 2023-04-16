@@ -1,5 +1,7 @@
 #![allow(clippy::module_name_repetitions)]
 
+use std::net::SocketAddr;
+
 use analyzer::BufferedAnalyzer;
 use axum::routing::{get, get_service};
 use axum::{Router, Server};
@@ -23,9 +25,22 @@ async fn main() {
         .route("/play", get(routes::play::serve))
         .with_state(terminator.clone());
 
-    Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    Server::bind(&get_addr())
         .serve(app.into_make_service())
         .with_graceful_shutdown(terminator.signal())
         .await
         .unwrap();
+}
+
+fn get_addr() -> SocketAddr {
+    let port = std::env::args()
+        .nth(1)
+        .map(|p| p.parse::<u16>())
+        .transpose()
+        .expect("Valid port")
+        .unwrap_or(15190);
+    assert!(port >= 3000);
+    let addr = SocketAddr::new("0.0.0.0".parse().unwrap(), port);
+    println!("Listening on {addr}");
+    addr
 }
