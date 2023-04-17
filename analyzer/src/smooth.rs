@@ -1,6 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use classifier::PredictedLabels;
+use log::info;
 use ndarray_stats::QuantileExt;
 
 use crate::BufferedAnalyzer;
@@ -19,7 +20,7 @@ impl LabelSmoother {
         let ahead_size =
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
 
-        eprintln!(
+        info!(
             "SMOOTHER behind={}ms/{} ahead={}ms/{}",
             behind.as_millis(),
             behind_size,
@@ -34,6 +35,29 @@ impl LabelSmoother {
         }
     }
 
+    pub fn get_buffer_content(&self) -> String {
+        format!(
+            "{} {:.2}",
+            self.buffer
+                .iter()
+                .map(|item| { "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_') })
+                .collect::<String>(),
+            self.get_ads_ratio()
+        )
+    }
+
+    fn get_ads_ratio(&self) -> f32 {
+        let ads = self
+            .buffer
+            .iter()
+            .map(MaxOutExt::max_out)
+            .filter(|x| (x[(0, 0)] - 1.0).abs() < f32::EPSILON)
+            .count();
+
+        // TODO count talks
+        ads as f32 / self.buffer.len() as f32
+    }
+
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
         self.buffer.push_back(labels);
 
@@ -45,26 +69,7 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        let ads = self
-            .buffer
-            .iter()
-            .map(MaxOutExt::max_out)
-            .filter(|x| (x[(0, 0)] - 1.0).abs() < f32::EPSILON)
-            .count();
-
-        // TODO count talks
-        let ads_ratio = ads as f32 / self.buffer.len() as f32;
-
-        eprint!(
-            "{} {:.2}",
-            self.buffer
-                .iter()
-                .map(|item| { "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_') })
-                .collect::<String>(),
-            ads_ratio
-        );
-
-        if ads_ratio > 0.66 {
+        if self.get_ads_ratio() > 0.66 {
             Some(make_labels(1.0, 0.0))
         } else {
             Some(make_labels(0.0, 1.0))

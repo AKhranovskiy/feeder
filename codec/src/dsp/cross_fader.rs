@@ -15,7 +15,7 @@ impl CrossFader {
     pub fn new<CF: CrossFade>(cf_duration: Duration, frame_duration: Duration) -> Self {
         let values = CF::generate((cf_duration.as_millis() / frame_duration.as_millis()) as usize);
 
-        eprintln!(
+        log::info!(
             "Cross-fade {:0.1}s, {} frames",
             cf_duration.as_secs_f32(),
             values.len()

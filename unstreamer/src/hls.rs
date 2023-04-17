@@ -45,7 +45,7 @@ impl HLSUnstreamer {
 
         std::thread::spawn(move || loop {
             if data_tx.is_disconnected() {
-                eprintln!("Data is disconected, exit");
+                log::error!("Data is disconected, exit");
                 break;
             }
 
@@ -68,12 +68,12 @@ impl HLSUnstreamer {
                         last_fetched = segment.sequence_number;
 
                         if data_tx.is_disconnected() {
-                            eprintln!("Data is disconected, exit");
+                            log::error!("Data is disconected, exit");
                             break;
                         }
 
                         if let Err(error) = ureq::get(segment.source.as_ref()).call().map(|resp| {
-                            eprintln!(
+                            log::debug!(
                                 "Fetched #{}: {}",
                                 segment.sequence_number,
                                 segment.title.unwrap_or_default()

@@ -1,10 +1,10 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, time::Duration, time::Instant};
 
 use anyhow::anyhow;
 use bytemuck::cast_slice;
+use log::debug;
 use ndarray::Array4;
 use ndarray_stats::QuantileExt;
-use time::{format_description, macros::offset, Instant};
 
 use classifier::Classifier;
 use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
@@ -16,7 +16,6 @@ pub struct BufferedAnalyzer {
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
-    prediction_timer: Instant,
 }
 
 impl BufferedAnalyzer {
@@ -40,7 +39,6 @@ impl BufferedAnalyzer {
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
             smoother,
             last_kind: ContentKind::Unknown,
-            prediction_timer: Instant::now(),
         }
     }
 
@@ -53,6 +51,8 @@ impl BufferedAnalyzer {
         self.queue.extend(samples.into_iter());
 
         if self.queue.len() >= 76 * config.frame_size {
+            let timer = Instant::now();
+
             let samples = self
                 .queue
                 .iter()
@@ -72,19 +72,6 @@ impl BufferedAnalyzer {
 
             let prediction = self.classifer.predict(&mfccs)?;
 
-            eprint!(
-                "{}, {:3}ms, {:?}:",
-                time::OffsetDateTime::now_utc()
-                    .to_offset(offset!(+7))
-                    .format(
-                        &format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
-                            .unwrap()
-                    )
-                    .unwrap(),
-                self.prediction_timer.elapsed().whole_milliseconds(),
-                pts
-            );
-
             if let Some(prediction) = self.smoother.push(prediction) {
                 self.last_kind = match prediction.argmax()?.1 {
                     0 => ContentKind::Advertisement,
@@ -93,9 +80,14 @@ impl BufferedAnalyzer {
                     _ => unreachable!("Unexpected prediction shape"),
                 };
             }
-            eprintln!(" {:#}", self.last_kind);
 
-            self.prediction_timer = Instant::now();
+            debug!(
+                "{:3}ms, {:?}: {} {:#}",
+                timer.elapsed().as_millis(),
+                pts,
+                self.smoother.get_buffer_content(),
+                self.last_kind
+            );
         }
 
         Ok(self.last_kind)

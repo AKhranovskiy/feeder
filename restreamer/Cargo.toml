@@ -1,6 +1,6 @@
 [package]
 name = "restreamer"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -9,12 +9,15 @@ analyzer = { workspace = true }
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 axum = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
 codec = { workspace = true }
 futures = { workspace = true }
+log = { workspace = true }
 mfcc = { workspace = true }
 os_pipe = { workspace = true }
 serde = { workspace = true }
-time = { workspace = true }
+stderrlog = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }

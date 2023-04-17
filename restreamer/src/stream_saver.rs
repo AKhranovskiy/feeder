@@ -4,8 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use chrono::Local;
 use codec::{AudioFrame, CodecParams, Encoder};
-use time::{format_description, macros::offset, OffsetDateTime};
+
+use crate::args::Args;
 
 const BASE_PATH: &str = "./recordings";
 
@@ -17,12 +19,7 @@ pub enum Destination {
 
 impl Destination {
     pub fn into_path(self) -> PathBuf {
-        let format =
-            format_description::parse("[year][month][day]-[hour][minute][second]").unwrap();
-        let now = OffsetDateTime::now_utc()
-            .to_offset(offset!(+7))
-            .format(&format)
-            .unwrap();
+        let now = Local::now().format("%Y%m%d-%H%M%S");
 
         let dest = match self {
             Destination::Original => "original",
@@ -34,52 +31,61 @@ impl Destination {
 }
 
 pub struct StreamSaver {
-    original: Encoder<BufWriter<File>>,
-    processed: Encoder<BufWriter<File>>,
+    original: Option<Encoder<BufWriter<File>>>,
+    processed: Option<Encoder<BufWriter<File>>>,
 }
 
 impl StreamSaver {
-    pub fn new(codec_params: CodecParams) -> anyhow::Result<Self> {
-        eprintln!(
-            "Creating stream saver\n{}\n{}",
-            Destination::Original.into_path().display(),
-            Destination::Processed.into_path().display()
-        );
+    pub fn new(args: &Args, codec_params: CodecParams) -> anyhow::Result<Self> {
+        if args.gcp || args.no_recordings {
+            log::info!("Recordings are not enabled");
+            Ok(Self {
+                original: None,
+                processed: None,
+            })
+        } else {
+            log::info!(
+                "Creating stream saver\n{}\n{}",
+                Destination::Original.into_path().display(),
+                Destination::Processed.into_path().display()
+            );
 
-        let original = {
-            let writer = BufWriter::new(File::create(Destination::Original.into_path())?);
-            Encoder::opus(codec_params, writer)?
-        };
-        let processed = {
-            let writer = BufWriter::new(File::create(Destination::Processed.into_path())?);
-            Encoder::opus(codec_params, writer)?
-        };
+            let original = Some({
+                let writer = BufWriter::new(File::create(Destination::Original.into_path())?);
+                Encoder::opus(codec_params, writer)?
+            });
+            let processed = Some({
+                let writer = BufWriter::new(File::create(Destination::Processed.into_path())?);
+                Encoder::opus(codec_params, writer)?
+            });
 
-        Ok(Self {
-            original,
-            processed,
-        })
+            Ok(Self {
+                original,
+                processed,
+            })
+        }
     }
 
     pub fn push(&mut self, destination: Destination, frame: AudioFrame) {
         let pts = frame.pts();
         match destination {
-            Destination::Original => {
+            Destination::Original if self.original.is_some() => {
                 let pts = frame.pts();
-                if let Err(error) = self.original.push(frame) {
-                    eprintln!("Failed to save original frame {pts:?}: {error:#?}");
+                if let Err(error) = self.original.as_mut().unwrap().push(frame) {
+                    log::error!("Failed to save original frame {pts:?}: {error:#?}");
                 }
             }
-            Destination::Processed => {
-                if let Err(error) = self.processed.push(frame) {
-                    eprintln!("Failed to save procesed frame {pts:?}: {error:#?}");
+            Destination::Processed if self.processed.is_some() => {
+                if let Err(error) = self.processed.as_mut().unwrap().push(frame) {
+                    log::error!("Failed to save procesed frame {pts:?}: {error:#?}");
                 }
             }
+            _ => {}
         }
     }
 
     pub fn flush(&mut self) {
-        self.original.flush().unwrap();
-        self.processed.flush().unwrap();
+        self.original.as_mut().map(|enc| enc.flush());
+        self.processed.as_mut().map(|enc| enc.flush());
     }
 }

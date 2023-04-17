@@ -2,16 +2,20 @@ use std::io::{Read, Write};
 use std::time::Duration;
 
 use async_stream::stream;
+use axum::routing::get;
+use axum::Router;
 use axum::{
     body::StreamBody,
     extract::{Query, State},
+    http::header,
+    response::IntoResponse,
 };
 use codec::dsp::CrossFader;
 use futures::Stream;
 
 use analyzer::{BufferedAnalyzer, LabelSmoother};
 use codec::{
-    dsp::{CrossFade, LinearCrossFade, ParabolicCrossFade},
+    dsp::{LinearCrossFade, ParabolicCrossFade},
     AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
 };
 
@@ -21,21 +25,52 @@ use play_params::{PlayAction, PlayParams};
 mod mixer;
 use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
+use crate::args::Args;
 use crate::{
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
 };
 
-pub async fn serve(
+#[derive(Clone)]
+struct PlayState {
+    terminator: Terminator,
+    args: Args,
+}
+
+pub fn router(terminator: Terminator, args: Args) -> Router {
+    Router::new()
+        .route("/", get(serve))
+        .with_state(PlayState { terminator, args })
+}
+
+async fn serve(
     Query(params): Query<PlayParams>,
-    State(terminator): State<Terminator>,
+    State(state): State<PlayState>,
+) -> impl IntoResponse {
+    log::info!(
+        "Serve {}, action={:?}",
+        params.url,
+        params.action.as_ref().unwrap_or(&PlayAction::Passthrough)
+    );
+
+    let headers = [
+        (header::CONTENT_TYPE, "audio/ogg"),
+        (header::TRANSFER_ENCODING, "chunked"),
+    ];
+
+    (headers, get_stream(params, state))
+}
+
+fn get_stream(
+    params: PlayParams,
+    state: PlayState,
 ) -> StreamBody<impl Stream<Item = anyhow::Result<Vec<u8>>>> {
     stream! {
         let (mut reader, writer) = os_pipe::pipe()?;
 
         let handle = {
-            let terminator = terminator.clone();
-            std::thread::spawn(move || analyze(params, writer, &terminator))
+            let state = state.clone();
+            std::thread::spawn(move || analyze(params, writer, &state))
         };
 
         let mut buf = [0u8;1024];
@@ -45,7 +80,7 @@ pub async fn serve(
                 handle.join().unwrap()?;
                 break;
             }
-            if terminator.is_terminated() {
+            if state.terminator.is_terminated() {
                 break;
             }
 
@@ -78,31 +113,23 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
 
 const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 
-fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> anyhow::Result<()> {
+fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow::Result<()> {
     let action = params.action.unwrap_or(PlayAction::Passthrough);
 
     let input = unstreamer::Unstreamer::open(params.url)?;
 
     let decoder = Decoder::try_from(input)?;
+    let codec_params = decoder.codec_params();
 
-    let sample_audio_frames = prepare_sample_audio(decoder.codec_params())?;
+    let sample_audio_frames = prepare_sample_audio(codec_params)?;
 
-    let cf = ParabolicCrossFade::generate(
-        (CROSS_FADE_DURATION.as_millis() / sample_audio_frames[0].duration().as_millis()) as usize,
-    );
-    eprintln!(
-        "Cross-fade {:0.1}s, {} frames",
-        CROSS_FADE_DURATION.as_secs_f32(),
-        cf.len()
-    );
+    let mut encoder = Encoder::opus(codec_params, writer)?;
 
-    let mut encoder = Encoder::opus(decoder.codec_params(), writer)?;
-
-    let mut stream_saver = StreamSaver::new(decoder.codec_params())?;
+    let mut stream_saver = StreamSaver::new(&state.args, codec_params)?;
 
     let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
-        Duration::from_millis(300),
-        Duration::from_millis(100),
+        Duration::from_millis(state.args.smooth_behind),
+        Duration::from_millis(state.args.smooth_ahead),
     ));
 
     let cross_fader = CrossFader::new::<ParabolicCrossFade>(
@@ -132,7 +159,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, terminator: &Terminator) -> 
 
         encoder.push(frame)?;
 
-        if terminator.is_terminated() {
+        if state.terminator.is_terminated() {
             break;
         }
     }
