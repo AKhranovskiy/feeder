@@ -39,7 +39,7 @@ RUN mkdir recordings
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-CMD restreamer 8192
+CMD restreamer --port 8192 --gcp
 
 EXPOSE 8192
 
