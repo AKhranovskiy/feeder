@@ -125,12 +125,15 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     let mut encoder = Encoder::opus(codec_params, writer)?;
 
-    let mut stream_saver = StreamSaver::new(&state.args, codec_params)?;
+    let mut stream_saver = StreamSaver::new(state.args.is_recording_enabled(), codec_params)?;
 
-    let mut analyzer = BufferedAnalyzer::new(LabelSmoother::new(
-        Duration::from_millis(state.args.smooth_behind),
-        Duration::from_millis(state.args.smooth_ahead),
-    ));
+    let mut analyzer = BufferedAnalyzer::new(
+        LabelSmoother::new(
+            Duration::from_millis(state.args.smooth_behind),
+            Duration::from_millis(state.args.smooth_ahead),
+        ),
+        state.args.buffer_stat(),
+    );
 
     let cross_fader = CrossFader::new::<ParabolicCrossFade>(
         CROSS_FADE_DURATION,
@@ -148,16 +151,16 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     for frame in decoder {
         let frame = frame?;
-        let kind = analyzer.push(frame.clone())?;
 
-        stream_saver.push(Destination::Original, frame.clone());
+        if let Some((kind, frame)) = analyzer.push(frame.clone())? {
+            stream_saver.push(Destination::Original, frame.clone());
 
-        let frame = mixer.push(kind, &frame);
-        let frame = entry.apply(&frame, &frame);
+            let frame = mixer.push(kind, &frame);
+            let frame = entry.apply(&codec::silence_frame(&frame), &frame);
+            encoder.push(frame.clone())?;
 
-        stream_saver.push(Destination::Processed, frame.clone());
-
-        encoder.push(frame)?;
+            stream_saver.push(Destination::Processed, frame);
+        }
 
         if state.terminator.is_terminated() {
             break;

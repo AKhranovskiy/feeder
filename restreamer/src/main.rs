@@ -7,6 +7,8 @@ use args::Args;
 use axum::routing::get_service;
 use axum::{Router, Server};
 use clap::Parser;
+use log::LevelFilter;
+use stderrlog::Timestamp;
 use tower_http::services::ServeDir;
 
 mod args;
@@ -46,21 +48,22 @@ fn get_addr(args: &Args) -> SocketAddr {
 }
 
 fn configure_logger(args: &Args) {
-    stderrlog::new()
-        .timestamp(stderrlog::Timestamp::Second)
-        .show_module_names(false)
+    let mut log = stderrlog::new();
+    log.show_module_names(false)
         .show_level(false)
         .module("restreamer")
         .module("restreamer::stream_saver")
         .module("analyzer::smooth")
         .module("codec::dsp::cross_fader")
         .module("analyzer::analyzer")
-        .quiet(args.quiet)
-        .verbosity(if args.gcp {
-            log::LevelFilter::Info
-        } else {
-            log::LevelFilter::Debug
-        })
-        .init()
-        .unwrap();
+        .quiet(args.quiet);
+
+    if args.gcp {
+        log.verbosity(LevelFilter::Info);
+    } else {
+        log.verbosity(LevelFilter::Debug);
+        log.timestamp(Timestamp::Second);
+    }
+
+    log.init().unwrap();
 }

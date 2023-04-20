@@ -7,8 +7,6 @@ use std::{
 use chrono::Local;
 use codec::{AudioFrame, CodecParams, Encoder};
 
-use crate::args::Args;
-
 const BASE_PATH: &str = "./recordings";
 
 #[derive(Debug, Clone, Copy)]
@@ -36,8 +34,8 @@ pub struct StreamSaver {
 }
 
 impl StreamSaver {
-    pub fn new(args: &Args, codec_params: CodecParams) -> anyhow::Result<Self> {
-        if args.gcp || args.no_recordings {
+    pub fn new(enabled: bool, codec_params: CodecParams) -> anyhow::Result<Self> {
+        if !enabled {
             log::info!("Recordings are not enabled");
             Ok(Self {
                 original: None,

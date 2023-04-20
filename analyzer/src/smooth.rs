@@ -10,18 +10,28 @@ pub struct LabelSmoother {
     behind: usize,
     ahead: usize,
     buffer: VecDeque<PredictedLabels>,
+    ads_threshold: f32,
 }
 
 impl LabelSmoother {
     #[must_use]
     pub fn new(behind: Duration, ahead: Duration) -> Self {
+        // let behind = behind.max(Duration::from_millis(1450)) - Duration::from_millis(1450);
+        // let ahead = ahead.max(Duration::from_millis(1450)) - Duration::from_millis(1450);
+
         let behind_size =
-            (behind.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
+            (behind.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
         let ahead_size =
-            (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
+            (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
+
+        let ads_threshold = if ahead_size > 0 && behind_size > 0 {
+            ahead_size as f32 / (behind_size + ahead_size) as f32
+        } else {
+            0.0
+        };
 
         info!(
-            "SMOOTHER behind={}ms/{} ahead={}ms/{}",
+            "SMOOTHER behind={}ms/{} ahead={}ms/{} threshold={ads_threshold}",
             behind.as_millis(),
             behind_size,
             ahead.as_millis(),
@@ -32,6 +42,7 @@ impl LabelSmoother {
             behind: behind_size,
             ahead: ahead_size,
             buffer: VecDeque::with_capacity(behind_size + ahead_size + 1),
+            ads_threshold,
         }
     }
 
@@ -69,11 +80,15 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        if self.get_ads_ratio() > 0.66 {
+        if self.get_ads_ratio() > self.ads_threshold {
             Some(make_labels(1.0, 0.0))
         } else {
             Some(make_labels(0.0, 1.0))
         }
+    }
+
+    pub(crate) fn ahead(&self) -> usize {
+        self.ahead
     }
 }
 

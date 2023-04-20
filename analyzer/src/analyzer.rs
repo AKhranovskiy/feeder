@@ -1,13 +1,13 @@
 use std::{collections::VecDeque, time::Duration, time::Instant};
 
+use ac_ffmpeg::time::TimeBase;
 use anyhow::anyhow;
 use bytemuck::cast_slice;
-use log::debug;
 use ndarray::Array4;
 use ndarray_stats::QuantileExt;
 
 use classifier::Classifier;
-use codec::{AudioFrame, CodecParams, Resampler, SampleFormat};
+use codec::{AudioFrame, CodecParams, Resampler, SampleFormat, Timestamp};
 
 use crate::{ContentKind, LabelSmoother};
 
@@ -16,6 +16,8 @@ pub struct BufferedAnalyzer {
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
+    print_buffer_stat: bool,
+    frame_buffer: VecDeque<AudioFrame>,
 }
 
 impl BufferedAnalyzer {
@@ -33,26 +35,27 @@ impl BufferedAnalyzer {
     }
 
     #[must_use]
-    pub fn new(smoother: LabelSmoother) -> Self {
+    pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
             queue: VecDeque::with_capacity(2 * 150 * Self::MFCCS.frame_size),
             classifer: Classifier::from_file("./model").expect("Initialized classifier"),
+            frame_buffer: VecDeque::with_capacity(smoother.ahead()),
             smoother,
             last_kind: ContentKind::Unknown,
+            print_buffer_stat,
         }
     }
 
-    pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<ContentKind> {
+    pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<(ContentKind, AudioFrame)>> {
         let config = mfcc::Config::default();
 
-        let pts = frame.pts();
-
-        let samples: Vec<i16> = samples(frame)?;
+        let samples: Vec<i16> = samples(frame.clone())?;
         self.queue.extend(samples.into_iter());
 
-        if self.queue.len() >= 76 * config.frame_size {
-            let timer = Instant::now();
+        self.frame_buffer.push_back(frame);
 
+        let elapsed = if self.queue.len() >= 76 * config.frame_size {
+            let timer = Instant::now();
             let samples = self
                 .queue
                 .iter()
@@ -80,17 +83,30 @@ impl BufferedAnalyzer {
                     _ => unreachable!("Unexpected prediction shape"),
                 };
             }
+            timer.elapsed().as_millis()
+        } else {
+            0
+        };
 
-            debug!(
-                "{:3}ms, {:?}: {} {:#}",
-                timer.elapsed().as_millis(),
-                pts,
+        let frame = if self.last_kind != ContentKind::Unknown {
+            self.frame_buffer.pop_front()
+        } else {
+            None
+        };
+
+        if self.print_buffer_stat {
+            print!(
+                "\r{:<3}ms, {:?}: {} {:#}        ",
+                elapsed,
+                frame
+                    .as_ref()
+                    .map(|f| f.pts())
+                    .unwrap_or(Timestamp::new(0, TimeBase::new(1, 1))),
                 self.smoother.get_buffer_content(),
                 self.last_kind
             );
         }
-
-        Ok(self.last_kind)
+        Ok(Some(self.last_kind).zip(frame))
     }
 }
 
