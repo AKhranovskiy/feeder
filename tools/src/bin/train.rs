@@ -1,109 +1,187 @@
-use std::env::args;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+use std::{
+    collections::VecDeque,
+    env::args,
+    fs::File,
+    io::{BufReader, Read, Seek, SeekFrom},
+};
 
-use ndarray::{concatenate, Array1, Array4, ArrayBase, Axis};
-
-use classifier::{verify, Classifier};
+use classifier::Classifier;
+use itertools::Itertools;
+use ndarray::{concatenate, stack, Array1, Array3, Array4, ArrayBase, ArrayView, Axis};
 use ndarray_shuffle::NdArrayShuffleInplaceExt;
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{rngs::SmallRng, SeedableRng};
 
-const BLOCK: usize = 150 * 39;
+const W: usize = 150;
+const H: usize = 39;
+
+const TRAIN_CHUNK: usize = 16_384;
+const VERIFICATION_CHUNK: usize = 256;
 
 fn main() -> anyhow::Result<()> {
-    let bindir = Path::new(&args().nth(1).expect("Path to bin dir")).to_owned();
+    println!(
+        r#"
+###############
+###  TRAIN  ###
+###############
+        "#
+    );
+    println!("CHUNK {TRAIN_CHUNK}");
+    train()?;
 
-    println!("Loading data from {}", bindir.display());
-    let (data, labels) = prepare_data(bindir)?;
-
-    println!("Training...");
-    let mut classifier = Classifier::new()?;
-    classifier.train(&data, &labels)?;
-    classifier.save("model")?;
-
-    println!("Verification...");
-    let owned_results = data
-        .axis_chunks_iter(Axis(0), 413)
-        .map(|chunk| {
-            classifier
-                .predict(&chunk.to_owned())
-                .expect("Python function returned result")
-        })
-        .collect::<Vec<_>>();
-
-    let predicted = concatenate(
-        Axis(0),
-        owned_results
-            .iter()
-            .map(ndarray::ArrayBase::view)
-            .collect::<Vec<_>>()
-            .as_ref(),
-    )?;
-
-    let accuracy = verify(&predicted, &labels)?;
-
-    println!("Accuracy: {accuracy:2.02}%");
+    println!(
+        r#"
+######################
+###  VERIFICATION  ###
+######################
+        "#
+    );
+    println!("CHUNK {VERIFICATION_CHUNK}");
+    verify()?;
 
     Ok(())
 }
 
-fn prepare_data<P>(bindir: P) -> anyhow::Result<(ndarray::Array4<f32>, ndarray::Array1<u32>)>
-where
-    P: AsRef<Path>,
-{
-    let data: Vec<Vec<f32>> = [
-        bindir.as_ref().join("ads.bin"),
-        bindir.as_ref().join("music.bin"),
-    ]
-    .iter()
-    .map(|source| bincode::deserialize_from(BufReader::new(File::open(source)?)))
-    .collect::<Result<_, _>>()?;
+fn train() -> anyhow::Result<()> {
+    let data_ads = get_data(&args().nth(1).expect("Ads train data"))?;
+    let data_music = get_data(&args().nth(2).expect("Music train data"))?;
 
-    let data = data
-        .into_iter()
-        .map(|mut v| {
-            let len = v.len();
-            let len = len - (len % BLOCK);
-            assert_eq!(0, len % BLOCK);
-            println!("{:?}->{:?}", v.len(), len);
-            v.truncate(len);
-            Array4::from_shape_vec((len / BLOCK, BLOCK / 39, 39, 1), v)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut classifier = Classifier::new()?;
 
-    println!(
-        "Loaded {:?} images",
-        data.iter().map(|x| x.shape()[0]).collect::<Vec<_>>()
-    );
+    let mut processed = 0;
 
-    let mut labels = data
-        .iter()
-        .enumerate()
-        .map(|x| Array1::<u32>::from_elem(x.1.shape()[0], x.0 as u32))
-        .fold(Array1::from_elem(0, 0), |mut acc, x| {
-            acc.append(Axis(0), x.view()).unwrap();
-            acc
-        });
-    println!("labels={:?}", labels.shape());
+    for chunk in &data_ads
+        .zip(data_music)
+        .take(TRAIN_CHUNK * 5)
+        .chunks(TRAIN_CHUNK)
+    {
+        let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();
+
+        println!("PROCESSING {}..{}", processed, processed + ads.len());
+        processed += ads.len();
+
+        let (data, labels) = prepare_data_and_labels(&ads, &music)?;
+        classifier.train(&data, &labels, 3, 128)?;
+        classifier.save("model")?;
+    }
+
+    Ok(())
+}
+
+fn verify() -> anyhow::Result<()> {
+    let data_ads = get_data(&args().nth(1).expect("Ads train data"))?;
+    let data_music = get_data(&args().nth(2).expect("Music train data"))?;
+
+    let classifier = Classifier::from_file("model")?;
+    for chunk in &data_ads
+        .zip(data_music)
+        .skip(TRAIN_CHUNK * 10)
+        .take(VERIFICATION_CHUNK * 5)
+        .chunks(VERIFICATION_CHUNK)
+    {
+        let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();
+        let (data, labels) = prepare_data_and_labels(&ads, &music)?;
+
+        let predicted = classifier.predict(&data)?;
+        let accuracy = classifier::verify(&predicted, &labels)?;
+        println!("Accuracy: {accuracy:2.02}%");
+    }
+
+    Ok(())
+}
+
+fn prepare_data_and_labels(
+    ads: &[Array3<f32>],
+    music: &[Array3<f32>],
+) -> anyhow::Result<(Array4<f32>, Array1<u32>)> {
+    let (ads_data, ads_labels) = prepare(ads, 0)?;
+    let (music_data, music_labels) = prepare(music, 1)?;
 
     let mut data = concatenate(
         Axis(0),
-        data.iter()
-            .map(ArrayBase::view)
-            .collect::<Vec<_>>()
-            .as_slice(),
+        &[ArrayView::from(&ads_data), ArrayView::from(&music_data)],
     )?;
-    println!("data={:?}", data.shape());
+    let mut labels = concatenate(
+        Axis(0),
+        &[ArrayView::from(&ads_labels), ArrayView::from(&music_labels)],
+    )?;
 
-    assert!(data.iter().all(|x| x.is_finite()));
-    println!("Sort labels...");
     labels.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
-    println!("Sort data...");
     data.shuffle_inplace_with(Axis(0), &mut SmallRng::seed_from_u64(0xFEEB))?;
 
-    println!("Done");
+    Ok((data, labels))
+}
+
+fn prepare(data: &[Array3<f32>], label: u32) -> anyhow::Result<(Array4<f32>, Array1<u32>)> {
+    let labels = Array1::<u32>::from_elem(data.len(), label);
+    let data = stack(
+        Axis(0),
+        &data.iter().map(ArrayBase::from).collect::<Vec<_>>(),
+    )?;
+
+    assert!(data.iter().all(|x| x.is_finite()));
 
     Ok((data, labels))
+}
+
+fn get_data(path: &str) -> anyhow::Result<DataIterator> {
+    println!("Loading {path}...");
+    let mut data = BufReader::new(File::open(path)?);
+
+    let mut count = 0;
+    while let Ok(values) = bincode::deserialize_from::<_, Vec<f32>>(&mut data) {
+        count += values.len() / (W * H);
+    }
+    data.seek(SeekFrom::Start(0))?;
+
+    println!(
+        "{} bytes, {} records",
+        data.get_ref().metadata()?.len(),
+        count
+    );
+
+    Ok(DataIterator::new(Box::new(data), count))
+}
+
+struct DataIterator {
+    data: Box<dyn Read>,
+    #[allow(dead_code)]
+    size: usize,
+    tail: VecDeque<Array3<f32>>,
+}
+
+impl DataIterator {
+    fn new(data: Box<dyn Read>, size: usize) -> Self {
+        Self {
+            data,
+            size,
+            tail: VecDeque::new(),
+        }
+    }
+}
+
+impl Iterator for DataIterator {
+    type Item = Array3<f32>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.tail.is_empty() {
+            return self.tail.pop_front();
+        }
+
+        while let Ok(block) = bincode::deserialize_from::<_, Vec<f32>>(&mut self.data.as_mut()) {
+            self.tail = block
+                .chunks_exact(W * H)
+                .map(|chunk| Array3::from_shape_vec((W, H, 1), chunk.to_vec()))
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            if self.tail.is_empty() {
+                continue;
+            }
+
+            return self.tail.pop_front();
+        }
+
+        self.tail.clear();
+        None
+    }
 }

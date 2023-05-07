@@ -47,6 +47,11 @@ impl<T> Decoder<T> {
     pub fn resample(self, target: CodecParams) -> ResamplingDecoder<T> {
         ResamplingDecoder::new(self, target)
     }
+
+    #[must_use]
+    pub fn frames(&self) -> u64 {
+        self.demuxer.streams()[0].frames().unwrap_or_default()
+    }
 }
 
 impl<T> Iterator for Decoder<T> {

@@ -10,3 +10,4 @@ artifacts
 classifier/model*
 restreamer/assets/files/
 .env
+model

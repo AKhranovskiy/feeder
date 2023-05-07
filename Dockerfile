@@ -34,7 +34,7 @@ WORKDIR /app
 COPY --from=rust-builder /usr/local/cargo/bin/restreamer /usr/local/bin/restreamer
 COPY --from=python-builder /opt/venv /opt/venv
 
-COPY tools/model model
+COPY model model
 RUN mkdir recordings
 
 ENV PATH="/opt/venv/bin:$PATH"
@@ -42,4 +42,3 @@ ENV PATH="/opt/venv/bin:$PATH"
 CMD restreamer --port 8192 --gcp
 
 EXPOSE 8192
-

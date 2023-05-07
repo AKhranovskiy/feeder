@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::util::stepped_windows;
+use crate::{delta::deltas, util::stepped_windows};
 
 use self::util::stepped_window_ranges;
 
@@ -24,6 +24,7 @@ impl Config {
         Duration::from_millis(ms as u64)
     }
 
+    #[must_use]
     pub const fn const_default() -> Self {
         Self {
             sample_rate_hz: 22050,
@@ -51,7 +52,7 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
         "Coeff must be multipler of 3"
     );
 
-    let coeff = config.num_coefficients;
+    let coeff = config.num_coefficients / 3;
 
     let (segments, _) = stepped_windows(input.len(), config.frame_size, config.hop_length);
 
@@ -81,5 +82,5 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
         output.extend_from_slice(&buf);
     }
 
-    Ok(output)
+    Ok(deltas(&output, coeff))
 }

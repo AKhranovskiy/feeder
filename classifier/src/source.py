@@ -3,13 +3,13 @@ from tensorflow import keras
 from keras import Sequential
 from keras import layers
 
-# TODO pass params from the caller
+
 INPUT_SHAPE = [150, 39, 1]
-CLASSES = 3
+CLASSES = 2
 TEST_SIZE = 0.25
 VALIDATION_SIZE = 0.2
-EPOCHS = 30
-BATCH = 64
+EPOCHS = 5
+BATCH = 128
 
 
 def define_model():
@@ -24,12 +24,15 @@ def define_model():
                 input_shape=INPUT_SHAPE,
             ),
             layers.MaxPooling2D(2, padding="same"),
+
             layers.Conv2D(128, (3, 3), activation="relu", padding="valid"),
             layers.MaxPooling2D(2, padding="same"),
             layers.Dropout(0.3),
+
             layers.Conv2D(128, (3, 3), activation="relu", padding="valid"),
             layers.MaxPooling2D(2, padding="same"),
             layers.Dropout(0.3),
+
             layers.GlobalAveragePooling2D(),
             layers.Dense(512, activation="relu"),
             layers.Dense(CLASSES, activation="softmax", name="model_out"),
@@ -47,7 +50,7 @@ def save_model(model, name):
     model.save(name)
 
 
-def train_model(model, data, labels):
+def train_model(model, data, labels, epochs=EPOCHS, batch=BATCH):
     labels = keras.utils.to_categorical(labels, num_classes=CLASSES)
 
     x_train, x_val, y_train, y_val = train_test_split(
@@ -58,9 +61,9 @@ def train_model(model, data, labels):
         x_train,
         y_train,
         validation_data=(x_val, y_val),
-        epochs=EPOCHS,
-        verbose=2,
-        batch_size=BATCH,
+        epochs=epochs,
+        verbose=1,
+        batch_size=batch,
     )
 
     return model

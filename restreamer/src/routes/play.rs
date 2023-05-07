@@ -43,6 +43,7 @@ pub fn router(terminator: Terminator, args: Args) -> Router {
         .with_state(PlayState { terminator, args })
 }
 
+#[allow(clippy::unused_async)]
 async fn serve(
     Query(params): Query<PlayParams>,
     State(state): State<PlayState>,
@@ -96,7 +97,7 @@ pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFram
     // TODO resample() does not work
     let params = params.with_samples_per_frame(2048); // for OGG
 
-    let sample_audio = include_bytes!("../../sample.mp3");
+    let sample_audio = include_bytes!("../../sample.aac");
     let decoder = Decoder::try_from(std::io::Cursor::new(sample_audio))?;
     let mut resampler = Resampler::new(decoder.codec_params(), params);
     let mut frames = vec![];

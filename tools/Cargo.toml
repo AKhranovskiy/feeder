@@ -1,15 +1,18 @@
 [package]
 name = "tools"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
+bytemuck = { workspace = true }
 clap = { workspace = true }
 classifier = { workspace = true }
 codec = { workspace = true }
+itertools = { workspace = true }
+kdam = { workspace = true }
 mfcc = { workspace = true }
 ndarray = { workspace = true }
 ndarray-shuffle = { workspace = true }

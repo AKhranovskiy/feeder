@@ -1,82 +1,130 @@
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
-use std::path::PathBuf;
-use std::time::Instant;
+use std::{
+    fs::{read_dir, File, FileType},
+    io::{BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
+use bytemuck::cast_slice;
 use clap::Parser;
-use rayon::prelude::ParallelIterator;
-use rayon::slice::ParallelSlice;
-
-use codec::CodecParams;
+use codec::{CodecParams, Decoder, Resampler, SampleFormat};
+use kdam::{tqdm, BarExt};
 use mfcc::calculate_mfccs;
+// use rand::{seq::SliceRandom, thread_rng};
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 #[derive(Debug, Parser)]
 struct Args {
-    /// Audio files to process
+    /// Path to directory with audio files to process.
     #[arg(required = true)]
-    file: PathBuf,
+    work_dir: PathBuf,
 
     /// File to write coefficients in Bincode format
-    #[arg(long, short)]
-    output: Option<PathBuf>,
-
-    /// Number of coefficients
-    #[arg(long, short, default_value_t = 39)]
-    #[arg(value_parser = clap::value_parser!(u16).range(1..=39))]
-    coeffs: u16,
+    #[arg(required = true)]
+    output: PathBuf,
 }
-
-const CHUNK: usize = 22050 * 1800; // 30min
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let config = mfcc::Config {
-        num_coefficients: args.coeffs as usize,
-        ..mfcc::Config::default()
-    };
+    let config = mfcc::Config::default();
 
-    println!("Loading audio file...");
+    let writer = Mutex::new(BufWriter::new(File::create(args.output)?));
 
-    let io = BufReader::new(File::open(args.file)?);
-    let params = CodecParams::new(22050, codec::SampleFormat::S16, 1);
-    let data: Vec<i16> = codec::resample(io, params)?;
-    let data: Vec<f32> = data.into_iter().map(f32::from).collect();
+    let files = read_dir(args.work_dir)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().ok().filter(FileType::is_file).is_some())
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
 
-    println!("Ok. {} samples", data.len());
+    // let files = {
+    //     let mut files = files;
+    //     files.partial_shuffle(&mut thread_rng(), 40_000);
+    //     files.truncate(40_000);
+    //     files
+    // };
 
-    let chunks = (data.len() as f32 / CHUNK as f32).ceil() as usize;
+    let pb = Mutex::new(tqdm!(
+        total = files.len(),
+        desc = "Processed",
+        force_refresh = true
+    ));
 
-    print!("Processing {chunks} chunks ",);
+    codec::suppress_ffmpeg_log();
 
-    let instant = Instant::now();
+    files.into_par_iter().for_each(|path| {
+        // decode
+        let Ok(data) = samples(&path) else { return; };
 
-    let coeffs = if chunks < 2 {
-        println!("sequentially");
-        calculate_mfccs(data.as_slice(), config)?
-    } else {
-        println!("in parallel");
+        if data.is_empty() {
+            // pb.lock()
+            //     .unwrap()
+            //     .write(format!("Empty data: {}", path.display()));
+            return;
+        }
 
-        data.as_slice()
-            .par_chunks(CHUNK)
-            .filter_map(|chunk| match calculate_mfccs(chunk, config) {
-                Ok(coeffs) => Some(coeffs),
-                Err(err) => panic!("Failed to process chunk: {err:#}"),
-            })
-            .reduce(Vec::new, |mut acc, mut x| {
-                acc.append(&mut x);
-                acc
-            })
-    };
+        // calculte
+        let mfccs = calculate_mfccs(&data, config).unwrap();
+        if mfccs.is_empty() {
+            // pb.lock()
+            //     .unwrap()
+            //     .write(format!("Empty mfccs: {}", path.display()));
+            return;
+        }
 
-    println!("Processed in {:.02}s", instant.elapsed().as_secs_f32());
+        // write
+        {
+            let mut writer = writer.lock().unwrap();
+            bincode::serialize_into(&mut *writer, &mfccs).unwrap();
+            writer.flush().unwrap();
+        }
 
-    if let Some(output) = args.output {
-        println!("Writing output...");
-        bincode::serialize_into(BufWriter::new(File::create(output)?), &coeffs)?;
-    } else {
-        println!("{coeffs:?}");
-    }
+        // update
+        {
+            pb.lock().unwrap().update(1);
+        }
+    });
 
     Ok(())
+}
+
+fn samples(path: &Path) -> anyhow::Result<Vec<f32>> {
+    const MFCCS_CODEC_PARAMS: CodecParams = CodecParams::new(22050, SampleFormat::S16, 1);
+
+    let io: BufReader<File> = BufReader::new(File::open(path)?);
+    let decoder = Decoder::try_from(io)?;
+    let mut resampler = Resampler::new(decoder.codec_params(), MFCCS_CODEC_PARAMS);
+
+    let mut output: Vec<i16> = vec![];
+
+    for frame in decoder {
+        for frame in resampler.push(frame?)? {
+            for plane in frame?.planes().iter() {
+                output.extend_from_slice(cast_slice(plane.data()));
+            }
+        }
+    }
+
+    Ok(output.into_iter().map(f32::from).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, Seek, SeekFrom};
+
+    #[test]
+    fn test_serde() {
+        let mut output = Cursor::new(Vec::new());
+
+        for i in 0..10 {
+            bincode::serialize_into(&mut output, &vec![i as f32; i]).unwrap();
+        }
+
+        output.seek(SeekFrom::Start(0)).unwrap();
+
+        while let Ok(data) = bincode::deserialize_from::<_, Vec<f32>>(&mut output) {
+            let len = data.len();
+            assert_eq!(vec![len as f32; len], data);
+        }
+    }
 }

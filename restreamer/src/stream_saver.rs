@@ -35,13 +35,7 @@ pub struct StreamSaver {
 
 impl StreamSaver {
     pub fn new(enabled: bool, codec_params: CodecParams) -> anyhow::Result<Self> {
-        if !enabled {
-            log::info!("Recordings are not enabled");
-            Ok(Self {
-                original: None,
-                processed: None,
-            })
-        } else {
+        if enabled {
             log::info!(
                 "Creating stream saver\n{}\n{}",
                 Destination::Original.into_path().display(),
@@ -60,6 +54,12 @@ impl StreamSaver {
             Ok(Self {
                 original,
                 processed,
+            })
+        } else {
+            log::info!("Recordings are not enabled");
+            Ok(Self {
+                original: None,
+                processed: None,
             })
         }
     }
@@ -83,7 +83,7 @@ impl StreamSaver {
     }
 
     pub fn flush(&mut self) {
-        self.original.as_mut().map(|enc| enc.flush());
-        self.processed.as_mut().map(|enc| enc.flush());
+        self.original.as_mut().map(Encoder::flush);
+        self.processed.as_mut().map(Encoder::flush);
     }
 }

@@ -7,5 +7,6 @@ target/
 **/*.wav
 **/*.ogg
 **/*.aac
+!restreamer/sample.aac
 **/*.bin
 **/*.sqlite

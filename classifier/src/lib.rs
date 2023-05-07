@@ -32,9 +32,15 @@ impl Classifier {
         PyVTable::predict(&model, data)
     }
 
-    pub fn train(&mut self, data: &Data, labels: &Labels) -> anyhow::Result<()> {
+    pub fn train(
+        &mut self,
+        data: &Data,
+        labels: &Labels,
+        epochs: u32,
+        batch: u32,
+    ) -> anyhow::Result<()> {
         let mut model = self.model.lock().unwrap();
-        *model = PyVTable::train(&model, data, labels)?;
+        *model = PyVTable::train(&model, data, labels, epochs, batch)?;
         Ok(())
     }
 

@@ -69,7 +69,13 @@ impl PyVTable {
         })
     }
 
-    pub(crate) fn train(model: &PyModel, data: &Data, labels: &Labels) -> anyhow::Result<PyModel> {
+    pub(crate) fn train(
+        model: &PyModel,
+        data: &Data,
+        labels: &Labels,
+        epochs: u32,
+        batch: u32,
+    ) -> anyhow::Result<PyModel> {
         Python::with_gil(|py| {
             anyhow::Ok(
                 Self::get()
@@ -79,6 +85,8 @@ impl PyVTable {
                         model,
                         data.clone().into_pyarray(py),
                         labels.clone().into_pyarray(py),
+                        epochs,
+                        batch,
                     ))?
                     .extract()?,
             )

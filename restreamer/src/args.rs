@@ -1,6 +1,7 @@
 use clap::{value_parser, Parser};
 
 #[derive(Debug, Clone, Parser)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Args {
     /// Listening port.
     #[arg(short, long, default_value_t = 15190)]

@@ -24,11 +24,7 @@ impl LabelSmoother {
         let ahead_size =
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
 
-        let ads_threshold = if ahead_size > 0 && behind_size > 0 {
-            ahead_size as f32 / (behind_size + ahead_size) as f32
-        } else {
-            0.0
-        };
+        let ads_threshold = 0.75_f32; // TODO make configurable;
 
         info!(
             "SMOOTHER behind={}ms/{} ahead={}ms/{} threshold={ads_threshold}",
@@ -46,6 +42,7 @@ impl LabelSmoother {
         }
     }
 
+    #[must_use]
     pub fn get_buffer_content(&self) -> String {
         format!(
             "{} {:.2}",
@@ -93,7 +90,7 @@ impl LabelSmoother {
 }
 
 fn make_labels(ads: f32, music: f32) -> PredictedLabels {
-    PredictedLabels::from_shape_vec((1, 3), vec![ads, music, 0.0]).unwrap()
+    PredictedLabels::from_shape_vec((1, 2), vec![ads, music]).unwrap()
 }
 
 trait MaxOutExt {
@@ -102,10 +99,10 @@ trait MaxOutExt {
 
 impl MaxOutExt for PredictedLabels {
     fn max_out(&self) -> Self {
-        if let Ok(max_value) = self.max() {
-            self.map(|v| if v < max_value { 0.0 } else { 1.0 })
+        if self[(0,0)] >= 0.75_f32 { // TODO make configurable
+            make_labels(1.0, 0.0)
         } else {
-            self.clone()
+            make_labels(0.0, 1.0)
         }
     }
 }

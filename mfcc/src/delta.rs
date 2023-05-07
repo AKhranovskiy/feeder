@@ -1,159 +1,96 @@
-// pub(crate) fn deltas(input: Vec<f32>) -> Vec<f32> {
-//     let delta_1 = delta(&input);
-//     let delta_2 = delta(&delta_1);
-//
-//     let mut output = input.t().to_owned();
-//     output.append(Axis(0), delta_1.t()).unwrap();
-//     output.append(Axis(0), delta_2.t()).unwrap();
-//     output.t().to_owned()
-// }
-//
-// fn delta(input: &[&) -> Array2<f64> {
-//     let mut output = Array2::<f64>::zeros((input.nrows(), input.ncols()));
-//
-//     for i in 0..input.nrows() {
-//         let a2 = input.row(i.saturating_sub(2)).to_owned();
-//         let a1 = input.row(i.saturating_sub(1)).to_owned();
-//         let b1 = input
-//             .row(i.saturating_add(1).min(input.nrows() - 1))
-//             .to_owned();
-//         let b2 = input
-//             .row(i.saturating_add(2).min(input.nrows() - 1))
-//             .to_owned();
-//
-//         // n = 2, denom = 10
-//         let delta = ((b1 - a1) + 2.0 * (b2 + a2)) / 10.0;
-//         output.row_mut(i).assign(&delta);
-//     }
-//
-//     output
-// }
-//
-// #[cfg(test)]
-// mod tests {
-//     use ndarray::array;
-//
-//     use super::*;
-//
-//     #[test]
-//     fn test_delta() {
-//         let input = array![
-//             [1.0, 2.0, 3.0, 4.0, 5.0],
-//             [1.0, 3.0, 5.0, 7.0, 9.0],
-//             [1.0, 4.0, 7.0, 10.0, 13.0],
-//             [1.0, 5.0, 9.0, 13.0, 17.0],
-//             [1.0, 6.0, 11.0, 16.0, 21.0],
-//         ];
-//         assert_eq!(
-//             delta(&input),
-//             array![
-//                 [0.4, 1.3, 2.2, 3.1, 4.0],
-//                 [0.4, 1.6, 2.8, 4.0, 5.2],
-//                 [0.4, 1.8, 3.2, 4.6, 6.0],
-//                 [0.4, 2.0, 3.6, 5.2, 6.8],
-//                 [0.4, 2.1, 3.8, 5.5, 7.2]
-//             ]
-//         );
-//     }
-//
-//     #[test]
-//     fn test_deltas() {
-//         let input = array![
-//             [1.0, 2.0, 3.0, 4.0, 5.0],
-//             [1.0, 3.0, 5.0, 7.0, 9.0],
-//             [1.0, 4.0, 7.0, 10.0, 13.0],
-//             [1.0, 5.0, 9.0, 13.0, 17.0],
-//             [1.0, 6.0, 11.0, 16.0, 21.0],
-//         ];
-//         assert_eq!(
-//             deltas(input),
-//             array![
-//                 [
-//                     1.0,
-//                     2.0,
-//                     3.0,
-//                     4.0,
-//                     5.0,
-//                     0.4,
-//                     1.3,
-//                     2.2,
-//                     3.1,
-//                     4.0,
-//                     0.16,
-//                     0.65,
-//                     1.140_000_000_000_000_1,
-//                     1.629_999_999_999_999_7,
-//                     2.12
-//                 ],
-//                 [
-//                     1.0,
-//                     3.0,
-//                     5.0,
-//                     7.0,
-//                     9.0,
-//                     0.4,
-//                     1.6,
-//                     2.8,
-//                     4.0,
-//                     5.2,
-//                     0.16,
-//                     0.71,
-//                     1.260_000_000_000_000_2,
-//                     1.81,
-//                     2.360_000_000_000_000_3
-//                 ],
-//                 [
-//                     1.0,
-//                     4.0,
-//                     7.0,
-//                     10.0,
-//                     13.0,
-//                     0.4,
-//                     1.8,
-//                     3.2,
-//                     4.6,
-//                     6.0,
-//                     0.16,
-//                     0.720_000_000_000_000_1,
-//                     1.28,
-//                     1.839_999_999_999_999_9,
-//                     2.4
-//                 ],
-//                 [
-//                     1.0,
-//                     5.0,
-//                     9.0,
-//                     13.0,
-//                     17.0,
-//                     0.4,
-//                     2.0,
-//                     3.6,
-//                     5.2,
-//                     6.8,
-//                     0.16,
-//                     0.77,
-//                     1.38,
-//                     1.989_999_999_999_999_8,
-//                     2.6
-//                 ],
-//                 [
-//                     1.0,
-//                     6.0,
-//                     11.0,
-//                     16.0,
-//                     21.0,
-//                     0.4,
-//                     2.1,
-//                     3.8,
-//                     5.5,
-//                     7.2,
-//                     0.16,
-//                     0.79,
-//                     1.42,
-//                     2.05,
-//                     2.679_999_999_999_999_7
-//                 ]
-//             ]
-//         );
-//     }
-// }
+use itertools::izip;
+
+#[allow(clippy::erasing_op, clippy::identity_op)]
+pub fn deltas(input: &[f32], block_size: usize) -> Vec<f32> {
+    assert!(block_size >= 5);
+
+    let len = input.len();
+    assert!(len % block_size == 0);
+
+    let delta_1 = delta(input, block_size);
+    let delta_2 = delta(&delta_1, block_size);
+
+    let mut output = vec![0f32; len * 3];
+
+    let block = block_size * 3;
+    for (i, a, b, c) in izip!(
+        0..,
+        input.chunks_exact(block_size),
+        delta_1.chunks_exact(block_size),
+        delta_2.chunks_exact(block_size)
+    ) {
+        output[i * block + 0 * block_size..i * block + 1 * block_size].copy_from_slice(a);
+        output[i * block + 1 * block_size..i * block + 2 * block_size].copy_from_slice(b);
+        output[i * block + 2 * block_size..i * block + 3 * block_size].copy_from_slice(c);
+    }
+
+    output
+}
+
+#[allow(clippy::erasing_op, clippy::identity_op)]
+fn delta(input: &[f32], block_size: usize) -> Vec<f32> {
+    let mut output = vec![0f32; input.len()];
+
+    let rows = input.len() / block_size;
+
+    let padded = {
+        let mut padded = vec![0f32; input.len() + block_size * 4];
+
+        padded[0..block_size].copy_from_slice(&input[0..block_size]);
+        padded[block_size..2 * block_size].copy_from_slice(&input[0..block_size]);
+
+        padded[2 * block_size..(2 + rows) * block_size].copy_from_slice(input);
+
+        padded[(2 + rows) * block_size..(3 + rows) * block_size]
+            .copy_from_slice(&input[(rows - 1) * block_size..]);
+        padded[(3 + rows) * block_size..].copy_from_slice(&input[(rows - 1) * block_size..]);
+        padded
+    };
+
+    for row in 0..rows {
+        for col in 0..block_size {
+            let a = padded[(row + 0) * block_size + col];
+            let b = padded[(row + 1) * block_size + col];
+            let c = padded[(row + 3) * block_size + col];
+            let d = padded[(row + 4) * block_size + col];
+            output[row * block_size + col] = round(((c - b) + 2f32 * (d - a)) / 10f32);
+        }
+    }
+    output
+}
+
+#[allow(clippy::cast_possible_wrap)]
+fn round(value: f32) -> f32 {
+    let s = value.log10().ceil().max(0f32) as i32;
+    let p = (f32::DIGITS as i32).max(s) - s;
+    let n = 10.0_f32.powi(p);
+    (value * n).round() / n
+}
+
+#[cfg(test)]
+mod tests {
+    use super::deltas;
+
+    #[test]
+    fn test() {
+        #[rustfmt::skip]
+        let input: Vec<f32> = vec![
+            1.0, 2.0, 3.0,  4.0,  5.0, //
+            1.0, 3.0, 5.0,  7.0,  9.0, //
+            1.0, 4.0, 7.0, 10.0, 13.0, //
+            1.0, 5.0, 9.0, 13.0, 17.0, //
+            1.0, 6.0, 11.0, 16.0, 21.0, //
+        ];
+
+        #[rustfmt::skip]
+        let output: Vec<f32> = vec![
+            1.0, 2.0,  3.0,  4.0,  5.0, 0.0, 0.5, 1.0, 1.5, 2.0, 0.0,  0.13,  0.26,  0.39,  0.52, //
+            1.0, 3.0,  5.0,  7.0,  9.0, 0.0, 0.8, 1.6, 2.4, 3.2, 0.0,  0.11,  0.22,  0.33,  0.44, //
+            1.0, 4.0,  7.0, 10.0, 13.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0,  0.00,  0.00,  0.00,  0.00, //
+            1.0, 5.0,  9.0, 13.0, 17.0, 0.0, 0.8, 1.6, 2.4, 3.2, 0.0, -0.11, -0.22, -0.33, -0.44, //
+            1.0, 6.0, 11.0, 16.0, 21.0, 0.0, 0.5, 1.0, 1.5, 2.0, 0.0, -0.13, -0.26, -0.39, -0.52, //
+        ];
+
+        assert_eq!(deltas(&input, 5), output);
+    }
+}

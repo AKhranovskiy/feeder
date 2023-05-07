@@ -1,9 +1,9 @@
 use std::io::Read;
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
-use ac_ffmpeg::codec::audio::AudioFrameMut;
 pub use ac_ffmpeg::packet::Packet;
 pub use ac_ffmpeg::time::Timestamp;
+use ac_ffmpeg::{codec::audio::AudioFrameMut, set_log_callback};
 
 use bytemuck::cast_slice;
 
@@ -29,6 +29,10 @@ pub mod dsp;
 
 mod pts;
 pub use pts::Pts;
+
+pub fn suppress_ffmpeg_log() {
+    set_log_callback(|_, _| {});
+}
 
 // TODO Sample should be bound to SampleFormat.
 pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>
