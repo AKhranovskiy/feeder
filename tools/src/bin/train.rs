@@ -51,7 +51,6 @@ fn train() -> anyhow::Result<()> {
 
     for chunk in &data_ads
         .zip(data_music)
-        .take(TRAIN_CHUNK * 5)
         .chunks(TRAIN_CHUNK)
     {
         let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();
@@ -74,8 +73,6 @@ fn verify() -> anyhow::Result<()> {
     let classifier = Classifier::from_file("model")?;
     for chunk in &data_ads
         .zip(data_music)
-        .skip(TRAIN_CHUNK * 10)
-        .take(VERIFICATION_CHUNK * 5)
         .chunks(VERIFICATION_CHUNK)
     {
         let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();

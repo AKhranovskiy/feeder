@@ -13,6 +13,9 @@ pub struct LabelSmoother {
     ads_threshold: f32,
 }
 
+const ADS_BUFFER_THRESHOLD: f32 = 0.75;
+const ADS_PREDICTION_THRESHOLD: f32 = 0.65;
+
 impl LabelSmoother {
     #[must_use]
     pub fn new(behind: Duration, ahead: Duration) -> Self {
@@ -24,7 +27,7 @@ impl LabelSmoother {
         let ahead_size =
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
 
-        let ads_threshold = 0.75_f32; // TODO make configurable;
+        let ads_threshold = ADS_BUFFER_THRESHOLD; // TODO make configurable;
 
         info!(
             "SMOOTHER behind={}ms/{} ahead={}ms/{} threshold={ads_threshold}",
@@ -99,7 +102,7 @@ trait MaxOutExt {
 
 impl MaxOutExt for PredictedLabels {
     fn max_out(&self) -> Self {
-        if self[(0,0)] >= 0.75_f32 { // TODO make configurable
+        if self[(0,0)] >= ADS_PREDICTION_THRESHOLD { // TODO make configurable
             make_labels(1.0, 0.0)
         } else {
             make_labels(0.0, 1.0)

@@ -10,14 +10,14 @@ use clap::Parser;
 use codec::{CodecParams, Decoder, Resampler, SampleFormat};
 use kdam::{tqdm, BarExt};
 use mfcc::calculate_mfccs;
-// use rand::{seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, thread_rng};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 #[derive(Debug, Parser)]
 struct Args {
-    /// Path to directory with audio files to process.
+    /// Path to a file or a directory with audio files to process.
     #[arg(required = true)]
-    work_dir: PathBuf,
+    input: PathBuf,
 
     /// File to write coefficients in Bincode format
     #[arg(required = true)]
@@ -29,20 +29,24 @@ fn main() -> anyhow::Result<()> {
 
     let config = mfcc::Config::default();
 
+    let metadata = std::fs::metadata(&args.input)?;
+    let files = if metadata.is_file() {
+        vec![args.input.into()]
+    } else if metadata.is_dir() {
+        let mut files = read_dir(args.input)?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().ok().filter(FileType::is_file).is_some())
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
+
+        files.partial_shuffle(&mut thread_rng(), 10_000);
+        files.truncate(10_000);
+        files
+    } else {
+        panic!("Should be a file or a directory");
+    };
+
     let writer = Mutex::new(BufWriter::new(File::create(args.output)?));
-
-    let files = read_dir(args.work_dir)?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().ok().filter(FileType::is_file).is_some())
-        .map(|entry| entry.path())
-        .collect::<Vec<_>>();
-
-    // let files = {
-    //     let mut files = files;
-    //     files.partial_shuffle(&mut thread_rng(), 40_000);
-    //     files.truncate(40_000);
-    //     files
-    // };
 
     let pb = Mutex::new(tqdm!(
         total = files.len(),
