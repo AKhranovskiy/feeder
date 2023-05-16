@@ -61,18 +61,12 @@ fn main() -> anyhow::Result<()> {
         let Ok(data) = samples(&path) else { return; };
 
         if data.is_empty() {
-            // pb.lock()
-            //     .unwrap()
-            //     .write(format!("Empty data: {}", path.display()));
             return;
         }
 
-        // calculte
+        // calculate mfccs
         let mfccs = calculate_mfccs(&data, config).unwrap();
         if mfccs.is_empty() {
-            // pb.lock()
-            //     .unwrap()
-            //     .write(format!("Empty mfccs: {}", path.display()));
             return;
         }
 

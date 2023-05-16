@@ -1,10 +1,7 @@
 use std::time::Duration;
 
-use crate::{delta::deltas, util::stepped_windows};
+use self::util::{stepped_windows, stepped_window_ranges};
 
-use self::util::stepped_window_ranges;
-
-mod delta;
 mod util;
 
 #[allow(dead_code)]
@@ -82,6 +79,5 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
         output.extend_from_slice(&buf);
     }
 
-    // Ok(deltas(&output, coeff))
     Ok(output)
 }
