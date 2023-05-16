@@ -102,7 +102,9 @@ trait MaxOutExt {
 
 impl MaxOutExt for PredictedLabels {
     fn max_out(&self) -> Self {
-        if self[(0,0)] >= ADS_PREDICTION_THRESHOLD { // TODO make configurable
+        // eprintln!("{:.2} / {:.2}", self[(0, 0)], self[(0, 1)]);
+        if self[(0, 0)] >= ADS_PREDICTION_THRESHOLD {
+            // TODO make configurable
             make_labels(1.0, 0.0)
         } else {
             make_labels(0.0, 1.0)

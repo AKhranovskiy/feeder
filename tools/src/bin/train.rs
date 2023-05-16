@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     env::args,
     fs::File,
-    io::{BufReader, Read, Seek, SeekFrom},
+    io::{BufReader, Read},
 };
 
 use classifier::Classifier;
@@ -122,21 +122,21 @@ fn prepare(data: &[Array3<f32>], label: u32) -> anyhow::Result<(Array4<f32>, Arr
 
 fn get_data(path: &str) -> anyhow::Result<DataIterator> {
     println!("Loading {path}...");
-    let mut data = BufReader::new(File::open(path)?);
+    let data = BufReader::new(File::open(path)?);
 
-    let mut count = 0;
-    while let Ok(values) = bincode::deserialize_from::<_, Vec<f32>>(&mut data) {
-        count += values.len() / (W * H);
-    }
-    data.seek(SeekFrom::Start(0))?;
+    // let mut count = 0;
+    // while let Ok(values) = bincode::deserialize_from::<_, Vec<f32>>(&mut data) {
+    //     count += values.len() / (W * H);
+    // }
+    // data.seek(SeekFrom::Start(0))?;
+    //
+    // println!(
+    //     "{} bytes, {} records",
+    //     data.get_ref().metadata()?.len(),
+    //     count
+    // );
 
-    println!(
-        "{} bytes, {} records",
-        data.get_ref().metadata()?.len(),
-        count
-    );
-
-    Ok(DataIterator::new(Box::new(data), count))
+    Ok(DataIterator::new(Box::new(data), 0))
 }
 
 struct DataIterator {
