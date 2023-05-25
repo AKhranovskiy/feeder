@@ -5,10 +5,10 @@ use kdam::{tqdm, BarExt};
 use log::LevelFilter;
 use stderrlog::Timestamp;
 
-use analyzer::{BufferedAnalyzer, LabelSmoother};
+use analyzer::{BufferedAnalyzer, LabelSmoother, ContentKind};
 use codec::Decoder;
 
-const SIZE: usize = 10 * 1024;
+const BUFFER_SIZE: usize = 1 * 1024;
 
 fn main() -> anyhow::Result<()> {
     stderrlog::new()
@@ -31,30 +31,44 @@ fn main() -> anyhow::Result<()> {
         false,
     );
 
-    let mut buf = Vec::with_capacity(SIZE);
+    let mut buf = Vec::with_capacity(BUFFER_SIZE);
 
-    let mut pb = tqdm!(
+    let mut pb_frames = tqdm!(
         total = decoder.frames() as usize,
         desc = "Processed",
         unit = "f",
-        force_refresh = true
+        force_refresh = true,
+        position = 0
+    );
+
+    let mut pb_ads = tqdm!(
+        total = decoder.frames() as usize,
+        desc = "Detected ads",
+        unit = "f",
+        force_refresh = true,
+        position = 1
     );
 
     for frame in decoder {
         if let Some((kind, _)) = analyzer.push(frame?)? {
+            if kind == ContentKind::Advertisement {
+                pb_ads.update(1);
+            }
+
             let k = match kind {
-                analyzer::ContentKind::Advertisement => 'A',
-                analyzer::ContentKind::Music => 'M',
-                analyzer::ContentKind::Talk => 'T',
-                analyzer::ContentKind::Unknown => 'U',
+                ContentKind::Advertisement => 'A',
+                ContentKind::Music => 'M',
+                ContentKind::Talk => 'T',
+                ContentKind::Unknown => 'U',
             };
+
             buf.push(k as u8);
-            if buf.len() == SIZE {
+            if buf.len() == BUFFER_SIZE {
                 std::io::stdout().write_all(&buf)?;
                 buf.clear();
             }
         }
-        pb.update(1);
+        pb_frames.update(1);
     }
 
     std::io::stdout().write_all(&buf)?;
