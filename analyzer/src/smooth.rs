@@ -14,18 +14,15 @@ pub struct LabelSmoother {
 }
 
 const ADS_BUFFER_THRESHOLD: f32 = 0.75;
-const ADS_PREDICTION_THRESHOLD: f32 = 0.65;
+const ADS_PREDICTION_THRESHOLD: f32 = 0.55;
 
 impl LabelSmoother {
     #[must_use]
     pub fn new(behind: Duration, ahead: Duration) -> Self {
-        // let behind = behind.max(Duration::from_millis(1450)) - Duration::from_millis(1450);
-        // let ahead = ahead.max(Duration::from_millis(1450)) - Duration::from_millis(1450);
-
         let behind_size =
-            (behind.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
+            (behind.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
         let ahead_size =
-            (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis() / 2) as usize;
+            (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
 
         let ads_threshold = ADS_BUFFER_THRESHOLD; // TODO make configurable;
 
@@ -70,21 +67,22 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
-        self.buffer.push_back(labels);
+        Some(labels)
+        // self.buffer.push_back(labels);
 
-        if self.buffer.len() < self.ahead {
-            return None;
-        }
+        // if self.buffer.len() < self.ahead {
+        //     return None;
+        // }
 
-        if self.buffer.len() == (self.ahead + self.behind + 1) {
-            self.buffer.pop_front();
-        }
+        // if self.buffer.len() == (self.ahead + self.behind + 1) {
+        //     self.buffer.pop_front();
+        // }
 
-        if self.get_ads_ratio() > self.ads_threshold {
-            Some(make_labels(1.0, 0.0))
-        } else {
-            Some(make_labels(0.0, 1.0))
-        }
+        // if self.get_ads_ratio() > self.ads_threshold {
+        //     Some(make_labels(1.0, 0.0))
+        // } else {
+        //     Some(make_labels(0.0, 1.0))
+        // }
     }
 
     pub(crate) fn ahead(&self) -> usize {

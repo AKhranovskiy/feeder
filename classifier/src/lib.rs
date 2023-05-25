@@ -6,8 +6,8 @@ mod pyvtable;
 mod types;
 
 use self::pyvtable::PyVTable;
-pub use self::types::PredictedLabels;
-use self::types::{Data, Labels, PyModel};
+use self::types::PyModel;
+pub use self::types::{Data, Labels, PredictedLabels};
 
 #[non_exhaustive]
 pub struct Classifier {

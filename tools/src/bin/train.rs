@@ -1,21 +1,17 @@
 use std::{
-    collections::VecDeque,
     env::args,
     fs::File,
     io::{BufReader, Read},
 };
 
-use classifier::Classifier;
+use classifier::{Classifier, Data, Labels};
 use itertools::Itertools;
-use ndarray::{concatenate, stack, Array1, Array3, Array4, ArrayBase, ArrayView, Axis};
+use ndarray::{concatenate, stack, Array1, ArrayBase, ArrayView, Axis};
 use ndarray_shuffle::NdArrayShuffleInplaceExt;
 use rand::{rngs::SmallRng, SeedableRng};
 
-const W: usize = 150;
-const H: usize = 39;
-
-const TRAIN_CHUNK: usize = 16_384;
-const VERIFICATION_CHUNK: usize = 256;
+const TRAIN_CHUNK: usize = 128;
+const VERIFICATION_CHUNK: usize = 64;
 
 fn main() -> anyhow::Result<()> {
     println!(
@@ -49,10 +45,7 @@ fn train() -> anyhow::Result<()> {
 
     let mut processed = 0;
 
-    for chunk in &data_ads
-        .zip(data_music)
-        .chunks(TRAIN_CHUNK)
-    {
+    for chunk in &data_ads.zip(data_music).chunks(TRAIN_CHUNK) {
         let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();
 
         println!("PROCESSING {}..{}", processed, processed + ads.len());
@@ -71,10 +64,7 @@ fn verify() -> anyhow::Result<()> {
     let data_music = get_data(&args().nth(2).expect("Music train data"))?;
 
     let classifier = Classifier::from_file("model")?;
-    for chunk in &data_ads
-        .zip(data_music)
-        .chunks(VERIFICATION_CHUNK)
-    {
+    for chunk in &data_ads.zip(data_music).chunks(VERIFICATION_CHUNK) {
         let (ads, music): (Vec<_>, Vec<_>) = chunk.unzip();
         let (data, labels) = prepare_data_and_labels(&ads, &music)?;
 
@@ -87,9 +77,9 @@ fn verify() -> anyhow::Result<()> {
 }
 
 fn prepare_data_and_labels(
-    ads: &[Array3<f32>],
-    music: &[Array3<f32>],
-) -> anyhow::Result<(Array4<f32>, Array1<u32>)> {
+    ads: &[Array1<i16>],
+    music: &[Array1<i16>],
+) -> anyhow::Result<(Data, Labels)> {
     let (ads_data, ads_labels) = prepare(ads, 0)?;
     let (music_data, music_labels) = prepare(music, 1)?;
 
@@ -108,14 +98,12 @@ fn prepare_data_and_labels(
     Ok((data, labels))
 }
 
-fn prepare(data: &[Array3<f32>], label: u32) -> anyhow::Result<(Array4<f32>, Array1<u32>)> {
-    let labels = Array1::<u32>::from_elem(data.len(), label);
+fn prepare(data: &[Array1<i16>], label: u32) -> anyhow::Result<(Data, Labels)> {
+    let labels = Labels::from_elem(data.len(), label);
     let data = stack(
         Axis(0),
         &data.iter().map(ArrayBase::from).collect::<Vec<_>>(),
     )?;
-
-    assert!(data.iter().all(|x| x.is_finite()));
 
     Ok((data, labels))
 }
@@ -123,62 +111,27 @@ fn prepare(data: &[Array3<f32>], label: u32) -> anyhow::Result<(Array4<f32>, Arr
 fn get_data(path: &str) -> anyhow::Result<DataIterator> {
     println!("Loading {path}...");
     let data = BufReader::new(File::open(path)?);
-
-    // let mut count = 0;
-    // while let Ok(values) = bincode::deserialize_from::<_, Vec<f32>>(&mut data) {
-    //     count += values.len() / (W * H);
-    // }
-    // data.seek(SeekFrom::Start(0))?;
-    //
-    // println!(
-    //     "{} bytes, {} records",
-    //     data.get_ref().metadata()?.len(),
-    //     count
-    // );
-
-    Ok(DataIterator::new(Box::new(data), 0))
+    Ok(DataIterator::new(Box::new(data)))
 }
 
 struct DataIterator {
     data: Box<dyn Read>,
-    #[allow(dead_code)]
-    size: usize,
-    tail: VecDeque<Array3<f32>>,
 }
 
 impl DataIterator {
-    fn new(data: Box<dyn Read>, size: usize) -> Self {
-        Self {
-            data,
-            size,
-            tail: VecDeque::new(),
-        }
+    fn new(data: Box<dyn Read>) -> Self {
+        Self { data }
     }
 }
 
 impl Iterator for DataIterator {
-    type Item = Array3<f32>;
+    type Item = Array1<i16>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.tail.is_empty() {
-            return self.tail.pop_front();
+        if let Ok(block) = bincode::deserialize_from::<_, Vec<i16>>(&mut self.data.as_mut()) {
+            Some(block.into())
+        } else {
+            None
         }
-
-        while let Ok(block) = bincode::deserialize_from::<_, Vec<f32>>(&mut self.data.as_mut()) {
-            self.tail = block
-                .chunks_exact(W * H)
-                .map(|chunk| Array3::from_shape_vec((W, H, 1), chunk.to_vec()))
-                .collect::<Result<_, _>>()
-                .unwrap();
-
-            if self.tail.is_empty() {
-                continue;
-            }
-
-            return self.tail.pop_front();
-        }
-
-        self.tail.clear();
-        None
     }
 }

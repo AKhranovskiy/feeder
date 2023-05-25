@@ -1,44 +1,58 @@
-from sklearn.model_selection import train_test_split
+import os
+import tensorflow as tf
 from tensorflow import keras
-from keras import Sequential
-from keras import layers
 
 
-INPUT_SHAPE = [150, 39, 1]
-CLASSES = 2
-TEST_SIZE = 0.25
-VALIDATION_SIZE = 0.2
-EPOCHS = 5
-BATCH = 128
+MODEL_NAME = 'adbanda'
+CLASS_NAMES = ['advert', 'music']
 
+SEED = 1234567
+EPOCHS = 10
+BATCH_SIZE = 64
+VALIDATION_RATIO = 0.1
+LEARNING_RATE = 0.00002
+
+# Location where the dataset will be downloaded.
+# By default (None), keras.utils.get_file will use ~/.keras/ as the CACHE_DIR
+CACHE_DIR = None
+
+# Set all random seeds in order to get reproducible results
+keras.utils.set_random_seed(SEED)
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.get_logger().setLevel('ERROR')
+
+YAMNET = tf.saved_model.load('models/yamnet')
 
 def define_model():
-    model = Sequential(
-        [
-            layers.Conv2D(
-                32,
-                (3, 3),
-                activation="relu",
-                padding="valid",
-                name="model_in",
-                input_shape=INPUT_SHAPE,
-            ),
-            layers.MaxPooling2D(2, padding="same"),
+    inputs = keras.layers.Input(shape=(1024), name='embedding')
 
-            layers.Conv2D(128, (3, 3), activation="relu", padding="valid"),
-            layers.MaxPooling2D(2, padding="same"),
-            layers.Dropout(0.3),
+    x = keras.layers.Dense(256, activation='relu', name='dense_1')(inputs)
+    x = keras.layers.Dropout(0.15, name='dropout_1')(x)
 
-            layers.Conv2D(128, (3, 3), activation="relu", padding="valid"),
-            layers.MaxPooling2D(2, padding="same"),
-            layers.Dropout(0.3),
+    x = keras.layers.Dense(384, activation='relu', name='dense_2')(x)
+    x = keras.layers.Dropout(0.2, name='dropout_2')(x)
 
-            layers.GlobalAveragePooling2D(),
-            layers.Dense(512, activation="relu"),
-            layers.Dense(CLASSES, activation="softmax", name="model_out"),
-        ]
+    x = keras.layers.Dense(192, activation='relu', name='dense_3')(x)
+    x = keras.layers.Dropout(0.25, name='dropout_3')(x)
+
+    x = keras.layers.Dense(384, activation='relu', name='dense_4')(x)
+    x = keras.layers.Dropout(0.2, name='dropout_4')(x)
+
+    outputs = keras.layers.Dense(
+        len(CLASS_NAMES),
+        activation='softmax',
+        name='ouput'
+    )(x)
+
+    model = keras.Model(inputs=inputs, outputs=outputs, name=MODEL_NAME)
+
+    model.compile(
+        optimizer=keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss=keras.losses.CategoricalCrossentropy(),
+        metrics=['accuracy', keras.metrics.AUC(name='auc')],
     )
-    model.compile(loss="binary_crossentropy", optimizer="adam", metrics="acc")
+
     return model
 
 
@@ -50,24 +64,75 @@ def save_model(model, name):
     model.save(name)
 
 
-def train_model(model, data, labels, epochs=EPOCHS, batch=BATCH):
-    labels = keras.utils.to_categorical(labels, num_classes=CLASSES)
+def prepare_dataset(data, labels):
+    data_ds = tf.data.Dataset.from_tensor_slices(data)
+    labels_ds = tf.data.Dataset.from_tensor_slices(labels)
 
-    x_train, x_val, y_train, y_val = train_test_split(
-        data, labels, test_size=VALIDATION_SIZE
+    dataset = tf.data.Dataset.zip((data_ds, labels_ds))
+    dataset = dataset.shuffle(len(dataset), seed=SEED)
+
+    split = int(len(dataset) * (1 - VALIDATION_RATIO))
+    train_ds = dataset.take(split)
+    valid_ds = dataset.skip(split)
+
+    train_ds = process_dataset(train_ds)
+    valid_ds = process_dataset(valid_ds)
+
+    return (train_ds, valid_ds)
+
+def process_dataset(dataset):
+    dataset = dataset.map(
+        lambda x, y: get_embeddings(x, y),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+    ).unbatch()
+
+    return dataset.cache().batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+
+def get_embeddings(audio, label):
+    # Get audio embeddings & scores.
+    # The embeddings are the audio features extracted using transfer learning
+    _, embeddings, _ = YAMNET(audio) # type: ignore
+
+    # Number of embeddings in order to know how many times to repeat the label
+    embeddings_num = tf.shape(embeddings)[0]
+    labels = tf.repeat(label, embeddings_num)
+
+    # Using one-hot in order to use AUC
+    return (embeddings, tf.one_hot(labels, len(CLASS_NAMES)))
+
+def train_model(model, data, labels, epochs=EPOCHS, batch=BATCH_SIZE):
+    train_ds, valid_ds = prepare_dataset(data, labels)
+
+    early_stopping_cb = keras.callbacks.EarlyStopping(
+        monitor='val_auc', patience=10, restore_best_weights=True
     )
+
+    checkpoint_filepath = f'/tmp/checkpoint/{MODEL_NAME}'
+    model_checkpoint_cb = keras.callbacks.ModelCheckpoint(
+        checkpoint_filepath, monitor='val_auc', save_best_only=True
+    )
+
+    tensorboard_cb = keras.callbacks.TensorBoard(
+        os.path.join(os.curdir, 'logs', model.name)
+    )
+
+    callbacks = [early_stopping_cb, model_checkpoint_cb, tensorboard_cb]
 
     model.fit(
-        x_train,
-        y_train,
-        validation_data=(x_val, y_val),
-        epochs=epochs,
-        verbose=1,
-        batch_size=batch,
+        train_ds,
+        epochs=EPOCHS,
+        validation_data=valid_ds,
+        callbacks=callbacks,
+        verbose=1, # type: ignore
     )
+
+    model.load_weights(checkpoint_filepath)
 
     return model
 
-
 def predict(model, data):
-    return model(data, training=False).numpy()
+    _, embeddings, _ = YAMNET(data) # type: ignore
+    return model.predict(embeddings, verbose=0)
+
+# print(list(np.argmax(predictions, axis=-1)))
+# infered_class = CLASS_NAMES[predictions.mean(axis=0).argmax()]

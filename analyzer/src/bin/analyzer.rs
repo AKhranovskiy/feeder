@@ -5,10 +5,10 @@ use kdam::{tqdm, BarExt};
 use log::LevelFilter;
 use stderrlog::Timestamp;
 
-use analyzer::{BufferedAnalyzer, LabelSmoother, ContentKind};
+use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use codec::Decoder;
 
-const BUFFER_SIZE: usize = 1 * 1024;
+const BUFFER_SIZE: usize = 2 * 1024;
 
 fn main() -> anyhow::Result<()> {
     stderrlog::new()
@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     let decoder = Decoder::try_from(input)?;
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(200), Duration::from_millis(400)),
+        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(0)),
         false,
     );
 

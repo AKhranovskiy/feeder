@@ -58,7 +58,12 @@ impl PyVTable {
 
     pub(crate) fn predict(model: &PyModel, data: &Data) -> anyhow::Result<PredictedLabels> {
         Python::with_gil(|py| {
-            let data = data.clone().into_pyarray(py);
+            let data = data
+                .iter()
+                .copied()
+                .map(f32::from)
+                .collect::<Vec<_>>()
+                .into_pyarray(py);
             let model = model.as_ref(py);
             let pyarray: &numpy::PyArray2<f32> = Self::get()
                 .predict

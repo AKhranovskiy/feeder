@@ -2,7 +2,6 @@ use std::{collections::VecDeque, time::Duration, time::Instant};
 
 use ac_ffmpeg::time::TimeBase;
 use bytemuck::cast_slice;
-use ndarray::Array4;
 use ndarray_stats::QuantileExt;
 
 use classifier::Classifier;
@@ -11,7 +10,7 @@ use codec::{AudioFrame, CodecParams, FrameDuration, Resampler, SampleFormat, Tim
 use crate::{ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
-    queue: VecDeque<f32>,
+    queue: VecDeque<i16>,
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
@@ -21,15 +20,11 @@ pub struct BufferedAnalyzer {
     ads_counter: usize,
 }
 
+const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975ms
+const DRAIN_WIDTH: usize = 7_680; // 16_000 * 0.100ms
+
 impl BufferedAnalyzer {
-    const MFCCS: mfcc::Config = mfcc::Config::const_default();
-
-    const DRAIN: usize = 1;
-
-    pub const DRAIN_DURATION: Duration =
-        Duration::from_millis(Self::MFCCS.frame_duration().as_millis() as u64 * Self::DRAIN as u64);
-
-    const COEFFS: usize = Self::MFCCS.num_coefficients;
+    pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
 
     pub fn warmup() {
         Classifier::new().expect("Empty model");
@@ -38,8 +33,8 @@ impl BufferedAnalyzer {
     #[must_use]
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
-            queue: VecDeque::with_capacity(2 * 150 * Self::MFCCS.frame_size),
-            classifer: Classifier::from_file("./model").expect("Initialized classifier"),
+            queue: VecDeque::with_capacity(2 * 16_000),
+            classifer: Classifier::from_file("./models/adbanda").expect("Initialized classifier"),
             frame_buffer: VecDeque::with_capacity(smoother.ahead()),
             smoother,
             last_kind: ContentKind::Unknown,
@@ -50,33 +45,26 @@ impl BufferedAnalyzer {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<(ContentKind, AudioFrame)>> {
-        let config = mfcc::Config::default();
-
         let samples = samples(frame.clone())?;
         self.queue.extend(samples.into_iter());
-
         self.frame_buffer.push_back(frame);
 
-        let elapsed = if self.queue.len() >= 76 * config.frame_size {
+        let elapsed = if self.queue.len() >= FRAME_WIDTH {
             let timer = Instant::now();
             let samples = self
                 .queue
                 .iter()
-                .take(76 * config.frame_size)
+                .take(FRAME_WIDTH)
                 .copied()
                 .collect::<Vec<_>>();
 
-            self.queue.drain(0..Self::DRAIN * config.frame_size);
+            self.queue.drain(0..DRAIN_WIDTH);
 
-            let mfccs = {
-                let mut mfccs = mfcc::calculate_mfccs(&samples, mfcc::Config::default())?;
-                mfccs.truncate(150 * Self::COEFFS);
-                assert_eq!(150 * Self::COEFFS, mfccs.len(),);
-                Array4::from_shape_vec((1, 150, Self::COEFFS, 1), mfccs)?
-            };
+            let data = classifier::Data::from_shape_vec((1, FRAME_WIDTH), samples)?;
+            let prediction = self.classifer.predict(&data)?;
 
-            let prediction = self.classifer.predict(&mfccs)?;
             let is_ad = self.last_kind == ContentKind::Advertisement;
+
             if let Some(prediction) = self.smoother.push(prediction) {
                 self.last_kind = match prediction.argmax()?.1 {
                     0 => ContentKind::Advertisement,
@@ -120,12 +108,13 @@ impl BufferedAnalyzer {
     }
 }
 
-fn samples(frame: AudioFrame) -> anyhow::Result<Vec<f32>> {
-    const MFCCS_CODEC_PARAMS: CodecParams = CodecParams::new(22050, SampleFormat::S16, 1);
+fn samples(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
+    const CODEC_PARAMS: CodecParams = CodecParams::new(16_000, SampleFormat::S16, 1);
 
-    let mut resampler = Resampler::new(CodecParams::from(&frame), MFCCS_CODEC_PARAMS);
+    dbg!(CodecParams::from(&frame));
+    let mut resampler = Resampler::new(CodecParams::from(&frame), CODEC_PARAMS);
 
-    let mut output: Vec<i16> = vec![];
+    let mut output = Vec::with_capacity(frame.samples());
 
     for frame in resampler.push(frame)? {
         for plane in frame?.planes().iter() {
@@ -133,5 +122,5 @@ fn samples(frame: AudioFrame) -> anyhow::Result<Vec<f32>> {
         }
     }
 
-    Ok(output.into_iter().map(f32::from).collect())
+    Ok(output)
 }

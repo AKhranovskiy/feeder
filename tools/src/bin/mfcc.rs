@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
 
     let metadata = std::fs::metadata(&args.input)?;
     let files = if metadata.is_file() {
-        vec![args.input.into()]
+        vec![args.input]
     } else if metadata.is_dir() {
         let mut files = read_dir(args.input)?
             .filter_map(Result::ok)
