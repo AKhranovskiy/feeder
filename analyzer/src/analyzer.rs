@@ -1,11 +1,9 @@
 use std::{collections::VecDeque, time::Duration, time::Instant};
 
-use ac_ffmpeg::time::TimeBase;
-use bytemuck::cast_slice;
 use ndarray_stats::QuantileExt;
 
 use classifier::Classifier;
-use codec::{AudioFrame, CodecParams, FrameDuration, Resampler, SampleFormat, Timestamp};
+use codec::{resample_16k_mono_s16_frame, AudioFrame, FrameDuration, TimeBase, Timestamp};
 
 use crate::{ContentKind, LabelSmoother};
 
@@ -21,7 +19,7 @@ pub struct BufferedAnalyzer {
 }
 
 const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975ms
-const DRAIN_WIDTH: usize = 7_680; // 16_000 * 0.100ms
+const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.100ms
 
 impl BufferedAnalyzer {
     pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
@@ -33,7 +31,7 @@ impl BufferedAnalyzer {
     #[must_use]
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
-            queue: VecDeque::with_capacity(2 * 16_000),
+            queue: VecDeque::with_capacity(2 * FRAME_WIDTH),
             classifer: Classifier::from_file("./models/adbanda").expect("Initialized classifier"),
             frame_buffer: VecDeque::with_capacity(smoother.ahead()),
             smoother,
@@ -109,18 +107,5 @@ impl BufferedAnalyzer {
 }
 
 fn samples(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
-    const CODEC_PARAMS: CodecParams = CodecParams::new(16_000, SampleFormat::S16, 1);
-
-    dbg!(CodecParams::from(&frame));
-    let mut resampler = Resampler::new(CodecParams::from(&frame), CODEC_PARAMS);
-
-    let mut output = Vec::with_capacity(frame.samples());
-
-    for frame in resampler.push(frame)? {
-        for plane in frame?.planes().iter() {
-            output.extend_from_slice(cast_slice(plane.data()));
-        }
-    }
-
-    Ok(output)
+    resample_16k_mono_s16_frame(frame)
 }

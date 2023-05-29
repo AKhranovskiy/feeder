@@ -6,6 +6,7 @@ use ndarray_stats::QuantileExt;
 
 use crate::BufferedAnalyzer;
 
+#[allow(dead_code)]
 pub struct LabelSmoother {
     behind: usize,
     ahead: usize,
@@ -14,7 +15,7 @@ pub struct LabelSmoother {
 }
 
 const ADS_BUFFER_THRESHOLD: f32 = 0.75;
-const ADS_PREDICTION_THRESHOLD: f32 = 0.55;
+const ADS_PREDICTION_THRESHOLD: f32 = 0.85;
 
 impl LabelSmoother {
     #[must_use]
@@ -58,8 +59,7 @@ impl LabelSmoother {
         let ads = self
             .buffer
             .iter()
-            .map(MaxOutExt::max_out)
-            .filter(|x| (x[(0, 0)] - 1.0).abs() < f32::EPSILON)
+            .filter(|x| x[(0, 0)] > ADS_PREDICTION_THRESHOLD)
             .count();
 
         // TODO count talks
@@ -67,22 +67,21 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
-        Some(labels)
-        // self.buffer.push_back(labels);
+        self.buffer.push_back(labels);
 
-        // if self.buffer.len() < self.ahead {
-        //     return None;
-        // }
+        if self.buffer.len() < self.ahead {
+            return None;
+        }
 
-        // if self.buffer.len() == (self.ahead + self.behind + 1) {
-        //     self.buffer.pop_front();
-        // }
+        if self.buffer.len() > (self.ahead + self.behind + 1) {
+            self.buffer.pop_front();
+        }
 
-        // if self.get_ads_ratio() > self.ads_threshold {
-        //     Some(make_labels(1.0, 0.0))
-        // } else {
-        //     Some(make_labels(0.0, 1.0))
-        // }
+        if self.get_ads_ratio() > self.ads_threshold {
+            Some(make_labels(1.0, 0.0))
+        } else {
+            Some(make_labels(0.0, 1.0))
+        }
     }
 
     pub(crate) fn ahead(&self) -> usize {
@@ -92,22 +91,6 @@ impl LabelSmoother {
 
 fn make_labels(ads: f32, music: f32) -> PredictedLabels {
     PredictedLabels::from_shape_vec((1, 2), vec![ads, music]).unwrap()
-}
-
-trait MaxOutExt {
-    fn max_out(&self) -> Self;
-}
-
-impl MaxOutExt for PredictedLabels {
-    fn max_out(&self) -> Self {
-        // eprintln!("{:.2} / {:.2}", self[(0, 0)], self[(0, 1)]);
-        if self[(0, 0)] >= ADS_PREDICTION_THRESHOLD {
-            // TODO make configurable
-            make_labels(1.0, 0.0)
-        } else {
-            make_labels(0.0, 1.0)
-        }
-    }
 }
 
 #[cfg(test)]

@@ -61,7 +61,7 @@ impl PyVTable {
             let data = data
                 .iter()
                 .copied()
-                .map(f32::from)
+                .map(|x| f32::from(x) / 32768.0)
                 .collect::<Vec<_>>()
                 .into_pyarray(py);
             let model = model.as_ref(py);

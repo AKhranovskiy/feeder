@@ -5,7 +5,6 @@ use kdam::{tqdm, BarExt};
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use rusqlite::{params, Connection};
 
-use codec::{CodecParams, SampleFormat};
 use mfcc::{calculate_mfccs, Config};
 
 fn main() -> anyhow::Result<()> {
@@ -111,9 +110,7 @@ where
 
             let io = std::io::Cursor::new(content);
 
-            let data: Vec<i16> =
-                codec::resample(io, CodecParams::new(22050, SampleFormat::S16, 1))?;
-
+            let data: Vec<i16> = codec::resample_16k_mono_s16_stream(io)?;
             let data: Vec<f32> = data.into_iter().map(f32::from).collect();
 
             if data.len() < 1024 {
