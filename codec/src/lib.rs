@@ -97,6 +97,8 @@ pub fn resample_16k_mono_s16_stream<R: Read>(input: R) -> anyhow::Result<Vec<i16
 }
 
 pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
+    // let orig = frame.samples();
+
     let mut output: Vec<i16> = vec![];
 
     let mut resampler = AudioResampler::builder()
@@ -111,14 +113,18 @@ pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>
 
     resampler.push(frame)?;
 
+    // Plane data buffer is bigger than required amount,
+    // so take only required amount.
     while let Some(frame) = resampler.take()? {
-        output.extend_from_slice(cast_slice(frame.planes()[0].data()));
+        output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
     }
 
     resampler.flush()?;
     while let Some(frame) = resampler.take()? {
-        output.extend_from_slice(cast_slice(frame.planes()[0].data()));
+        output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
     }
+
+    // eprintln!("\nSAMPLES orig={orig} resampled={}", output.len());
 
     Ok(output)
 }

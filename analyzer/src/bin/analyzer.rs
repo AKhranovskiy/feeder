@@ -38,7 +38,8 @@ fn main() -> anyhow::Result<()> {
         desc = "Processed",
         unit = "f",
         force_refresh = true,
-        position = 0
+        position = 0,
+        disable = false
     );
 
     let mut pb_ads = tqdm!(
@@ -46,7 +47,8 @@ fn main() -> anyhow::Result<()> {
         desc = "Detected ads",
         unit = "f",
         force_refresh = true,
-        position = 1
+        position = 1,
+        disable = false
     );
 
     for frame in decoder {
@@ -67,10 +69,16 @@ fn main() -> anyhow::Result<()> {
                 std::io::stdout().write_all(&buf)?;
                 buf.clear();
             }
+            pb_frames.update(1);
         }
-        pb_frames.update(1);
     }
 
+    println!(
+        "\nProcessed {}, ads={} / {}%",
+        pb_frames.get_counter(),
+        pb_ads.get_counter(),
+        (pb_ads.get_counter() as f64) / (pb_frames.get_counter() as f64) * 100.0
+    );
     std::io::stdout().write_all(&buf)?;
 
     Ok(())

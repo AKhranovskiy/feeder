@@ -18,8 +18,8 @@ pub struct BufferedAnalyzer {
     ads_counter: usize,
 }
 
-const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975ms
-const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.100ms
+const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975s
+const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.1s
 
 impl BufferedAnalyzer {
     pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
@@ -43,7 +43,7 @@ impl BufferedAnalyzer {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<(ContentKind, AudioFrame)>> {
-        let samples = samples(frame.clone())?;
+        let samples = resample_16k_mono_s16_frame(frame.clone())?;
         self.queue.extend(samples.into_iter());
         self.frame_buffer.push_back(frame);
 
@@ -63,8 +63,13 @@ impl BufferedAnalyzer {
 
             let is_ad = self.last_kind == ContentKind::Advertisement;
 
-            if let Some(prediction) = self.smoother.push(prediction) {
-                self.last_kind = match prediction.argmax()?.1 {
+            if let Some(smoothed) = self.smoother.push(prediction.clone()) {
+                // eprintln!(
+                //     "{:?} / {:?}",
+                //     prediction.as_slice().unwrap(),
+                //     smoothed.as_slice().unwrap()
+                // );
+                self.last_kind = match smoothed.argmax()?.1 {
                     0 => ContentKind::Advertisement,
                     1 => ContentKind::Music,
                     x => unreachable!("Unexpected label {x}"),
@@ -104,8 +109,4 @@ impl BufferedAnalyzer {
         }
         Ok(Some(self.last_kind).zip(frame))
     }
-}
-
-fn samples(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
-    resample_16k_mono_s16_frame(frame)
 }

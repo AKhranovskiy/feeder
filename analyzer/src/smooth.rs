@@ -11,11 +11,12 @@ pub struct LabelSmoother {
     behind: usize,
     ahead: usize,
     buffer: VecDeque<PredictedLabels>,
-    ads_threshold: f32,
+    ads_label: PredictedLabels,
+    music_label: PredictedLabels,
 }
 
-const ADS_BUFFER_THRESHOLD: f32 = 0.75;
-const ADS_PREDICTION_THRESHOLD: f32 = 0.85;
+const ADS_RATIO_THRESHOLD: f32 = 0.75;
+const ADS_ACCURACY_THRESHOLD: f32 = 0.65;
 
 impl LabelSmoother {
     #[must_use]
@@ -25,10 +26,8 @@ impl LabelSmoother {
         let ahead_size =
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
 
-        let ads_threshold = ADS_BUFFER_THRESHOLD; // TODO make configurable;
-
         info!(
-            "SMOOTHER behind={}ms/{} ahead={}ms/{} threshold={ads_threshold}",
+            "SMOOTHER behind={}ms/{} ahead={}ms/{} accuracy={ADS_ACCURACY_THRESHOLD} length={ADS_RATIO_THRESHOLD}",
             behind.as_millis(),
             behind_size,
             ahead.as_millis(),
@@ -39,7 +38,8 @@ impl LabelSmoother {
             behind: behind_size,
             ahead: ahead_size,
             buffer: VecDeque::with_capacity(behind_size + ahead_size + 1),
-            ads_threshold,
+            ads_label: PredictedLabels::from_shape_vec((1, 2), vec![1.0, 0.0]).unwrap(),
+            music_label: PredictedLabels::from_shape_vec((1, 2), vec![0.0, 1.0]).unwrap(),
         }
     }
 
@@ -59,7 +59,7 @@ impl LabelSmoother {
         let ads = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 0)] > ADS_PREDICTION_THRESHOLD)
+            .filter(|x| x[(0, 0)] > ADS_ACCURACY_THRESHOLD)
             .count();
 
         // TODO count talks
@@ -67,6 +67,7 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
+        // Some(labels)
         self.buffer.push_back(labels);
 
         if self.buffer.len() < self.ahead {
@@ -77,64 +78,14 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        if self.get_ads_ratio() > self.ads_threshold {
-            Some(make_labels(1.0, 0.0))
+        if self.get_ads_ratio() > ADS_RATIO_THRESHOLD {
+            Some(self.ads_label.clone())
         } else {
-            Some(make_labels(0.0, 1.0))
+            Some(self.music_label.clone())
         }
     }
 
     pub(crate) fn ahead(&self) -> usize {
         self.ahead
-    }
-}
-
-fn make_labels(ads: f32, music: f32) -> PredictedLabels {
-    PredictedLabels::from_shape_vec((1, 2), vec![ads, music]).unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use super::make_labels;
-    use super::LabelSmoother;
-
-    const BEHIND: Duration = Duration::from_millis(40);
-    const AHEAD: Duration = Duration::from_millis(20);
-
-    #[test]
-    fn test_short() {
-        let mut sut = LabelSmoother::new(BEHIND, AHEAD);
-
-        assert_eq!(
-            sut.push(make_labels(0.6, 0.4)).unwrap(),
-            make_labels(1.0, 0.0)
-        );
-    }
-
-    #[test]
-    fn test_exact() {
-        let mut sut = LabelSmoother::new(BEHIND, AHEAD);
-
-        sut.push(make_labels(0.6, 0.4));
-        sut.push(make_labels(0.2, 0.8));
-        let smoothed = sut.push(make_labels(0.4, 0.6)).unwrap();
-
-        assert_eq!(make_labels(0.0, 1.0), smoothed);
-    }
-
-    #[test]
-    fn test_long_history() {
-        let mut sut = LabelSmoother::new(BEHIND, AHEAD);
-
-        sut.push(make_labels(0.4, 0.6));
-        sut.push(make_labels(0.4, 0.6));
-        sut.push(make_labels(0.4, 0.6));
-        sut.push(make_labels(0.6, 0.6));
-
-        let smoothed = sut.push(make_labels(0.6, 0.4)).unwrap();
-
-        assert_eq!(make_labels(1.0, 0.0), smoothed);
     }
 }

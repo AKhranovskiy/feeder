@@ -88,7 +88,11 @@ impl PyVTable {
                     .as_ref(py)
                     .call1((
                         model,
-                        data.clone().into_pyarray(py),
+                        data.iter()
+                            .copied()
+                            .map(|x| f32::from(x) / 32768.0)
+                            .collect::<Vec<_>>()
+                            .into_pyarray(py),
                         labels.clone().into_pyarray(py),
                         epochs,
                         batch,
