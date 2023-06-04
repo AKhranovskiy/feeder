@@ -1,8 +1,8 @@
 target/
 artifacts/
 models/
+recordings/
 restreamer/assets/files/
-restreamer/recordings
 Cargo.lock
 *.bin
 *.sqlite

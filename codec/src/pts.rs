@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use ac_ffmpeg::time::Timestamp;
+use ac_ffmpeg::{codec::audio::AudioFrame, time::Timestamp};
+
+use crate::FrameDuration;
 
 pub struct Pts {
     duration: Duration,
@@ -22,6 +24,10 @@ impl Pts {
         let timestamp = self.duration * self.counter;
         self.counter += 1;
         Timestamp::from_micros(timestamp.as_micros().try_into().unwrap_or_default())
+    }
+
+    pub fn update(&mut self, frame: &AudioFrame) {
+        self.duration = frame.duration();
     }
 }
 

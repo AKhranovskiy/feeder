@@ -34,6 +34,7 @@ impl SilenceMixer {
 
 impl Mixer for SilenceMixer {
     fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
+        self.pts.update(frame);
         let silence = codec::silence_frame(frame);
 
         let (fade_out, fade_in) = match kind {
