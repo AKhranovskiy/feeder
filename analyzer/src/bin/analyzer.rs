@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
     let decoder = Decoder::try_from(input)?;
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(500)),
+        LabelSmoother::new(Duration::from_millis(900), Duration::from_millis(0)),
         false,
     );
 
@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
         unit = "f",
         force_refresh = true,
         position = 0,
-        disable = false
+        disable = true
     );
 
     let mut pb_ads = tqdm!(
@@ -48,11 +48,17 @@ fn main() -> anyhow::Result<()> {
         unit = "f",
         force_refresh = true,
         position = 1,
-        disable = false
+        disable = true
     );
 
+    let mut prev_kind = ContentKind::Unknown;
     for frame in decoder {
-        if let Some((kind, _)) = analyzer.push(frame?)? {
+        if let Some((kind, frame)) = analyzer.push(frame?)? {
+            if prev_kind != kind {
+                eprintln!("{:?} {kind}", frame.pts());
+                prev_kind = kind;
+            }
+
             if kind == ContentKind::Advertisement {
                 pb_ads.update(1);
             }
@@ -74,10 +80,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!(
-        "\nProcessed {}, ads={} / {}%",
+        "\nTotal {}, ads={} / {}%",
         pb_frames.get_counter(),
         pb_ads.get_counter(),
-        (pb_ads.get_counter() as f64) / (pb_frames.get_counter() as f64) * 100.0
+        ((pb_ads.get_counter() as f64) / (pb_frames.get_counter() as f64) * 100.0).trunc() as u32
     );
     std::io::stdout().write_all(&buf)?;
 

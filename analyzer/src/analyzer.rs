@@ -63,7 +63,7 @@ impl BufferedAnalyzer {
 
             let is_ad = self.last_kind == ContentKind::Advertisement;
 
-            if let Some(smoothed) = self.smoother.push(prediction.clone()) {
+            if let Some(smoothed) = self.smoother.push(prediction) {
                 // eprintln!(
                 //     "{:?} / {:?}",
                 //     prediction.as_slice().unwrap(),

@@ -16,7 +16,7 @@ pub struct LabelSmoother {
 }
 
 const ADS_RATIO_THRESHOLD: f32 = 0.75;
-const ADS_ACCURACY_THRESHOLD: f32 = 0.65;
+const ADS_ACCURACY_THRESHOLD: f32 = 0.70;
 
 impl LabelSmoother {
     #[must_use]
@@ -27,7 +27,7 @@ impl LabelSmoother {
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
 
         info!(
-            "SMOOTHER behind={}ms/{} ahead={}ms/{} accuracy={ADS_ACCURACY_THRESHOLD} length={ADS_RATIO_THRESHOLD}",
+            "SMOOTHER behind={}ms/{} ahead={}ms/{} accuracy={ADS_ACCURACY_THRESHOLD} ratio={ADS_RATIO_THRESHOLD}",
             behind.as_millis(),
             behind_size,
             ahead.as_millis(),
