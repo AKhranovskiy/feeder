@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use self::util::{stepped_windows, stepped_window_ranges};
+use self::util::{stepped_window_ranges, stepped_windows};
 
 mod util;
 
@@ -49,7 +49,7 @@ pub fn calculate_mfccs(input: &[f32], config: Config) -> anyhow::Result<Vec<f32>
         "Coeff must be multipler of 3"
     );
 
-    let coeff = config.num_coefficients / 1;
+    let coeff = config.num_coefficients;
 
     let (segments, _) = stepped_windows(input.len(), config.frame_size, config.hop_length);
 

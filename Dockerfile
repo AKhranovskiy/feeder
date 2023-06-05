@@ -34,8 +34,7 @@ WORKDIR /app
 COPY --from=rust-builder /usr/local/cargo/bin/restreamer /usr/local/bin/restreamer
 COPY --from=python-builder /opt/venv /opt/venv
 
-COPY model model
-RUN mkdir recordings
+COPY models/ models/
 
 ENV PATH="/opt/venv/bin:$PATH"
 

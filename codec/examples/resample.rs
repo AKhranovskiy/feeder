@@ -1,24 +1,21 @@
-use std::io::Write;
-
-use codec::{CodecParams, Decoder, SampleFormat};
+use codec::resample_16k_mono_s16_stream;
 
 fn main() -> anyhow::Result<()> {
     let input = std::env::args().nth(1).expect("Expects audio file");
-
     let io = std::io::BufReader::new(std::fs::File::open(input)?);
 
-    let decoder = Decoder::try_from(io)?.resample(CodecParams::new(22050, SampleFormat::S16, 1));
+    let output: Vec<i16> = resample_16k_mono_s16_stream(io)?;
 
-    let mut resampled: Vec<u8> = vec![];
+    let norm = normalize(output);
 
-    for frame in decoder {
-        for plane in frame?.planes().iter() {
-            resampled.extend_from_slice(plane.data());
-        }
-    }
-
-    std::io::stdout().write_all(&resampled)?;
-    std::io::stdout().flush()?;
+    eprintln!("{} samples, {:?}", norm.len(), &norm[0..100]);
 
     Ok(())
+}
+
+fn normalize(samples: Vec<i16>) -> Vec<f32> {
+    samples
+        .into_iter()
+        .map(|x| f32::from(x) / 32768.0)
+        .collect()
 }

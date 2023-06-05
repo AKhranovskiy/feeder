@@ -1,9 +1,20 @@
 use std::io::Read;
+use std::str::FromStr;
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 pub use ac_ffmpeg::packet::Packet;
-pub use ac_ffmpeg::time::Timestamp;
-use ac_ffmpeg::{codec::audio::AudioFrameMut, set_log_callback};
+pub use ac_ffmpeg::time::{TimeBase, Timestamp};
+
+use ac_ffmpeg::{
+    codec::audio::AudioFrameMut,
+    codec::audio::ChannelLayout as AcChannelLayout,
+    codec::audio::SampleFormat as AcSampleFormat,
+    codec::audio::{AudioDecoder, AudioResampler},
+    codec::Decoder as AcDecoder,
+    format::demuxer::Demuxer,
+    format::io::IO,
+    set_log_callback,
+};
 
 use bytemuck::cast_slice;
 
@@ -34,21 +45,86 @@ pub fn suppress_ffmpeg_log() {
     set_log_callback(|_, _| {});
 }
 
-// TODO Sample should be bound to SampleFormat.
-pub fn resample<R, Sample>(input: R, target: CodecParams) -> anyhow::Result<Vec<Sample>>
-where
-    R: Read,
-    Sample: Clone + bytemuck::Pod,
-{
-    let decoder = Decoder::try_from(input)?.resample(target);
+pub fn resample_16k_mono_s16_stream<R: Read>(input: R) -> anyhow::Result<Vec<i16>> {
+    let io = IO::from_read_stream(input);
 
-    let mut output: Vec<Sample> = vec![];
+    let mut demuxer = Demuxer::builder()
+        .build(io)?
+        .find_stream_info(None)
+        .map_err(|(_, err)| err)?;
 
-    for frame in decoder {
-        for plane in frame?.planes().iter() {
-            output.extend_from_slice(cast_slice::<u8, Sample>(plane.data()));
+    let params = demuxer.streams()[0].codec_parameters();
+    let source = params.as_audio_codec_parameters().unwrap();
+
+    let mut decoder = AudioDecoder::from_stream(&demuxer.streams()[0])?.build()?;
+
+    let mut resampler = AudioResampler::builder()
+        .source_sample_rate(source.sample_rate())
+        .source_channel_layout(source.channel_layout().to_owned())
+        .source_sample_format(source.sample_format())
+        .source_sample_rate(source.sample_rate())
+        .target_channel_layout(AcChannelLayout::from_channels(1).unwrap())
+        .target_sample_format(AcSampleFormat::from_str("s16").unwrap())
+        .target_sample_rate(16_000)
+        .build()?;
+
+    let mut output: Vec<i16> = vec![];
+
+    while let Some(packet) = demuxer.take()? {
+        decoder.push(packet)?;
+        while let Some(frame) = decoder.take()? {
+            resampler.push(frame)?;
+            while let Some(frame) = resampler.take()? {
+                output.extend_from_slice(cast_slice(frame.planes()[0].data()));
+            }
         }
     }
+
+    decoder.flush()?;
+    while let Some(frame) = decoder.take()? {
+        resampler.push(frame)?;
+        while let Some(frame) = resampler.take()? {
+            output.extend_from_slice(cast_slice(frame.planes()[0].data()));
+        }
+    }
+
+    resampler.flush()?;
+    while let Some(frame) = resampler.take()? {
+        output.extend_from_slice(cast_slice(frame.planes()[0].data()));
+    }
+
+    Ok(output)
+}
+
+pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
+    // let orig = frame.samples();
+
+    let mut output: Vec<i16> = vec![];
+
+    let mut resampler = AudioResampler::builder()
+        .source_sample_rate(frame.sample_rate())
+        .source_channel_layout(frame.channel_layout().to_owned())
+        .source_sample_format(frame.sample_format())
+        .source_sample_rate(frame.sample_rate())
+        .target_channel_layout(AcChannelLayout::from_channels(1).unwrap())
+        .target_sample_format(AcSampleFormat::from_str("s16").unwrap())
+        .target_sample_rate(16_000)
+        .build()?;
+
+    resampler.push(frame)?;
+
+    // Plane data buffer is bigger than required amount,
+    // so take only required amount.
+    while let Some(frame) = resampler.take()? {
+        output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
+    }
+
+    resampler.flush()?;
+    while let Some(frame) = resampler.take()? {
+        output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
+    }
+
+    // eprintln!("\nSAMPLES orig={orig} resampled={}", output.len());
 
     Ok(output)
 }

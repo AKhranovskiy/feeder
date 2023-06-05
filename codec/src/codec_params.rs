@@ -73,6 +73,11 @@ impl From<&AudioCodecParameters> for CodecParams {
         }
     }
 }
+impl From<AudioCodecParameters> for CodecParams {
+    fn from(value: AudioCodecParameters) -> Self {
+        Self::from(&value)
+    }
+}
 
 impl From<&AudioFrame> for CodecParams {
     fn from(frame: &AudioFrame) -> Self {

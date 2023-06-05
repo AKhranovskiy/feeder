@@ -4,6 +4,7 @@ artifacts/
 tools/audio/
 restreamer/assets/files/
 target/
+recordings/
 **/*.wav
 **/*.ogg
 **/*.aac

@@ -21,12 +21,12 @@ pub struct Args {
     pub gcp: bool,
 
     /// Smoothing behind buffer in ms.
-    #[arg(long, default_value_t = 200)]
+    #[arg(long, default_value_t = 900)]
     #[arg(value_parser = value_parser!(u64).range(0..10_000))]
     pub smooth_behind: u64,
 
     /// Smoothing ahead buffer in ms.
-    #[arg(long, default_value_t = 400)]
+    #[arg(long, default_value_t = 0)]
     #[arg(value_parser = value_parser!(u64).range(0..10_000))]
     pub smooth_ahead: u64,
 

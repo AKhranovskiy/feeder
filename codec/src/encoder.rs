@@ -75,4 +75,9 @@ impl<W: Write> Encoder<W> {
 
         Ok(self)
     }
+
+    #[must_use]
+    pub fn codec_params(&self) -> CodecParams {
+        self.encoder.codec_parameters().into()
+    }
 }

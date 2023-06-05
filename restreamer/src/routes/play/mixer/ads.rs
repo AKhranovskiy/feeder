@@ -23,6 +23,7 @@ pub struct AdsMixer {
 
 impl Mixer for AdsMixer {
     fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
+        self.pts.update(frame);
         match kind {
             analyzer::ContentKind::Advertisement => self.advertisement(frame),
             analyzer::ContentKind::Music
