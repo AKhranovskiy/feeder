@@ -24,7 +24,7 @@ async fn main() {
 
     configure_logger(&args);
 
-    let serve_dir = get_service(ServeDir::new("assets"));
+    let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
 
     BufferedAnalyzer::warmup();
@@ -62,7 +62,7 @@ fn configure_logger(args: &Args) {
         log.verbosity(LevelFilter::Info);
     } else {
         log.verbosity(LevelFilter::Debug);
-        log.timestamp(Timestamp::Second);
+        log.timestamp(Timestamp::Millisecond);
     }
 
     log.init().unwrap();

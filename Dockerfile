@@ -35,6 +35,7 @@ COPY --from=rust-builder /usr/local/cargo/bin/restreamer /usr/local/bin/restream
 COPY --from=python-builder /opt/venv /opt/venv
 
 COPY models/ models/
+COPY restreamer/assets restreamer/assets
 
 ENV PATH="/opt/venv/bin:$PATH"
 
