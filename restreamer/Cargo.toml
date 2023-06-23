@@ -15,7 +15,6 @@ codec = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
-mfcc = { workspace = true }
 os_pipe = { workspace = true }
 serde = { workspace = true }
 stderrlog = { workspace = true }

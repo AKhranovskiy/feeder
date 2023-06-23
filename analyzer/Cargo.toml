@@ -12,7 +12,6 @@ classifier = { workspace = true }
 codec = { workspace = true }
 kdam = { workspace = true }
 log = { workspace = true }
-mfcc = { workspace = true }
 ndarray = { workspace = true }
 ndarray-stats = { workspace = true }
 stderrlog = { workspace = true }

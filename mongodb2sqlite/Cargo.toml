@@ -11,7 +11,12 @@ futures = { workspace = true }
 humansize = { workspace = true }
 kdam = { workspace = true }
 mongodb = { version = "2.5.0", features = ["bson-uuid-0_8", "bson-chrono-0_4"] }
-rusqlite = { workspace = true }
+rusqlite = { version = "0.29.0", features = [
+    "bundled",
+    "blob",
+    "i128_blob",
+    "time",
+] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 time = { workspace = true }
