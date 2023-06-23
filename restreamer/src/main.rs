@@ -1,6 +1,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::net::SocketAddr;
+use std::time::Instant;
 
 use analyzer::BufferedAnalyzer;
 use args::Args;
@@ -27,7 +28,16 @@ async fn main() {
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
 
+    log::info!("Warming up analyzer...");
+
+    let instant = Instant::now();
+
     BufferedAnalyzer::warmup();
+
+    log::info!(
+        "Warming up completed in {}ms",
+        instant.elapsed().as_millis()
+    );
 
     let app = Router::new().nest_service("/", serve_dir.clone()).nest(
         "/play",
@@ -51,11 +61,13 @@ fn configure_logger(args: &Args) {
     let mut log = stderrlog::new();
     log.show_module_names(false)
         .show_level(false)
-        .module("restreamer")
-        .module("restreamer::stream_saver")
+        .module("analyzer::analyzer")
         .module("analyzer::smooth")
         .module("codec::dsp::cross_fader")
-        .module("analyzer::analyzer")
+        .module("restreamer")
+        .module("restreamer::routes::play")
+        .module("restreamer::stream_saver")
+        .module("restreamer::terminate")
         .quiet(args.quiet);
 
     if args.gcp {

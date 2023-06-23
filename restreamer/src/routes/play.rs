@@ -50,7 +50,7 @@ async fn serve(
 ) -> impl IntoResponse {
     log::info!(
         "Serve {}, action={:?}",
-        params.url,
+        params.source,
         params.action.as_ref().unwrap_or(&PlayAction::Passthrough)
     );
 
@@ -113,7 +113,7 @@ const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow::Result<()> {
     let action = params.action.unwrap_or(PlayAction::Passthrough);
 
-    let input = unstreamer::Unstreamer::open(params.url)?;
+    let input = unstreamer::Unstreamer::open(&params.source)?;
 
     let mut decoder = Decoder::try_from(input)?;
     let first_frame = decoder.next().unwrap()?;
@@ -147,14 +147,13 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
-        PlayAction::Lang(_) => Box::new(AdsMixer::new(sample_audio_frames, cross_fader)),
+        PlayAction::Replace => Box::new(AdsMixer::new(sample_audio_frames, cross_fader)),
     };
 
     for frame in decoder {
         let frame = frame?;
 
         if let Some((kind, frame)) = analyzer.push(frame.clone())? {
-            // todo move saver to another thread
             stream_saver.push(Destination::Original, frame.clone());
 
             let frame = mixer.push(kind, &frame);
@@ -170,10 +169,10 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
     }
 
     encoder.flush()?;
-    stream_saver.flush();
 
-    std::io::stdout().write_all("\nTerminating analyzer".as_bytes())?;
-    std::io::stdout().flush()?;
+    stream_saver.terminate();
+
+    log::info!("Terminating analyzer");
 
     Ok(())
 }

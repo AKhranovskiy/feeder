@@ -13,10 +13,11 @@ pub struct LabelSmoother {
     buffer: VecDeque<PredictedLabels>,
     ads_label: PredictedLabels,
     music_label: PredictedLabels,
+    talk_label: PredictedLabels,
 }
 
-const ADS_RATIO_THRESHOLD: f32 = 0.75;
-const ADS_ACCURACY_THRESHOLD: f32 = 0.70;
+const RATIO_THRESHOLD: f32 = 0.75;
+const ACCURACY_THRESHOLD: f32 = 0.70;
 
 impl LabelSmoother {
     #[must_use]
@@ -27,7 +28,7 @@ impl LabelSmoother {
             (ahead.as_millis() / BufferedAnalyzer::DRAIN_DURATION.as_millis()) as usize;
 
         info!(
-            "SMOOTHER behind={}ms/{} ahead={}ms/{} accuracy={ADS_ACCURACY_THRESHOLD} ratio={ADS_RATIO_THRESHOLD}",
+            "SMOOTHER behind={}ms/{} ahead={}ms/{} accuracy={ACCURACY_THRESHOLD} ratio={RATIO_THRESHOLD}",
             behind.as_millis(),
             behind_size,
             ahead.as_millis(),
@@ -38,32 +39,51 @@ impl LabelSmoother {
             behind: behind_size,
             ahead: ahead_size,
             buffer: VecDeque::with_capacity(behind_size + ahead_size + 1),
-            ads_label: PredictedLabels::from_shape_vec((1, 2), vec![1.0, 0.0]).unwrap(),
-            music_label: PredictedLabels::from_shape_vec((1, 2), vec![0.0, 1.0]).unwrap(),
+            ads_label: PredictedLabels::from_shape_vec((1, 3), vec![1.0, 0.0, 0.0]).unwrap(),
+            music_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
+            talk_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 0.0, 1.0]).unwrap(),
         }
     }
 
     #[must_use]
     pub fn get_buffer_content(&self) -> String {
+        let (ads, music, talk) = self.get_ratio();
+
         format!(
-            "{} {:.2}",
+            "{} {ads:.2} / {music:.2} / {talk:2.}",
             self.buffer
                 .iter()
                 .map(|item| { "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_') })
                 .collect::<String>(),
-            self.get_ads_ratio()
         )
     }
 
-    fn get_ads_ratio(&self) -> f32 {
+    fn get_ratio(&self) -> (f32, f32, f32) {
+        if self.buffer.is_empty() {
+            return (0.0, 0.0, 0.0);
+        }
+
         let ads = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 0)] > ADS_ACCURACY_THRESHOLD)
+            .filter(|x| x[(0, 0)] > ACCURACY_THRESHOLD)
             .count();
 
-        // TODO count talks
-        ads as f32 / self.buffer.len() as f32
+        let music = self
+            .buffer
+            .iter()
+            .filter(|x| x[(0, 1)] > ACCURACY_THRESHOLD)
+            .count();
+
+        let talk = self
+            .buffer
+            .iter()
+            .filter(|x| x[(0, 2)] > ACCURACY_THRESHOLD)
+            .count();
+
+        let len = self.buffer.len() as f32;
+
+        (ads as f32 / len, music as f32 / len, talk as f32 / len)
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
@@ -78,10 +98,14 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        if self.get_ads_ratio() > ADS_RATIO_THRESHOLD {
+        let (ads, music, _) = self.get_ratio();
+
+        if ads > RATIO_THRESHOLD {
             Some(self.ads_label.clone())
-        } else {
+        } else if music >= RATIO_THRESHOLD {
             Some(self.music_label.clone())
+        } else {
+            Some(self.talk_label.clone())
         }
     }
 

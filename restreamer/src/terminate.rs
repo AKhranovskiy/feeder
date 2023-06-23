@@ -42,6 +42,6 @@ impl Terminator {
             _ = terminate => { self.terminate(); },
         }
 
-        println!("signal received, starting graceful shutdown");
+        log::info!("Signal received, starting graceful shutdown");
     }
 }

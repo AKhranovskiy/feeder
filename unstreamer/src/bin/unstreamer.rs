@@ -2,15 +2,14 @@ use std::io::{Read, Write};
 
 use clap::Parser;
 use unstreamer::Unstreamer;
-use url::Url;
 
 #[derive(Parser)]
 struct Args {
-    source: Url,
+    source: String,
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut unstreamer = Unstreamer::open(Args::parse().source)?;
+    let mut unstreamer = Unstreamer::open(&Args::parse().source)?;
     loop {
         let mut buf = [0u8; 2048];
         let read = unstreamer.read(&mut buf)?;

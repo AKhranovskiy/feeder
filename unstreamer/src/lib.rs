@@ -11,14 +11,20 @@ static MIME_AUDIO: &str = "audio/";
 pub struct Unstreamer(Box<dyn Read + Send>);
 
 impl Unstreamer {
-    pub fn open(source: Url) -> anyhow::Result<Unstreamer> {
-        let resp = ureq::get(source.as_ref()).call()?;
-        if resp.content_type() == hls::MIME_HLS {
-            Ok(Self(Box::new(hls::HLSUnstreamer::open(source)?)))
-        } else if resp.content_type().starts_with(MIME_AUDIO) {
-            Ok(Self(resp.into_reader()))
+    pub fn open(source: &str) -> anyhow::Result<Unstreamer> {
+        if let Ok(url) = Url::parse(source) {
+            let resp = ureq::get(url.as_ref()).call()?;
+            if resp.content_type() == hls::MIME_HLS {
+                Ok(Self(Box::new(hls::HLSUnstreamer::open(url)?)))
+            } else if resp.content_type().starts_with(MIME_AUDIO) {
+                Ok(Self(resp.into_reader()))
+            } else {
+                bail!("Unsupported content type: {}", resp.content_type());
+            }
+        } else if let Ok(file) = std::fs::File::open(source) {
+            Ok(Self(Box::new(file)))
         } else {
-            bail!("Unsupported content type: {}", resp.content_type());
+            bail!("Unsupported source: {}", source);
         }
     }
 }

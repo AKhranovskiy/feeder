@@ -32,7 +32,7 @@ impl BufferedAnalyzer {
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
             queue: VecDeque::with_capacity(2 * FRAME_WIDTH),
-            classifer: Classifier::from_file("./models/adbanda").expect("Initialized classifier"),
+            classifer: Classifier::from_file("./models/adbanda_2").expect("Initialized classifier"),
             frame_buffer: VecDeque::with_capacity(smoother.ahead()),
             smoother,
             last_kind: ContentKind::Unknown,
@@ -72,6 +72,7 @@ impl BufferedAnalyzer {
                 self.last_kind = match smoothed.argmax()?.1 {
                     0 => ContentKind::Advertisement,
                     1 => ContentKind::Music,
+                    2 => ContentKind::Talk,
                     x => unreachable!("Unexpected label {x}"),
                 };
             }

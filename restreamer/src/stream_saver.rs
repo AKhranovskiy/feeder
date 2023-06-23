@@ -2,12 +2,13 @@ use std::{
     fs::File,
     io::BufWriter,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use chrono::Local;
 use codec::{AudioFrame, CodecParams, Encoder};
 
-const BASE_PATH: &str = "./recordings";
+use crate::terminate::Terminator;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Destination {
@@ -15,75 +16,115 @@ pub enum Destination {
     Processed,
 }
 
-impl Destination {
-    pub fn into_path(self) -> PathBuf {
-        let now = Local::now().format("%Y%m%d-%H%M%S");
-
-        let dest = match self {
-            Destination::Original => "original",
-            Destination::Processed => "processed",
-        };
-
-        Path::new(BASE_PATH).join(format!("{now}-{dest}.ogg"))
-    }
+pub struct StreamSaver {
+    inner: Option<Inner>,
 }
 
-pub struct StreamSaver {
-    original: Option<Encoder<BufWriter<File>>>,
-    processed: Option<Encoder<BufWriter<File>>>,
+struct Inner {
+    original: flume::Sender<AudioFrame>,
+    processed: flume::Sender<AudioFrame>,
+    terminator: Terminator,
+}
+
+const BASE_PATH: &str = "./recordings";
+
+fn paths() -> (PathBuf, PathBuf) {
+    let now = Local::now().format("%Y%m%d-%H%M%S");
+    (
+        Path::new(BASE_PATH).join(format!("{now}.original.ogg")),
+        Path::new(BASE_PATH).join(format!("{now}.processed.ogg")),
+    )
 }
 
 impl StreamSaver {
     pub fn new(enabled: bool, codec_params: CodecParams) -> anyhow::Result<Self> {
-        if enabled {
+        let inner = if enabled {
+            let (original_path, processed_path) = paths();
+
             log::info!(
                 "Creating stream saver\n{}\n{}",
-                Destination::Original.into_path().display(),
-                Destination::Processed.into_path().display()
+                original_path.display(),
+                processed_path.display()
             );
 
-            let original = Some({
-                let writer = BufWriter::new(File::create(Destination::Original.into_path())?);
-                Encoder::opus(codec_params, writer)?
-            });
-            let processed = Some({
-                let writer = BufWriter::new(File::create(Destination::Processed.into_path())?);
-                Encoder::opus(codec_params, writer)?
-            });
-
-            Ok(Self {
-                original,
-                processed,
+            let terminator = Terminator::new();
+            Some(Inner {
+                original: start_worker(codec_params, original_path, terminator.clone())?,
+                processed: start_worker(codec_params, processed_path, terminator.clone())?,
+                terminator,
             })
         } else {
             log::info!("Recordings are not enabled");
-            Ok(Self {
-                original: None,
-                processed: None,
-            })
-        }
+            None
+        };
+
+        Ok(Self { inner })
     }
 
     pub fn push(&mut self, destination: Destination, frame: AudioFrame) {
-        let pts = frame.pts();
-        match destination {
-            Destination::Original if self.original.is_some() => {
-                let pts = frame.pts();
-                if let Err(error) = self.original.as_mut().unwrap().push(frame) {
-                    log::error!("Failed to save original frame {pts:?}: {error:#?}");
+        if let Some(inner) = &mut self.inner {
+            let pts = frame.pts();
+
+            match destination {
+                Destination::Original => {
+                    if let Err(error) = inner.original.send(frame) {
+                        log::error!("Failed to save original frame {pts:?}: {error:#?}");
+                    }
+                }
+                Destination::Processed => {
+                    if let Err(error) = inner.processed.send(frame) {
+                        log::error!("Failed to save procesed frame {pts:?}: {error:#?}");
+                    }
                 }
             }
-            Destination::Processed if self.processed.is_some() => {
-                if let Err(error) = self.processed.as_mut().unwrap().push(frame) {
-                    log::error!("Failed to save procesed frame {pts:?}: {error:#?}");
-                }
-            }
-            _ => {}
         }
     }
 
-    pub fn flush(&mut self) {
-        self.original.as_mut().map(Encoder::flush);
-        self.processed.as_mut().map(Encoder::flush);
+    pub fn terminate(&self) {
+        if let Some(inner) = &self.inner {
+            inner.terminator.terminate();
+        }
     }
+}
+
+impl Drop for StreamSaver {
+    fn drop(&mut self) {
+        if let Some(inner) = &self.inner {
+            inner.terminator.terminate();
+        }
+    }
+}
+
+const TIMEOUT: Duration = Duration::from_millis(200);
+
+fn start_worker(
+    codec_params: CodecParams,
+    destination: PathBuf,
+    terminator: Terminator,
+) -> anyhow::Result<flume::Sender<AudioFrame>> {
+    let (sender, queue) = flume::unbounded();
+
+    let mut output = {
+        let writer = BufWriter::new(File::create(destination.clone())?);
+        Encoder::opus(codec_params, writer)?
+    };
+
+    std::thread::spawn(move || {
+        while !terminator.is_terminated() {
+            while let Ok(frame) = queue.recv_timeout(TIMEOUT) {
+                if let Err(error) = output.push(frame) {
+                    log::error!(
+                        "Failed to save frame for {}: {error:#?}",
+                        destination.display()
+                    );
+                }
+            }
+        }
+
+        output.flush()?;
+        log::info!("Terminating stream saver for {}", destination.display());
+        anyhow::Ok(())
+    });
+
+    Ok(sender)
 }
