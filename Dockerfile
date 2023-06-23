@@ -1,17 +1,18 @@
 # Build restreamer
-FROM rust:latest as rust-builder
+FROM rust:slim-bookworm as rust-builder
 
 WORKDIR /usr/src/app
 
 COPY . .
 RUN apt-get update \
-    && apt-get install -y python3-dev libavutil-dev libavcodec-dev libavformat-dev libswscale-dev libaubio-dev \
+    && apt-get install -y --no-install-recommends \
+    python3-dev libavutil-dev libavcodec-dev libavformat-dev libswscale-dev libaubio-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install --path restreamer
 
 # Prepare Python virtual env
-FROM python:3.9-slim as python-builder
+FROM python:3.11-slim-bookworm as python-builder
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -22,12 +23,15 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 # final stage
-FROM python:3.9-slim as final
+FROM python:3.11-slim-bookworm as final
 
-RUN apt-get update && apt-get install -y ffmpeg libaubio5 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ffmpeg libaubio5 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -38,6 +42,7 @@ COPY models/ models/
 COPY restreamer/assets restreamer/assets
 
 ENV PATH="/opt/venv/bin:$PATH"
+ENV TF_CPP_MIN_LOG_LEVEL=3
 
 CMD restreamer --port 8192 --gcp
 
