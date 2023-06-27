@@ -33,7 +33,7 @@ impl BufferedAnalyzer {
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
             samples_queue: VecDeque::new(),
-            classifer: Classifier::from_file("./models/adbanda_at_m")
+            classifer: Classifier::from_file("./models/adbanda_a_mt")
                 .expect("Initialized classifier"),
             input_queue: VecDeque::new(),
             output_queue: VecDeque::new(),
