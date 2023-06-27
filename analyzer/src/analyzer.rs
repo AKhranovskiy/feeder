@@ -3,17 +3,18 @@ use std::{collections::VecDeque, time::Duration, time::Instant};
 use ndarray_stats::QuantileExt;
 
 use classifier::Classifier;
-use codec::{resample_16k_mono_s16_frame, AudioFrame, FrameDuration, TimeBase, Timestamp};
+use codec::{resample_16k_mono_s16_frame, AudioFrame, FrameDuration, Timestamp};
 
 use crate::{ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
-    queue: VecDeque<i16>,
+    samples_queue: VecDeque<i16>,
     classifer: Classifier,
     smoother: LabelSmoother,
     last_kind: ContentKind,
     print_buffer_stat: bool,
-    frame_buffer: VecDeque<AudioFrame>,
+    input_queue: VecDeque<AudioFrame>,
+    output_queue: VecDeque<(ContentKind, AudioFrame)>,
     ads_duration: Duration,
     ads_counter: usize,
 }
@@ -31,9 +32,10 @@ impl BufferedAnalyzer {
     #[must_use]
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
-            queue: VecDeque::with_capacity(2 * FRAME_WIDTH),
-            classifer: Classifier::from_file("./models/adbanda_2").expect("Initialized classifier"),
-            frame_buffer: VecDeque::with_capacity(smoother.ahead()),
+            samples_queue: VecDeque::new(),
+            classifer: Classifier::from_file("./models/adbanda_3").expect("Initialized classifier"),
+            input_queue: VecDeque::new(),
+            output_queue: VecDeque::new(),
             smoother,
             last_kind: ContentKind::Unknown,
             print_buffer_stat,
@@ -43,71 +45,92 @@ impl BufferedAnalyzer {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<Option<(ContentKind, AudioFrame)>> {
-        let samples = resample_16k_mono_s16_frame(frame.clone())?;
-        self.queue.extend(samples.into_iter());
-        self.frame_buffer.push_back(frame);
+        let zero_pts = Timestamp::new(0, frame.time_base());
+        let frame_duration = frame.duration();
 
-        let elapsed = if self.queue.len() >= FRAME_WIDTH {
-            let timer = Instant::now();
+        let timer = Instant::now();
+
+        self.samples_queue
+            .extend(resample_16k_mono_s16_frame(frame.clone())?.into_iter());
+        self.input_queue.push_back(frame);
+
+        if self.samples_queue.len() >= FRAME_WIDTH {
             let samples = self
-                .queue
+                .samples_queue
                 .iter()
                 .take(FRAME_WIDTH)
                 .copied()
                 .collect::<Vec<_>>();
 
-            self.queue.drain(0..DRAIN_WIDTH);
+            self.samples_queue.drain(0..DRAIN_WIDTH);
 
             let data = classifier::Data::from_shape_vec((1, FRAME_WIDTH), samples)?;
             let prediction = self.classifer.predict(&data)?;
 
-            let is_ad = self.last_kind == ContentKind::Advertisement;
-
             if let Some(smoothed) = self.smoother.push(prediction) {
-                // eprintln!(
-                //     "{:?} / {:?}",
-                //     prediction.as_slice().unwrap(),
-                //     smoothed.as_slice().unwrap()
-                // );
-                self.last_kind = match smoothed.argmax()?.1 {
+                let kind = match smoothed.argmax()?.1 {
                     0 => ContentKind::Advertisement,
                     1 => ContentKind::Music,
                     2 => ContentKind::Talk,
                     x => unreachable!("Unexpected label {x}"),
                 };
-            }
-            if !is_ad && self.last_kind == ContentKind::Advertisement {
-                self.ads_counter += 1;
-            }
-            timer.elapsed().as_millis()
-        } else {
-            0
-        };
 
-        let frame = if self.last_kind == ContentKind::Unknown {
-            None
-        } else {
-            self.frame_buffer.pop_front()
-        };
+                let frames_to_drain = self
+                    .input_queue
+                    .iter()
+                    .scan(Duration::ZERO, |acc, frame| {
+                        *acc += frame.duration();
+                        Some(*acc)
+                    })
+                    .take_while(|dur| dur < &Self::DRAIN_DURATION)
+                    .count();
 
-        if self.last_kind == ContentKind::Advertisement && frame.is_some() {
-            self.ads_duration += frame.as_ref().unwrap().duration();
+                self.output_queue.extend(
+                    self.input_queue
+                        .drain(0..frames_to_drain)
+                        .map(|frame| (kind, frame)),
+                );
+
+                log::debug!("Drained {frames_to_drain} frames");
+            }
+        } else {
+            log::debug!("Output queue size {}", self.output_queue.len());
+        }
+
+        if let Some((kind, frame)) = self.output_queue.front() {
+            if *kind == ContentKind::Advertisement {
+                self.ads_duration += frame.duration();
+                if *kind != self.last_kind {
+                    self.ads_counter += 1;
+                }
+            }
+            self.last_kind = *kind;
         }
 
         if self.print_buffer_stat {
             print!(
                 "\r{:<3}ms, {:?}: {} {:#} {}s/{}          ",
-                elapsed,
-                frame.as_ref().map_or(
-                    Timestamp::new(0, TimeBase::new(1, 1)),
-                    codec::AudioFrame::pts
-                ),
+                timer.elapsed().as_millis(),
+                self.output_queue
+                    .front()
+                    .as_ref()
+                    .map_or(zero_pts, |(_, frame)| frame.pts()),
                 self.smoother.get_buffer_content(),
-                self.last_kind,
+                self.output_queue
+                    .front()
+                    .map_or(ContentKind::Unknown, |(kind, _)| *kind),
                 self.ads_duration.as_secs(),
                 self.ads_counter
             );
         }
-        Ok(Some(self.last_kind).zip(frame))
+
+        if timer.elapsed() >= frame_duration {
+            log::error!(
+                "Frame processing exceeded frame duration: {}ms vs {}ms",
+                timer.elapsed().as_millis(),
+                frame_duration.as_millis()
+            );
+        }
+        Ok(self.output_queue.pop_front())
     }
 }

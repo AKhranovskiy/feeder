@@ -66,19 +66,19 @@ impl LabelSmoother {
         let ads = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 0)] > ACCURACY_THRESHOLD)
+            .filter(|x| x[(0, 0)] >= ACCURACY_THRESHOLD)
             .count();
 
         let music = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 1)] > ACCURACY_THRESHOLD)
+            .filter(|x| x[(0, 1)] >= ACCURACY_THRESHOLD)
             .count();
 
         let talk = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 2)] > ACCURACY_THRESHOLD)
+            .filter(|x| x[(0, 2)] >= ACCURACY_THRESHOLD)
             .count();
 
         let len = self.buffer.len() as f32;
@@ -87,7 +87,6 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
-        // Some(labels)
         self.buffer.push_back(labels);
 
         if self.buffer.len() < self.ahead {
@@ -98,18 +97,15 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        let (ads, music, _) = self.get_ratio();
+        let (ads, _, talk) = self.get_ratio();
 
-        if ads > RATIO_THRESHOLD {
+        if ads >= RATIO_THRESHOLD {
             Some(self.ads_label.clone())
-        } else if music >= RATIO_THRESHOLD {
-            Some(self.music_label.clone())
-        } else {
+        } else if talk >= RATIO_THRESHOLD {
             Some(self.talk_label.clone())
+        } else {
+            // Just music by default
+            Some(self.music_label.clone())
         }
-    }
-
-    pub(crate) fn ahead(&self) -> usize {
-        self.ahead
     }
 }
