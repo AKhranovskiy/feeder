@@ -78,7 +78,7 @@ impl LabelSmoother {
         let talk = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 2)] >= ACCURACY_THRESHOLD)
+            .filter(|x| x[(0, 0)] >= ACCURACY_THRESHOLD)
             .count();
 
         let len = self.buffer.len() as f32;

@@ -33,7 +33,8 @@ impl BufferedAnalyzer {
     pub fn new(smoother: LabelSmoother, print_buffer_stat: bool) -> Self {
         Self {
             samples_queue: VecDeque::new(),
-            classifer: Classifier::from_file("./models/adbanda_3").expect("Initialized classifier"),
+            classifer: Classifier::from_file("./models/adbanda_at_m")
+                .expect("Initialized classifier"),
             input_queue: VecDeque::new(),
             output_queue: VecDeque::new(),
             smoother,
@@ -90,11 +91,7 @@ impl BufferedAnalyzer {
                         .drain(0..frames_to_drain)
                         .map(|frame| (kind, frame)),
                 );
-
-                log::debug!("Drained {frames_to_drain} frames");
             }
-        } else {
-            log::debug!("Output queue size {}", self.output_queue.len());
         }
 
         if let Some((kind, frame)) = self.output_queue.front() {
@@ -126,7 +123,7 @@ impl BufferedAnalyzer {
 
         if timer.elapsed() >= frame_duration {
             log::error!(
-                "Frame processing exceeded frame duration: {}ms vs {}ms",
+                "Frame processing time exceeded frame duration: {}ms vs {}ms",
                 timer.elapsed().as_millis(),
                 frame_duration.as_millis()
             );
