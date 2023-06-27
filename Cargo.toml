@@ -16,7 +16,7 @@ bincode = "1.3.3"
 bson = "2.6.1"
 bytemuck = "1.13.1"
 chrono = "0.4.26"
-clap = { version = "4.3.5", features = ["derive"] }
+clap = { version = "4.3.8", features = ["derive"] }
 criterion = "0.5.1"
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 flume = { version = "0.10.14", default-features = false }
@@ -43,7 +43,7 @@ rayon = { version = "1.7.0" }
 regex = "1.8.4"
 serde = { version = "1.0.164", features = ["derive"] }
 serde-pickle = "1.1.1"
-serde_json = "1.0.97"
+serde_json = "1.0.99"
 serde_with = "3.0.0"
 stderrlog = "0.5.4"
 thiserror = "1.0.40"
@@ -59,7 +59,7 @@ tower-http = { version = "0.4.1", features = ["full"] }
 ulid = "1.0.0"
 ureq = { version = "2.7.1", features = ["json"] }
 url = { version = "2.4.0", features = ["serde"] }
-uuid = { version = "1.3.4", features = ["v4", "serde"] }
+uuid = { version = "1.4.0", features = ["v4", "serde"] }
 
 analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }
