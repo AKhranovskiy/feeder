@@ -1,10 +1,10 @@
 target/
 artifacts/
-models/
 recordings/
 restreamer/assets/files/
 Cargo.lock
 *.bin
 *.sqlite
 .env
-yamnet/__pycache__
+__pycache__/
+models
