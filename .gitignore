@@ -7,3 +7,4 @@ Cargo.lock
 *.bin
 *.sqlite
 .env
+yamnet/__pycache__
