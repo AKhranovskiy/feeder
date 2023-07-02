@@ -8,3 +8,7 @@ Cargo.lock
 .env
 __pycache__/
 models
+.vscode
+yamnet/dataset_full
+yamnet/dataset_small
+yamnet/verification_set

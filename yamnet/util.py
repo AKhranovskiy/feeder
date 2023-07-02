@@ -5,8 +5,8 @@ import tensorflow_io as tfio
 @tf.function
 def load_16k_audio_wav(filename):
     """
-    Decorated TensorFlow function that loads an audio file from the given file path
-    and returns a tensor of audio waveforms resampled to 16kHz.
+    Decorated TensorFlow function that loads an audio file from the given file
+    path and returns a tensor of audio waveforms resampled to 16kHz.
     The input is a string, the path to the audio file.
     """
     # Read file content
