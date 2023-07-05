@@ -1,11 +1,11 @@
 import os
 
-import args
-
 # import config
 import tensorflow as tf
-import util
 from tensorflow import keras
+
+import args
+import util
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 tf.get_logger().setLevel("ERROR")
@@ -63,22 +63,22 @@ valid_ds = process_dataset(valid_ds)
 
 # This step takes a lot of time because it eagerly computes TF graph,
 # converting audio samples to embeddings.
-print("Calculate class weights")
-class_counts = train_ds.reduce(
-    tf.zeros(shape=(len(config.class_names),), dtype=tf.int32),
-    lambda acc, item: acc
-    + tf.math.bincount(
-        tf.cast(tf.math.argmax(item[1], axis=1), tf.int32),
-        minlength=len(config.class_names),
-    ),
-)
+# print("Calculate class weights")
+# class_counts = train_ds.reduce(
+#     tf.zeros(shape=(len(config.class_names),), dtype=tf.int32),
+#     lambda acc, item: acc
+#     + tf.math.bincount(
+#         tf.cast(tf.math.argmax(item[1], axis=1), tf.int32),
+#         minlength=len(config.class_names),
+#     ),
+# )
 
-class_weight = {
-    i: float(tf.math.reduce_sum(class_counts).numpy() / class_counts[i].numpy())
-    for i in range(len(class_counts))
-}
+# class_weight = {
+#     i: float(tf.math.reduce_sum(class_counts).numpy() / class_counts[i].numpy())
+#     for i in range(len(class_counts))
+# }
 
-print({config.class_names[k]: class_weight[k] for k in class_weight})
+# print({config.class_names[k]: class_weight[k] for k in class_weight})
 
 keras.backend.clear_session()
 
@@ -136,7 +136,7 @@ history = model.fit(
     epochs=config.epochs,
     validation_data=valid_ds,
     callbacks=callbacks,
-    class_weight=class_weight,
+    # class_weight=class_weight,
     verbose=1,  # type: ignore
 )
 
