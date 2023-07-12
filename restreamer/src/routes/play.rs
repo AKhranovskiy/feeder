@@ -133,7 +133,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
             Duration::from_millis(state.args.smooth_behind),
             Duration::from_millis(state.args.smooth_ahead),
         ),
-        state.args.buffer_stat(),
+        state.args.clone().into(),
     );
 
     let cross_fader = CrossFader::new::<ParabolicCrossFade>(

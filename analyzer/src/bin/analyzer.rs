@@ -5,7 +5,7 @@ use kdam::{tqdm, BarExt};
 use log::LevelFilter;
 use stderrlog::Timestamp;
 
-use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
+use analyzer::{AnalyzerOpts, BufferedAnalyzer, ContentKind, LabelSmoother};
 use codec::Decoder;
 
 const BUFFER_SIZE: usize = 2 * 1024;
@@ -26,9 +26,11 @@ fn main() -> anyhow::Result<()> {
 
     let decoder = Decoder::try_from(input)?;
 
+    BufferedAnalyzer::warmup();
+
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(900), Duration::from_millis(0)),
-        false,
+        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(500)),
+        AnalyzerOpts::ReportSlowProcessing | AnalyzerOpts::ShowBufferStatistic,
     );
 
     let mut buf = Vec::with_capacity(BUFFER_SIZE);
