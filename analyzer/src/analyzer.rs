@@ -166,7 +166,7 @@ fn processing_worker(
         rate.start();
 
         input_queue.push_back(frame.clone());
-        samples_queue.extend(resample_16k_mono_s16_frame(frame)?.into_iter());
+        samples_queue.extend(resample_16k_mono_s16_frame(frame)?);
 
         if samples_queue.len() >= FRAME_WIDTH {
             let samples = samples_queue

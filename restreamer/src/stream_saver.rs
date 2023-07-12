@@ -31,8 +31,8 @@ const BASE_PATH: &str = "./recordings";
 fn paths() -> (PathBuf, PathBuf) {
     let now = Local::now().format("%Y%m%d-%H%M%S");
     (
-        Path::new(BASE_PATH).join(format!("{now}.original.ogg")),
-        Path::new(BASE_PATH).join(format!("{now}.processed.ogg")),
+        Path::new(BASE_PATH).join(format!("{now}.original.aac")),
+        Path::new(BASE_PATH).join(format!("{now}.processed.aac")),
     )
 }
 
@@ -106,7 +106,7 @@ fn start_worker(
 
     let mut output = {
         let writer = BufWriter::new(File::create(destination.clone())?);
-        Encoder::opus(codec_params, writer)?
+        Encoder::aac(codec_params, writer)?
     };
 
     std::thread::spawn(move || {

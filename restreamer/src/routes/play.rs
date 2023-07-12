@@ -2,20 +2,19 @@ use std::io::{Read, Write};
 use std::time::Duration;
 
 use async_stream::stream;
-use axum::routing::get;
-use axum::Router;
 use axum::{
     body::StreamBody,
     extract::{Query, State},
-    http::header,
+    http::header::{self},
     response::IntoResponse,
+    routing::get,
+    Router, TypedHeader,
 };
-use codec::dsp::CrossFader;
 use futures::Stream;
 
 use analyzer::{BufferedAnalyzer, LabelSmoother};
 use codec::{
-    dsp::{LinearCrossFade, ParabolicCrossFade},
+    dsp::{CrossFader, LinearCrossFade, ParabolicCrossFade},
     AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
 };
 
@@ -25,11 +24,14 @@ use play_params::{PlayAction, PlayParams};
 mod mixer;
 use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
+use crate::accept_header::Accept;
 use crate::args::Args;
 use crate::{
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
 };
+
+const OUTPUT_MIME: &str = "audio/aac";
 
 #[derive(Clone)]
 struct PlayState {
@@ -45,6 +47,7 @@ pub fn router(terminator: Terminator, args: Args) -> Router {
 
 #[allow(clippy::unused_async)]
 async fn serve(
+    TypedHeader(accept): TypedHeader<Accept>,
     Query(params): Query<PlayParams>,
     State(state): State<PlayState>,
 ) -> impl IntoResponse {
@@ -54,8 +57,11 @@ async fn serve(
         params.action.as_ref().unwrap_or(&PlayAction::Passthrough)
     );
 
+    log::info!("Client accepts: {accept}");
+    log::info!("Server serves: {OUTPUT_MIME}");
+
     let headers = [
-        (header::CONTENT_TYPE, "audio/ogg"),
+        (header::CONTENT_TYPE, OUTPUT_MIME),
         (header::TRANSFER_ENCODING, "chunked"),
     ];
 
@@ -115,17 +121,15 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     let input = unstreamer::Unstreamer::open(&params.source)?;
 
-    let mut decoder = Decoder::try_from(input)?;
-    let first_frame = decoder.next().unwrap()?;
-    let codec_params = decoder
-        .codec_params()
-        .with_samples_per_frame(first_frame.samples());
+    let decoder = Decoder::try_from(input)?;
+    let codec_params = decoder.codec_params();
     log::info!("Input media info {codec_params:?}");
 
-    let mut encoder = Encoder::opus(codec_params, writer)?;
+    let mut encoder = Encoder::aac(codec_params, writer)?;
     log::info!("Output media info {:?}", encoder.codec_params());
 
     let sample_audio_frames = prepare_sample_audio(codec_params)?;
+
     let mut stream_saver = StreamSaver::new(state.args.is_recording_enabled(), codec_params)?;
 
     let mut analyzer = BufferedAnalyzer::new(
@@ -152,7 +156,6 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     for frame in decoder {
         let frame = frame?;
-
         if let Some((kind, frame)) = analyzer.push(frame.clone())? {
             stream_saver.push(Destination::Original, frame.clone());
 

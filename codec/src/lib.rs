@@ -28,6 +28,7 @@ mod encoder;
 pub use encoder::Encoder;
 
 mod resampler;
+use log::Level;
 pub use resampler::{Resampler, ResamplingDecoder};
 
 mod sample_format;
@@ -43,6 +44,27 @@ pub use pts::Pts;
 
 pub fn suppress_ffmpeg_log() {
     set_log_callback(|_, _| {});
+}
+
+pub fn configure_ffmpeg_log() {
+    set_log_callback(|level, message| {
+        let level = match level {
+            // Quiet
+            -8 => return,
+            // FFMpeg is going to crash.
+            0 => panic!("FFMPEG panics: {}", message),
+            // PANIC and ERROR
+            8 | 16 => Level::Error,
+            24 => Level::Warn,
+            32 => Level::Info,
+            // VERBOSE
+            40 => Level::Debug,
+            // DEBUG
+            48 => Level::Trace,
+            _ => unreachable!("Unknown log level {} {}", level, message),
+        };
+        log::log!(level, "FFMPEG: {}", message);
+    });
 }
 
 pub fn resample_16k_mono_s16_stream<R: Read>(input: R) -> anyhow::Result<Vec<i16>> {
@@ -97,8 +119,6 @@ pub fn resample_16k_mono_s16_stream<R: Read>(input: R) -> anyhow::Result<Vec<i16
 }
 
 pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
-    // let orig = frame.samples();
-
     let mut output: Vec<i16> = vec![];
 
     let mut resampler = AudioResampler::builder()
@@ -123,8 +143,6 @@ pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>
     while let Some(frame) = resampler.take()? {
         output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
     }
-
-    // eprintln!("\nSAMPLES orig={orig} resampled={}", output.len());
 
     Ok(output)
 }

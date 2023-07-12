@@ -34,7 +34,7 @@ mod tests {
     fn frame_with_content(content: f32) -> AudioFrame {
         let mut frame = empty_frame().into_mut();
 
-        for plane in frame.planes_mut().iter_mut() {
+        for plane in &mut *frame.planes_mut() {
             cast_slice_mut(plane.data_mut())[0] = content;
         }
 
@@ -72,7 +72,7 @@ mod tests {
             let mut samples =
                 Vec::with_capacity(self.samples() / 4 * self.channel_layout().channels() as usize);
 
-            for plane in self.planes().iter() {
+            for plane in &*self.planes() {
                 samples.extend_from_slice(&cast_slice(plane.data())[..self.samples() / 4]);
             }
 

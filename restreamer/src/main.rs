@@ -3,21 +3,23 @@
 use std::net::SocketAddr;
 use std::time::Instant;
 
-use analyzer::BufferedAnalyzer;
-use args::Args;
-use axum::routing::get_service;
-use axum::{Router, Server};
+use axum::{routing::get_service, Router, Server};
 use clap::Parser;
 use log::LevelFilter;
 use stderrlog::Timestamp;
 use tower_http::services::ServeDir;
 
-mod args;
-mod terminate;
-use terminate::Terminator;
+use analyzer::BufferedAnalyzer;
+use args::Args;
+use codec::configure_ffmpeg_log;
 
+mod accept_header;
+mod args;
 mod routes;
 mod stream_saver;
+mod terminate;
+
+use terminate::Terminator;
 
 #[tokio::main]
 async fn main() {
@@ -63,6 +65,7 @@ fn configure_logger(args: &Args) {
         .show_level(false)
         .module("analyzer::analyzer")
         .module("analyzer::smooth")
+        .module("codec")
         .module("codec::dsp::cross_fader")
         .module("restreamer")
         .module("restreamer::routes::play")
@@ -78,4 +81,6 @@ fn configure_logger(args: &Args) {
     }
 
     log.init().unwrap();
+
+    configure_ffmpeg_log();
 }

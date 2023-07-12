@@ -14,6 +14,9 @@ use crate::SampleFormat;
 static OPUS_SAMPLE_RATE: u32 = 48_000;
 static OPUS_SAMPLE_FORMAT: SampleFormat = SampleFormat::Flt;
 
+static AAC_SAMPLE_RATE: u32 = 44_100;
+static AAC_SAMPLE_FORMAT: SampleFormat = SampleFormat::FltPlanar;
+
 #[non_exhaustive]
 pub struct Encoder<T> {
     encoder: AudioEncoder,
@@ -36,6 +39,37 @@ impl<W: Write> Encoder<W> {
         let muxer = muxer_builder.build(
             IO::from_write_stream(output),
             OutputFormat::find_by_name("ogg").expect("output format"),
+        )?;
+
+        let target = {
+            let mut params = CodecParams::from(&encoder.codec_parameters());
+            params.samples_per_frame = encoder.samples_per_frame();
+            params
+        };
+
+        let resampler = Resampler::new(params, target);
+
+        Ok(Self {
+            encoder,
+            muxer,
+            resampler,
+        })
+    }
+
+    pub fn aac(params: CodecParams, output: W) -> anyhow::Result<Self> {
+        let encoder = AudioEncoder::builder("aac")?
+            .sample_rate(AAC_SAMPLE_RATE)
+            .sample_format(AAC_SAMPLE_FORMAT.into())
+            .bit_rate(params.bit_rate)
+            .channel_layout(params.channel_layout())
+            .build()?;
+
+        let mut muxer_builder = Muxer::builder();
+        muxer_builder.add_stream(&encoder.codec_parameters().into())?;
+
+        let muxer = muxer_builder.build(
+            IO::from_write_stream(output),
+            OutputFormat::guess_from_file_name("file.aac").expect("Output format for AAC"),
         )?;
 
         let target = {

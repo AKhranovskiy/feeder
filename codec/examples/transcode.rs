@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     let input = args().nth(1).expect("Expects input file");
 
     let decoder = Decoder::try_from(BufReader::new(File::open(input)?))?;
-    let mut encoder = Encoder::opus(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
+    let mut encoder = Encoder::aac(decoder.codec_params(), BufWriter::new(std::io::stdout()))?;
 
     for frame in decoder {
         encoder.push(frame?)?;
