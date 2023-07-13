@@ -26,7 +26,7 @@ pub(crate) const DRAIN_DURATION: Duration = Duration::from_millis(100);
 
 impl BufferedAnalyzer {
     pub fn warmup() {
-        Classifier::new().expect("Empty model");
+        Classifier::check().expect("Check succeed");
     }
 
     #[must_use]

@@ -1,0 +1,4 @@
+keras==2.12
+tensorflow==2.12.0
+tensorflow-io==0.32.0
+scikit-learn==1.3.0

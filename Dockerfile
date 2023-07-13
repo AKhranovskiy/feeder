@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY . .
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    python3-dev libavutil-dev libavcodec-dev libavformat-dev libswscale-dev libaubio-dev \
+    python3-dev libavutil-dev libavcodec-dev libavformat-dev libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install --path restreamer
@@ -22,7 +22,7 @@ WORKDIR /app
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
+COPY requirements.docker.txt requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
@@ -30,7 +30,7 @@ RUN pip install -r requirements.txt
 FROM python:3.11-slim-bookworm as final
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y ffmpeg libaubio5 \
+    && apt-get install --no-install-recommends -y ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

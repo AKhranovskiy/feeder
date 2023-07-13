@@ -4,15 +4,12 @@ use numpy::IntoPyArray;
 use pyo3::types::PyModule;
 use pyo3::{Py, PyAny, Python};
 
-use crate::types::{Data, Labels, PredictedLabels, PyModel};
+use crate::types::{Data, PredictedLabels, PyModel};
 
-#[allow(dead_code)]
 pub(crate) struct PyVTable {
-    define: Py<PyAny>,
+    check: Py<PyAny>,
     load: Py<PyAny>,
     predict: Py<PyAny>,
-    save: Py<PyAny>,
-    train: Py<PyAny>,
 }
 
 impl PyVTable {
@@ -29,11 +26,9 @@ impl PyVTable {
                         |name: &str| source.getattr(name).expect("Attribute {name} is loaded");
 
                     PyVTable {
-                        define: attr("define_model").into(),
+                        check: attr("check").into(),
                         load: attr("load_model").into(),
                         predict: attr("predict").into(),
-                        save: attr("save_model").into(),
-                        train: attr("train_model").into(),
                     }
                 })
             };
@@ -41,19 +36,15 @@ impl PyVTable {
         &PYVTABLE
     }
 
-    pub(crate) fn define() -> anyhow::Result<PyModel> {
-        Python::with_gil(|py| anyhow::Ok(Self::get().define.as_ref(py).call0()?.into()))
+    pub(crate) fn check() -> anyhow::Result<()> {
+        Python::with_gil(|py| {
+            Self::get().check.as_ref(py).call0()?;
+            Ok(())
+        })
     }
 
     pub(crate) fn load(path: &str) -> anyhow::Result<PyModel> {
         Python::with_gil(|py| anyhow::Ok(Self::get().load.as_ref(py).call1((path,))?.into()))
-    }
-
-    pub(crate) fn save(model: &PyModel, path: &str) -> anyhow::Result<()> {
-        Python::with_gil(|py| {
-            Self::get().save.as_ref(py).call1((model, path))?;
-            anyhow::Ok(())
-        })
     }
 
     pub(crate) fn predict(model: &PyModel, data: &Data) -> anyhow::Result<PredictedLabels> {
@@ -64,41 +55,16 @@ impl PyVTable {
                 .map(|x| f32::from(x) / 32768.0)
                 .collect::<Vec<_>>()
                 .into_pyarray(py);
+
             let model = model.as_ref(py);
+
             let pyarray: &numpy::PyArray2<f32> = Self::get()
                 .predict
                 .as_ref(py)
                 .call1((model, data))?
                 .extract()?;
-            Ok(pyarray.readonly().as_array().to_owned())
-        })
-    }
 
-    pub(crate) fn train(
-        model: &PyModel,
-        data: &Data,
-        labels: &Labels,
-        epochs: u32,
-        batch: u32,
-    ) -> anyhow::Result<PyModel> {
-        Python::with_gil(|py| {
-            anyhow::Ok(
-                Self::get()
-                    .train
-                    .as_ref(py)
-                    .call1((
-                        model,
-                        data.iter()
-                            .copied()
-                            .map(|x| f32::from(x) / 32768.0)
-                            .collect::<Vec<_>>()
-                            .into_pyarray(py),
-                        labels.clone().into_pyarray(py),
-                        epochs,
-                        batch,
-                    ))?
-                    .extract()?,
-            )
+            Ok(pyarray.readonly().as_array().to_owned())
         })
     }
 }
