@@ -1,10 +1,10 @@
 import argparse
 from typing import NoReturn
 
-import config
+import configurations
 
 
-def parse_train() -> config.TrainConfig | NoReturn:
+def parse_train() -> configurations.TrainConfig | NoReturn:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "config", choices=["amt", "mo", "at"], help="Model configuration"
@@ -14,17 +14,17 @@ def parse_train() -> config.TrainConfig | NoReturn:
 
     match args.config:
         case "amt":
-            return config.AdvertMusicOrTalkConfig(
+            return configurations.AdvertMusicOrTalkConfig(
                 model_name="adbanda_amt",
                 dataset_root=args.dataset_root,
             )
         case "mo":
-            return config.MusicOrOtherConfig(
+            return configurations.MusicOrOtherConfig(
                 model_name="adbanda_mo",
                 dataset_root=args.dataset_root,
             )
         case "at":
-            return config.AdvertOrTalkConfig(
+            return configurations.AdvertOrTalkConfig(
                 model_name="adbanda_at",
                 dataset_root=args.dataset_root,
             )
@@ -32,7 +32,7 @@ def parse_train() -> config.TrainConfig | NoReturn:
             assert False, "Should never get here"
 
 
-def parse_predict() -> config.PredictionConfig | NoReturn:
+def parse_predict() -> configurations.PredictionConfig | NoReturn:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "config", choices=["amt", "mo", "at"], help="Model configuration"
@@ -43,20 +43,20 @@ def parse_predict() -> config.PredictionConfig | NoReturn:
     cfg = None
     match args.config:
         case "amt":
-            cfg = config.AdvertMusicOrTalkConfig(
+            cfg = configurations.AdvertMusicOrTalkConfig(
                 model_name="adbanda_amt",
             )
         case "mo":
-            cfg = config.MusicOrOtherConfig(
+            cfg = configurations.MusicOrOtherConfig(
                 model_name="adbanda_mo",
             )
         case "at":
-            cfg = config.AdvertOrTalkConfig(
+            cfg = configurations.AdvertOrTalkConfig(
                 model_name="adbanda_at",
             )
         case _:
             assert False, "Should never get here"
 
-    return config.PredictionConfig(
+    return configurations.PredictionConfig(
         model_name=cfg.model_name, class_names=cfg.class_names, input=args.input
     )
