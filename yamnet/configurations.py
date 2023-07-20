@@ -35,9 +35,16 @@ def combine_datasets(
     num_classes = len(model_config.classes)
 
     def label_embeddings(embeddings: tf.data.Dataset, label: int) -> tf.data.Dataset:
-        return embeddings.map(
-            lambda x: (x, tf.one_hot(tf.repeat(label, tf.shape(x)[0]), num_classes)),
-            num_parallel_calls=tf.data.AUTOTUNE,
+        return (
+            embeddings.batch(64)
+            .prefetch(tf.data.AUTOTUNE)
+            .map(
+                lambda x: (
+                    x,
+                    tf.one_hot(tf.repeat(label, tf.shape(x)[0]), num_classes),
+                ),
+                num_parallel_calls=tf.data.AUTOTUNE,
+            )
         )
 
     def concat(data: Sequence[tf.data.Dataset]) -> tf.data.Dataset:
@@ -123,3 +130,11 @@ class TrainConfig:
 class PredictionConfig:
     model_config: ModelConfig
     input: str
+
+    @property
+    def model_name(self) -> str:
+        return self.model_config.name
+
+    @property
+    def class_names(self) -> list[str]:
+        return self.model_config.classes

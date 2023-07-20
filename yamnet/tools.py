@@ -12,7 +12,7 @@ class LayerHyperparameters:
     dropout: float | None = None
 
     def __str__(self) -> str:
-        dropout = "" if self.dropout is None else f", dropout={self.dropout}"
+        dropout = "" if self.dropout is None else f", dropout={self.dropout:.3e}"
         return f"units={self.units}{dropout}"
 
 
@@ -49,18 +49,6 @@ def build_model(config: TrainConfig, hp: ModelHyperparameters):
 
         if layer.dropout is not None:
             x = keras.layers.Dropout(layer.dropout, name=f"dropout_{i}")(x)
-
-    # x = keras.layers.Dense(256, activation="relu", name="dense_1")(inputs)
-    # x = keras.layers.Dropout(0.15, name="dropout_1")(x)
-
-    # x = keras.layers.Dense(384, activation="relu", name="dense_2")(x)
-    # x = keras.layers.Dropout(0.2, name="dropout_2")(x)
-
-    # x = keras.layers.Dense(192, activation="relu", name="dense_3")(x)
-    # x = keras.layers.Dropout(0.25, name="dropout_3")(x)
-
-    # x = keras.layers.Dense(384, activation="relu", name="dense_4")(x)
-    # x = keras.layers.Dropout(0.2, name="dropout_4")(x)
 
     outputs = keras.layers.Dense(
         config.num_classes, activation=hp.output_activation, name="ouput"
@@ -165,21 +153,6 @@ HP_ORIG = ModelHyperparameters(
     learning_rate=2e-5,
 )
 
-"""
-units=64, droupout=0.06936726288431967
-units=640, droupout=0.009831974852189196
-units=512, droupout=0.2722492738414498
-layer_activation=relu, output_activation=softmax, learning_rate=0.00030162274543822453
-"""
-"""
-units=896, droupout=0.0830980980088495
-units=704, droupout=0.1126367950060339
-units=1024, droupout=0.05630244804326629
-units=512, droupout=0.0742384384236275
-units=32, droupout=0.0
-layer_activation=relu, output_activation=softmax, learning_rate=3.063028198164177e-05
-
-"""
 HP_BEST_ATM = ModelHyperparameters(
     layers=[
         LayerHyperparameters(units=64, dropout=0.069),
@@ -189,4 +162,17 @@ HP_BEST_ATM = ModelHyperparameters(
     layer_activation="relu",
     output_activation="softmax",
     learning_rate=0.0003,
+)
+
+HP_SECOND_ATM = ModelHyperparameters(
+    layers=[
+        LayerHyperparameters(units=896, dropout=0.083),
+        LayerHyperparameters(units=704, dropout=0.113),
+        LayerHyperparameters(units=1024, dropout=0.056),
+        LayerHyperparameters(units=512, dropout=0.074),
+        LayerHyperparameters(units=32),
+    ],
+    layer_activation="relu",
+    output_activation="softmax",
+    learning_rate=3e-05,
 )
