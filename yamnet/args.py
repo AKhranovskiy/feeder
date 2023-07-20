@@ -14,19 +14,19 @@ def parse_train() -> configurations.TrainConfig | NoReturn:
 
     match args.config:
         case "amt":
-            return configurations.AdvertMusicOrTalkConfig(
-                model_name="adbanda_amt",
-                dataset_root=args.dataset_root,
+            return configurations.TrainConfig(
+                configurations.AMT_MODEL,
+                data_dir=args.dataset_root,
             )
         case "mo":
-            return configurations.MusicOrOtherConfig(
-                model_name="adbanda_mo",
-                dataset_root=args.dataset_root,
+            return configurations.TrainConfig(
+                configurations.MO_MODEL,
+                data_dir=args.dataset_root,
             )
         case "at":
-            return configurations.AdvertOrTalkConfig(
-                model_name="adbanda_at",
-                dataset_root=args.dataset_root,
+            return configurations.TrainConfig(
+                configurations.AT_MODEL,
+                data_dir=args.dataset_root,
             )
         case _:
             assert False, "Should never get here"
@@ -40,23 +40,24 @@ def parse_predict() -> configurations.PredictionConfig | NoReturn:
     parser.add_argument("input", type=str, help="WAV file for prediction")
     args = parser.parse_args()
 
-    cfg = None
     match args.config:
         case "amt":
-            cfg = configurations.AdvertMusicOrTalkConfig(
-                model_name="adbanda_amt",
+            return configurations.PredictionConfig(
+                model_config=configurations.AMT_MODEL, input=args.input
             )
         case "mo":
-            cfg = configurations.MusicOrOtherConfig(
-                model_name="adbanda_mo",
+            return configurations.PredictionConfig(
+                model_config=configurations.MO_MODEL, input=args.input
             )
         case "at":
-            cfg = configurations.AdvertOrTalkConfig(
-                model_name="adbanda_at",
+            return configurations.PredictionConfig(
+                model_config=configurations.AT_MODEL, input=args.input
             )
         case _:
             assert False, "Should never get here"
 
-    return configurations.PredictionConfig(
-        model_name=cfg.model_name, class_names=cfg.class_names, input=args.input
-    )
+
+def parse_embeddings() -> str:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset_root", type=str, help="Dataset root")
+    return parser.parse_args().dataset_root

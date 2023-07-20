@@ -5,14 +5,9 @@ from tensorflow import keras
 
 import args
 import tools
-import util
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-tf.get_logger().setLevel("ERROR")
 
 config = args.parse_train()
 
-# Set all random seeds in order to get reproducible results
 keras.utils.set_random_seed(config.seed)
 
 print(f"Training model {config.model_name}")
@@ -20,16 +15,9 @@ print(f"Training model {config.model_name}")
 print("Loading YAMNET model")
 yamnet_model = tf.saved_model.load("models/yamnet")
 
-print("Prepare dataset")
-
-print(f"Training dataset size: {len(config.train_dataset)}")
-print(f"Validation dataset size: {len(config.validation_dataset)}")
-
-(train_ds, valid_ds) = util.prepare_datasets(config, yamnet_model)
-
 keras.backend.clear_session()
 
-model = tools.build_model(config, tools.HP_BEST)
+model = tools.build_model(config, tools.HP_BEST_ATM)
 
 model.summary()
 
@@ -48,10 +36,14 @@ tensorboard_cb = keras.callbacks.TensorBoard(
 
 callbacks = [early_stopping_cb, model_checkpoint_cb, tensorboard_cb]
 
+print(config.train_dataset)
+# <_TakeDataset element_spec=(TensorSpec(shape=(1024,), dtype=tf.float32, name=None), TensorSpec(shape=(1024, 3), dtype=tf.float32, name=None))>
+
+exit(0)
 history = model.fit(
-    train_ds,
+    config.train_dataset,
     epochs=config.epochs,
-    validation_data=valid_ds,
+    validation_data=config.validation_dataset,
     callbacks=callbacks,
     # class_weight=class_weight,
     verbose=1,  # type: ignore

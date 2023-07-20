@@ -1,14 +1,8 @@
-import os
-
 import tensorflow as tf
 from tensorflow import keras
 
 import args
-import util
 from tools import model_hypertuner  # type: ignore
-
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-tf.get_logger().setLevel("ERROR")
 
 config = args.parse_train()
 
@@ -20,19 +14,40 @@ print(f"Hypertune model {config.model_name}")
 print("Loading YAMNET model")
 yamnet_model = tf.saved_model.load("models/yamnet")
 
-print("Prepare dataset")
-
-print(f"Training dataset size: {len(config.train_dataset)}")
-print(f"Validation dataset size: {len(config.validation_dataset)}")
-
-(train_ds, valid_ds) = util.prepare_datasets(config, yamnet_model)
-
 keras.backend.clear_session()
 
 tuner = model_hypertuner(config)
 tuner.search_space_summary()
 
-tuner.search(train_ds, epochs=5, validation_data=valid_ds, verbose=1)
+
+class LowValAccuracyCallback(tf.keras.callbacks.Callback):
+    def __init__(self, min_val_accuracy: float = 0.80):
+        self.min_val_accuracy = min_val_accuracy
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        acc = logs.get("val_accuracy")
+        if acc is None:
+            return
+
+        if acc >= self.min_val_accuracy:
+            return
+
+        print(
+            f"\n\nval_accuracy={acc:.3} is below threshold {self.min_val_accuracy:.3}"
+            + ", terminating training\n"
+        )
+        self.model.stop_training = True  # type: ignore
+
+
+# Half of dataset should be enough to estimate
+tuner.search(
+    config.train_dataset.take(len(config.train_dataset) / 2),
+    epochs=5,
+    validation_data=config.validation_dataset,
+    verbose=1,
+    callbacks=[LowValAccuracyCallback()],
+)
 tuner.results_summary(num_trials=2)
 
 best_models = tuner.get_best_models(num_models=2)
