@@ -14,7 +14,7 @@ class TrainParams:
 
 
 DEFAULT_TRAIN_PARAMS = TrainParams(
-    epochs=20, batch_size=64, validation_ratio=0.1, seed=1231239
+    epochs=6, batch_size=64, validation_ratio=0.1, seed=1231239
 )
 
 

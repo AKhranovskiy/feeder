@@ -1,10 +1,10 @@
 import os
 
-import args
 import tensorflow as tf
-import util
 from tensorflow import keras
 
+import args
+import util
 from tools import model_hypertuner  # type: ignore
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -33,7 +33,7 @@ tuner = model_hypertuner(config)
 tuner.search_space_summary()
 
 tuner.search(train_ds, epochs=5, validation_data=valid_ds, verbose=1)
-tuner.results_summary()
+tuner.results_summary(num_trials=2)
 
 best_models = tuner.get_best_models(num_models=2)
 
@@ -43,6 +43,6 @@ best_model.build(input_shape=(1024))
 best_model.summary()
 
 print("Best model #2")
-best_model = best_models[0]
+best_model = best_models[1]
 best_model.build(input_shape=(1024))
 best_model.summary()

@@ -1,11 +1,11 @@
 import os
 
-import args
 import tensorflow as tf
-import util
 from tensorflow import keras
 
-import yamnet.tools as tools
+import args
+import tools
+import util
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 tf.get_logger().setLevel("ERROR")
@@ -29,7 +29,7 @@ print(f"Validation dataset size: {len(config.validation_dataset)}")
 
 keras.backend.clear_session()
 
-model = tools.build_model(config, tools.HP_ORIG)
+model = tools.build_model(config, tools.HP_BEST)
 
 model.summary()
 

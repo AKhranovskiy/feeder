@@ -1,14 +1,15 @@
 from dataclasses import dataclass
 
 import keras_tuner
-from configurations import TrainConfig
 from tensorflow import keras
+
+from configurations import TrainConfig
 
 
 @dataclass
 class LayerHyperparameters:
     units: int
-    dropout: float | None
+    dropout: float | None = None
 
     def __str__(self) -> str:
         return f"units={self.units}, droupout={self.dropout}"
@@ -43,7 +44,7 @@ def build_model(config: TrainConfig, hp: ModelHyperparameters):
 
         x = keras.layers.Dense(
             layer.units, activation=hp.layer_activation, name=f"dense_{i}"
-        )(inputs)
+        )(x)
 
         if layer.dropout is not None:
             x = keras.layers.Dropout(layer.dropout, name=f"dropout_{i}")(x)
@@ -71,6 +72,8 @@ def build_model(config: TrainConfig, hp: ModelHyperparameters):
         loss=keras.losses.CategoricalCrossentropy(),
         metrics=["accuracy", keras.metrics.AUC(name="auc")],
     )
+
+    print(model.summary())
 
     return model
 
@@ -165,13 +168,18 @@ HP_ORIG = ModelHyperparameters(
     learning_rate=2e-5,
 )
 
-HP_AT = ModelHyperparameters(
+HP_BEST = ModelHyperparameters(
     layers=[
-        LayerHyperparameters(units=288, dropout=0.1),
-        LayerHyperparameters(units=672, dropout=None),
-        LayerHyperparameters(units=736, dropout=0.2678),
+        LayerHyperparameters(units=608, dropout=0.412),
+        LayerHyperparameters(units=544, dropout=0.120),
+        LayerHyperparameters(units=544),
+        LayerHyperparameters(units=832, dropout=0.100),
+        LayerHyperparameters(units=192, dropout=0.100),
+        LayerHyperparameters(units=768),
+        LayerHyperparameters(units=352, dropout=0.100),
+        LayerHyperparameters(units=320),
     ],
     layer_activation="relu",
     output_activation="softmax",
-    learning_rate=0.0002,
+    learning_rate=0.00029,
 )
