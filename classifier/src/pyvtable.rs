@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use lazy_static::lazy_static;
 
 use numpy::IntoPyArray;
@@ -7,7 +9,7 @@ use pyo3::{Py, PyAny, Python};
 use crate::types::{Data, PredictedLabels, PyModel};
 
 pub(crate) struct PyVTable {
-    check: Py<PyAny>,
+    num_gpus: Py<PyAny>,
     load: Py<PyAny>,
     predict: Py<PyAny>,
 }
@@ -26,7 +28,7 @@ impl PyVTable {
                         |name: &str| source.getattr(name).expect("Attribute {name} is loaded");
 
                     PyVTable {
-                        check: attr("check").into(),
+                        num_gpus: attr("num_gpus").into(),
                         load: attr("load_model").into(),
                         predict: attr("predict").into(),
                     }
@@ -36,15 +38,17 @@ impl PyVTable {
         &PYVTABLE
     }
 
-    pub(crate) fn check() -> anyhow::Result<()> {
-        Python::with_gil(|py| {
-            Self::get().check.as_ref(py).call0()?;
-            Ok(())
-        })
+    pub(crate) fn num_gpus() -> anyhow::Result<u32> {
+        Python::with_gil(|py| Ok(Self::get().num_gpus.as_ref(py).call0()?.extract()?))
     }
 
-    pub(crate) fn load(path: &str) -> anyhow::Result<PyModel> {
-        Python::with_gil(|py| anyhow::Ok(Self::get().load.as_ref(py).call1((path,))?.into()))
+    pub(crate) fn load<P>(path: &P) -> anyhow::Result<PyModel>
+    where
+        P: AsRef<Path>,
+    {
+        Python::with_gil(|py| {
+            anyhow::Ok(Self::get().load.as_ref(py).call1((path.as_ref(),))?.into())
+        })
     }
 
     pub(crate) fn predict(model: &PyModel, data: &Data) -> anyhow::Result<PredictedLabels> {

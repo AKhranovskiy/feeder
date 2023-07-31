@@ -7,18 +7,18 @@ exclude = ["mfcc", "mongodb2sqlite", "tools"]
 
 [workspace.dependencies]
 ac-ffmpeg = "0.18.1"
-anyhow = "1.0.71"
+anyhow = "1.0.72"
 async-stream = "0.3.5"
-axum = { version = "0.6.18", features = ["headers"] }
+axum = { version = "0.6.19", features = ["headers"] }
 bytemuck = "1.13.1"
 chrono = "0.4.26"
-clap = { version = "4.3.11", features = ["derive"] }
+clap = { version = "4.3.19", features = ["derive"] }
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 enumflags2 = "0.7.7"
 flume = { version = "0.10.14", default-features = false }
 futures = { version = "0.3.28" }
 hls_m3u8 = "0.4.1"
-kdam = "0.3.0"
+kdam = "0.4.0"
 lazy_static = "1.4.0"
 log = "0.4.19"
 mime = "0.3.17"
@@ -29,7 +29,7 @@ os_pipe = "1.1.4"
 pyo3 = { version = "0.19.1", features = ["auto-initialize"] }
 rand = { version = "0.8.5", features = ["small_rng"] }
 ringbuf = "0.3.3"
-serde = { version = "1.0.171", features = ["derive"] }
+serde = { version = "1.0.179", features = ["derive"] }
 stderrlog = "0.5.4"
 tokio = { version = "1.29.1", features = [
     "macros",
@@ -38,7 +38,7 @@ tokio = { version = "1.29.1", features = [
     "signal",
 ] }
 tower = "0.4.13"
-tower-http = { version = "0.4.1", features = ["full"] }
+tower-http = { version = "0.4.3", features = ["full"] }
 ureq = { version = "2.7.1", features = ["json"] }
 url = { version = "2.4.0", features = ["serde"] }
 

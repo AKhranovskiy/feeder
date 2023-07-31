@@ -14,8 +14,8 @@ tf.get_logger().setLevel("ERROR")
 YAMNET = tf.saved_model.load("models/yamnet")
 
 
-def check():
-    print(tf.config.list_physical_devices("GPU"))
+def num_gpus():
+    return len(tf.config.list_physical_devices("GPU"))
 
 
 def load_model(name):

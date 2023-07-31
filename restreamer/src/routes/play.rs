@@ -155,25 +155,32 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
     };
 
     for frame in decoder {
-        let frame = frame?;
-        if let Some((kind, frame)) = analyzer.push(frame.clone())? {
-            stream_saver.push(Destination::Original, frame.clone());
-
-            let frame = mixer.push(kind, &frame);
-            let frame = entry.apply(&codec::silence_frame(&frame), &frame);
-            encoder.push(frame.clone())?;
-
-            stream_saver.push(Destination::Processed, frame);
-        }
-
         if state.terminator.is_terminated() {
             break;
         }
+
+        let frame = frame?;
+        stream_saver.push(Destination::Original, frame.clone());
+
+        analyzer.push(frame)?;
+
+        while let Some((kind, frame)) = analyzer.pop()? {
+            if state.terminator.is_terminated() {
+                break;
+            }
+
+            let frame = mixer.push(kind, &frame);
+            let frame = entry.apply(&codec::silence_frame(&frame), &frame);
+
+            stream_saver.push(Destination::Processed, frame.clone());
+
+            encoder.push(frame)?;
+        }
     }
 
-    encoder.flush()?;
-
     stream_saver.terminate();
+
+    encoder.flush()?;
 
     log::info!("Terminating analyzer");
 

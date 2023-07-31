@@ -14,10 +14,11 @@ pub struct LabelSmoother {
     ads_label: PredictedLabels,
     music_label: PredictedLabels,
     talk_label: PredictedLabels,
+    last: PredictedLabels,
 }
 
-const RATIO_THRESHOLD: f32 = 0.75;
-const ACCURACY_THRESHOLD: f32 = 0.70;
+const RATIO_THRESHOLD: f32 = 0.66;
+const ACCURACY_THRESHOLD: f32 = 0.60;
 
 impl LabelSmoother {
     #[must_use]
@@ -40,6 +41,7 @@ impl LabelSmoother {
             ads_label: PredictedLabels::from_shape_vec((1, 3), vec![1.0, 0.0, 0.0]).unwrap(),
             music_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
             talk_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 0.0, 1.0]).unwrap(),
+            last: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
         }
     }
 
@@ -64,19 +66,19 @@ impl LabelSmoother {
         let ads = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 0)] >= ACCURACY_THRESHOLD)
+            .filter(|x| x.argmax().unwrap_or((0, 0)).1 == 0)
             .count();
 
         let music = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 1)] >= ACCURACY_THRESHOLD)
+            .filter(|x| x.argmax().unwrap_or((0, 1)).1 == 1)
             .count();
 
         let talk = self
             .buffer
             .iter()
-            .filter(|x| x[(0, 0)] >= ACCURACY_THRESHOLD)
+            .filter(|x| x.argmax().unwrap_or((0, 2)).1 == 2)
             .count();
 
         let len = self.buffer.len() as f32;
@@ -95,15 +97,18 @@ impl LabelSmoother {
             self.buffer.pop_front();
         }
 
-        let (ads, _, talk) = self.get_ratio();
+        let (ads, music, talk) = self.get_ratio();
+
+        dbg!(ads, music, talk);
 
         if ads >= RATIO_THRESHOLD {
             Some(self.ads_label.clone())
+        } else if music >= RATIO_THRESHOLD {
+            Some(self.music_label.clone())
         } else if talk >= RATIO_THRESHOLD {
             Some(self.talk_label.clone())
         } else {
-            // Just music by default
-            Some(self.music_label.clone())
+            Some(self.last.clone())
         }
     }
 }

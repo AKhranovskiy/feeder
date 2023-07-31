@@ -1,11 +1,12 @@
 use std::io::Write;
 use std::time::Duration;
 
+use enumflags2::BitFlags;
 use kdam::{tqdm, BarExt};
 use log::LevelFilter;
 use stderrlog::Timestamp;
 
-use analyzer::{AnalyzerOpts, BufferedAnalyzer, ContentKind, LabelSmoother};
+use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use codec::Decoder;
 
 const BUFFER_SIZE: usize = 2 * 1024;
@@ -29,8 +30,8 @@ fn main() -> anyhow::Result<()> {
     BufferedAnalyzer::warmup();
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(500)),
-        AnalyzerOpts::ReportSlowProcessing | AnalyzerOpts::ShowBufferStatistic,
+        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(0)),
+        BitFlags::empty(),
     );
 
     let mut buf = Vec::with_capacity(BUFFER_SIZE);
@@ -55,14 +56,20 @@ fn main() -> anyhow::Result<()> {
 
     let mut prev_kind = ContentKind::Unknown;
     for frame in decoder {
-        if let Some((kind, frame)) = analyzer.push(frame?)? {
+        analyzer.push(frame?)?;
+    }
+
+    analyzer.flush()?;
+
+    while !analyzer.is_completed() {
+        while let Some((kind, frame)) = analyzer.pop()? {
             if prev_kind != kind {
                 eprintln!("{:?} {kind}", frame.pts());
                 prev_kind = kind;
             }
 
             if kind == ContentKind::Advertisement {
-                pb_ads.update(1);
+                pb_ads.update(1)?;
             }
 
             let k = match kind {
@@ -77,15 +84,15 @@ fn main() -> anyhow::Result<()> {
                 std::io::stdout().write_all(&buf)?;
                 buf.clear();
             }
-            pb_frames.update(1);
+            pb_frames.update(1)?;
         }
     }
 
     println!(
         "\nTotal {}, ads={} / {}%",
-        pb_frames.get_counter(),
-        pb_ads.get_counter(),
-        ((pb_ads.get_counter() as f64) / (pb_frames.get_counter() as f64) * 100.0).trunc() as u32
+        pb_frames.fmt_counter(),
+        pb_ads.fmt_counter(),
+        ((pb_ads.counter as f64) / (pb_frames.counter as f64) * 100.0).trunc() as u32
     );
     std::io::stdout().write_all(&buf)?;
 
