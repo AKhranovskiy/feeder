@@ -7,14 +7,14 @@ use std::{
     time::Duration,
 };
 
-use classifier::Classify;
+use classifier::{Classify, ClassifyModel};
 use enumflags2::BitFlags;
 use flume::TryRecvError;
 use ndarray_stats::QuantileExt;
 
 use codec::{resample_16k_mono_s16_frame, AudioFrame, FrameDuration, Timestamp};
 
-use crate::{rate::Rate, AnalyzerOpts, ContentKind, LabelSmoother};
+use crate::{amplify::Apmlify, rate::Rate, AnalyzerOpts, ContentKind, LabelSmoother};
 
 pub struct BufferedAnalyzer {
     frame_sender: flume::Sender<AudioFrame>,
@@ -31,6 +31,10 @@ pub struct BufferedAnalyzer {
 const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975s
 const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.1s
 pub(crate) const DRAIN_DURATION: Duration = Duration::from_millis(100);
+
+const MODEL: ClassifyModel = ClassifyModel::AO;
+// Amplification 2:5:0 does ~72% -> ~50% confidence reduction for Advertisments for AO model.
+const AMPLIFICATION: [f32; 3] = [2., 5., 0.];
 
 impl BufferedAnalyzer {
     pub fn warmup() {
@@ -50,8 +54,7 @@ impl BufferedAnalyzer {
         // Receive processing stats.
         let (worker_stats_sender, worker_stats_receiver) = flume::unbounded();
 
-        let classifier = classifier::create(classifier::ClassifyModel::TwoLevels, "./models")
-            .expect("Initialized classifier");
+        let classifier = classifier::create(MODEL, "./models").expect("Initialized classifier");
 
         let processing_flag = Arc::new(AtomicBool::new(false));
         let flag = processing_flag.clone();
@@ -220,11 +223,9 @@ fn processing_worker(
             let data = classifier::Data::from_shape_vec((1, FRAME_WIDTH), samples)?;
             let prediction = classifier.classify(&data)?;
 
-            dbg!(&prediction);
+            let prediction = prediction.amplified(&AMPLIFICATION);
 
             if let Some(smoothed) = smoother.push(prediction) {
-                dbg!(&smoothed);
-
                 let kind = match smoothed.argmax()?.1 {
                     0 => ContentKind::Advertisement,
                     1 => ContentKind::Music,

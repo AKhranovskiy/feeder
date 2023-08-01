@@ -77,3 +77,10 @@ HP_AT_BEST = ModelHyperparameters(
     output_activation="softmax",
     learning_rate=3.524e-04,
 )
+
+HP_AO_BEST = ModelHyperparameters(
+    layers=[LayerHyperparameters(units=128, dropout=2.522e-01)],
+    layer_activation="relu",
+    output_activation="softmax",
+    learning_rate=3.524e-04,
+)

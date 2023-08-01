@@ -1,8 +1,7 @@
 import args
 import tensorflow as tf
+from factory import build_hypertuner  # type: ignore
 from tensorflow import keras
-
-from tools import model_hypertuner  # type: ignore
 
 config = args.parse_train()
 
@@ -11,12 +10,12 @@ keras.utils.set_random_seed(config.seed)
 
 print(f"Hypertune model {config.model_name}")
 
-print("Loading YAMNET model")
-yamnet_model = tf.saved_model.load("models/yamnet")
+# print("Loading YAMNET model")
+# yamnet_model = tf.saved_model.load("models/yamnet")
 
 keras.backend.clear_session()
 
-tuner = model_hypertuner(config)
+tuner = build_hypertuner(config)
 tuner.search_space_summary()
 
 
@@ -40,13 +39,16 @@ class LowValAccuracyCallback(tf.keras.callbacks.Callback):
         self.model.stop_training = True  # type: ignore
 
 
+print({config.class_names[k]: config.class_weight[k] for k in config.class_weight})
+
 # Half of dataset should be enough to estimate
 tuner.search(
     config.train_dataset.take(int(0.5 * len(config.train_dataset))),
-    epochs=5,
+    epochs=4,
     validation_data=config.validation_dataset,
-    verbose=1,
     callbacks=[LowValAccuracyCallback()],
+    class_weight=config.class_weight,
+    verbose=1,  # type: ignore
 )
 tuner.results_summary(num_trials=2)
 

@@ -22,8 +22,9 @@ pub trait Classify: Send + Sync {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ClassifyModel {
-    OneLevel,
-    TwoLevels,
+    ATM,
+    MOAT,
+    AO,
 }
 
 pub fn create<P>(model: ClassifyModel, dir: P) -> anyhow::Result<Box<dyn Classify>>
@@ -31,8 +32,9 @@ where
     P: AsRef<Path>,
 {
     Ok(match model {
-        ClassifyModel::OneLevel => Box::new(AmtClassifier::load(dir)?),
-        ClassifyModel::TwoLevels => Box::new(MoatClassifer::load(dir)?),
+        ClassifyModel::ATM => Box::new(AmtClassifier::load(dir)?),
+        ClassifyModel::MOAT => Box::new(MoatClassifier::load(dir)?),
+        ClassifyModel::AO => Box::new(AoClassifier::load(dir)?),
     })
 }
 
@@ -58,12 +60,44 @@ impl Classify for AmtClassifier {
     }
 }
 
-struct MoatClassifer {
+struct AoClassifier {
+    model: Mutex<PyModel>,
+}
+
+impl AoClassifier {
+    fn load<P>(dir: P) -> anyhow::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        Ok(Self {
+            model: Mutex::new(PyVTable::load(&dir.as_ref().join("adbanda_ao"))?),
+        })
+    }
+}
+
+impl Classify for AoClassifier {
+    fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
+        let (ads, other) = {
+            let model = self.model.lock().unwrap();
+            let p = PyVTable::predict(&model, data)?;
+            assert_eq!(p.shape(), &[1, 2]);
+            (p[(0, 0)], p[(0, 1)])
+        };
+
+        // Ignore Talk
+        Ok(PredictedLabels::from_shape_vec(
+            (1, 3),
+            vec![ads, other, 0.0],
+        )?)
+    }
+}
+
+struct MoatClassifier {
     model_mo: Mutex<PyModel>,
     model_at: Mutex<PyModel>,
 }
 
-impl MoatClassifer {
+impl MoatClassifier {
     fn load<P>(dir: P) -> anyhow::Result<Self>
     where
         P: AsRef<Path>,
@@ -75,7 +109,7 @@ impl MoatClassifer {
     }
 }
 
-impl Classify for MoatClassifer {
+impl Classify for MoatClassifier {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
         let (music, other) = {
             let model = self.model_mo.lock().unwrap();

@@ -29,12 +29,15 @@ tensorboard_cb = keras.callbacks.TensorBoard(
 
 callbacks = [early_stopping_cb, model_checkpoint_cb, tensorboard_cb]
 
+class_weight = config.class_weight
+print({config.class_names[k]: class_weight[k] for k in class_weight})
+
 history = model.fit(
     config.train_dataset,
     epochs=config.epochs,
     validation_data=config.validation_dataset,
     callbacks=callbacks,
-    # class_weight=class_weight,
+    class_weight=class_weight,
     verbose=1,  # type: ignore
 )
 

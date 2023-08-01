@@ -6,6 +6,7 @@ mod analyzer;
 mod content_kind;
 mod rate;
 mod smooth;
+mod amplify;
 
 pub use analyzer::BufferedAnalyzer;
 pub use content_kind::ContentKind;

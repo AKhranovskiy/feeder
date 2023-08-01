@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
@@ -5,13 +6,20 @@ from typing import Sequence
 
 import dataset
 import tensorflow as tf
-from modelhp import HP_AT_BEST, HP_ATM_BEST, HP_MO_BEST, ModelHyperparameters
+from modelhp import (
+    HP_AO_BEST,
+    HP_AT_BEST,
+    HP_ATM_BEST,
+    HP_MO_BEST,
+    ModelHyperparameters,
+)
 
 
 class ModelType(Enum):
     AMT = "amt"
     MO = "mo"
     AT = "at"
+    AO = "ao"
 
 
 @dataclass
@@ -24,15 +32,23 @@ class ModelConfig:
     def name(self):
         return f"adbanda_{self.type.value}"
 
+    def copy(self, type=None, classes=None, hyperparams=None):
+        return ModelConfig(
+            type=type if type is not None else self.type,
+            classes=classes if classes is not None else self.classes,
+            hyperparams=hyperparams if hyperparams is not None else self.hyperparams,
+        )
+
 
 AMT_MODEL = ModelConfig(ModelType.AMT, ["advert", "music", "talk"], HP_ATM_BEST)
 MO_MODEL = ModelConfig(ModelType.MO, ["music", "other"], HP_MO_BEST)
 AT_MODEL = ModelConfig(ModelType.AT, ["advert", "talk"], HP_AT_BEST)
+AO_MODEL = ModelConfig(ModelType.AO, ["advert", "other"], HP_AO_BEST)
 
 
 def combine_datasets(
     model_config: ModelConfig, dataset: dataset.Dataset
-) -> tf.data.Dataset:
+) -> tuple[dict[int, float], tf.data.Dataset]:
     num_classes = len(model_config.classes)
 
     def label_embeddings(embeddings: tf.data.Dataset, label: int) -> tf.data.Dataset:
@@ -48,12 +64,17 @@ def combine_datasets(
             )
         )
 
-    def concat(data: Sequence[tf.data.Dataset]) -> tf.data.Dataset:
-        return reduce(
-            tf.data.Dataset.concatenate,  # type: ignore
-            (
-                label_embeddings(embeddings, label)
-                for (label, embeddings) in enumerate(data)
+    def concat(
+        data: Sequence[tf.data.Dataset],
+    ) -> tuple[dict[int, float], tf.data.Dataset]:
+        return (
+            {i: float(sum(map(len, data)) / len(d)) for i, d in enumerate(data)},
+            reduce(
+                tf.data.Dataset.concatenate,  # type: ignore
+                (
+                    label_embeddings(embeddings, label)
+                    for (label, embeddings) in enumerate(data)
+                ),
             ),
         )
 
@@ -64,6 +85,8 @@ def combine_datasets(
             return concat([dataset.music, dataset.adverts.concatenate(dataset.talk)])
         case ModelType.AT:
             return concat([dataset.adverts, dataset.talk])
+        case ModelType.AO:
+            return concat([dataset.adverts, dataset.music.concatenate(dataset.talk)])
         case _:
             assert False, "Should never get here"
 
@@ -91,12 +114,29 @@ class TrainConfig:
         self._train_params = train_params
         self._model_config = model_config
 
-        full_ds = combine_datasets(model_config, dataset.Dataset(data_dir))
+        (class_weight, full_ds) = combine_datasets(
+            model_config, dataset.Dataset(data_dir)
+        )
         full_ds = full_ds.shuffle(len(full_ds), seed=train_params.seed)
 
         split = int(len(full_ds) * (1 - train_params.validation_ratio))
         self._train_ds = full_ds.take(split)
         self._valid_ds = full_ds.skip(split)
+        self._class_weight = class_weight
+
+    def copy(self, model_config=None, train_params=None):
+        s = copy.copy(self)
+        s._model_config = (
+            model_config if model_config is not None else self.model_config
+        )
+        s._train_params = (
+            train_params if train_params is not None else self._train_params
+        )
+        return s
+
+    @property
+    def model_config(self) -> ModelConfig:
+        return self._model_config
 
     @property
     def model_name(self) -> str:
@@ -129,6 +169,10 @@ class TrainConfig:
     @property
     def hyperparameters(self) -> ModelHyperparameters:
         return self._model_config.hyperparams
+
+    @property
+    def class_weight(self) -> dict[int, float]:
+        return self._class_weight
 
 
 @dataclass

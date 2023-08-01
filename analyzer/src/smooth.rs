@@ -99,7 +99,7 @@ impl LabelSmoother {
 
         let (ads, music, talk) = self.get_ratio();
 
-        dbg!(ads, music, talk);
+        // dbg!((ads, music, talk));
 
         if ads >= RATIO_THRESHOLD {
             Some(self.ads_label.clone())

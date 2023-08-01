@@ -6,7 +6,7 @@ from tensorflow import keras
 
 def build_model(config: TrainConfig):
     hp = config.hyperparameters
-    print(f"Building model: {hp}")
+    print(f"Building model:\n{hp}")
 
     inputs = keras.layers.Input(shape=(1024), name="embedding")
     x = inputs
@@ -33,7 +33,7 @@ def build_model(config: TrainConfig):
         metrics=["accuracy", keras.metrics.AUC(name="auc")],
     )
 
-    print(model.summary())
+    # print(model.summary())
 
     return model
 
@@ -73,10 +73,8 @@ def build_hypertuner(config: TrainConfig):
         learning_rate = hp.Float("lr", min_value=1e-5, max_value=1e-2, sampling="log")
 
         return build_model(
-            TrainConfig(
-                model_config=ModelConfig(
-                    type=config.model_type,
-                    classes=config.class_names,
+            config.copy(
+                model_config=config.model_config.copy(
                     hyperparams=ModelHyperparameters(
                         layers,
                         layer_activation,  # type: ignore
@@ -84,8 +82,6 @@ def build_hypertuner(config: TrainConfig):
                         learning_rate,  # type: ignore
                     ),
                 ),
-                data_dir=config.data_dir,
-                train_params=config.train_params,
             )
         )
 
@@ -98,23 +94,3 @@ def build_hypertuner(config: TrainConfig):
         directory=f"/tmp/keras-tuner/{config.model_name}",
         project_name=config.model_name,
     )
-
-
-# This step takes a lot of time because it eagerly computes TF graph,
-# converting audio samples to embeddings.
-# print("Calculate class weights")
-# class_counts = train_ds.reduce(
-#     tf.zeros(shape=(len(config.class_names),), dtype=tf.int32),
-#     lambda acc, item: acc
-#     + tf.math.bincount(
-#         tf.cast(tf.math.argmax(item[1], axis=1), tf.int32),
-#         minlength=len(config.class_names),
-#     ),
-# )
-
-# class_weight = {
-#     i: float(tf.math.reduce_sum(class_counts).numpy() / class_counts[i].numpy())
-#     for i in range(len(class_counts))
-# }
-
-# print({config.class_names[k]: class_weight[k] for k in class_weight})
