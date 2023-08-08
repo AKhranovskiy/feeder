@@ -9,10 +9,10 @@ exclude = ["mfcc", "mongodb2sqlite", "tools"]
 ac-ffmpeg = "0.18.1"
 anyhow = "1.0.72"
 async-stream = "0.3.5"
-axum = { version = "0.6.19", features = ["headers"] }
+axum = { version = "0.6.20", features = ["headers"] }
 bytemuck = "1.13.1"
 chrono = "0.4.26"
-clap = { version = "4.3.19", features = ["derive"] }
+clap = { version = "4.3.21", features = ["derive"] }
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 enumflags2 = "0.7.7"
 flume = { version = "0.10.14", default-features = false }
@@ -26,10 +26,10 @@ ndarray = { version = "0.15.6", features = ["serde"] }
 ndarray-stats = "0.5.1"
 numpy = "0.19.0"
 os_pipe = "1.1.4"
-pyo3 = { version = "0.19.1", features = ["auto-initialize"] }
+pyo3 = { version = "0.19.2", features = ["auto-initialize"] }
 rand = { version = "0.8.5", features = ["small_rng"] }
 ringbuf = "0.3.3"
-serde = { version = "1.0.179", features = ["derive"] }
+serde = { version = "1.0.183", features = ["derive"] }
 stderrlog = "0.5.4"
 tokio = { version = "1.29.1", features = [
     "macros",

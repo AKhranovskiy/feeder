@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::time::Duration;
 
+use anyhow::anyhow;
 use async_stream::stream;
 use axum::{
     body::StreamBody,
@@ -121,8 +122,14 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     let input = unstreamer::Unstreamer::open(&params.source)?;
 
-    let decoder = Decoder::try_from(input)?;
-    let codec_params = decoder.codec_params();
+    let mut decoder = Decoder::try_from(input)?;
+    let codec_params = {
+        let first_frame = decoder.next().ok_or(anyhow!("No audio frame"))??;
+        decoder
+            .codec_params()
+            .with_samples_per_frame(first_frame.samples())
+    };
+
     log::info!("Input media info {codec_params:?}");
 
     let mut encoder = Encoder::aac(codec_params, writer)?;
