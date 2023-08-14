@@ -1,5 +1,5 @@
 import keras_tuner
-from configurations import ModelConfig, TrainConfig
+from configurations import TrainConfig
 from modelhp import LayerHyperparameters, ModelHyperparameters
 from tensorflow import keras
 

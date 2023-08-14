@@ -32,9 +32,10 @@ const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975s
 const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.1s
 pub(crate) const DRAIN_DURATION: Duration = Duration::from_millis(100);
 
-const MODEL: ClassifyModel = ClassifyModel::AO;
+const MODEL: ClassifyModel = ClassifyModel::AMT;
 // Amplification 2:5:0 does ~72% -> ~50% confidence reduction for Advertisments for AO model.
-const AMPLIFICATION: [f32; 3] = [2., 5., 0.];
+// Amplification 2:5:5 does ~75 -> ~55% confidence reduction for Advertisments for AMT model.
+const AMPLIFICATION: [f32; 3] = [0.25, 1., 1.];
 
 impl BufferedAnalyzer {
     #[must_use]
@@ -85,7 +86,7 @@ impl BufferedAnalyzer {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> anyhow::Result<Option<(ContentKind, AudioFrame)>> {
+    pub fn pop(&mut self) -> anyhow::Result<Vec<(ContentKind, AudioFrame)>> {
         match self.processed_receiver.try_recv() {
             Ok(processed_frames) => {
                 self.output_queue.extend(processed_frames);
@@ -127,7 +128,7 @@ impl BufferedAnalyzer {
             });
         }
 
-        Ok(self.output_queue.pop_front())
+        Ok(self.output_queue.drain(..).collect())
     }
 
     pub fn flush(&mut self) -> anyhow::Result<()> {
@@ -207,7 +208,7 @@ fn processing_worker(
         input_queue.push_back(frame.clone());
         samples_queue.extend(resample_16k_mono_s16_frame(frame)?);
 
-        if samples_queue.len() >= FRAME_WIDTH {
+        while samples_queue.len() >= FRAME_WIDTH {
             let samples = samples_queue
                 .iter()
                 .take(FRAME_WIDTH)
@@ -218,8 +219,7 @@ fn processing_worker(
             samples_queue.drain(0..DRAIN_WIDTH);
 
             let data = classifier::Data::from_shape_vec((FRAME_WIDTH,), samples)? / 32768.0;
-            let prediction = classifier.classify(&data)?;
-            let prediction = prediction.amplified(&AMPLIFICATION);
+            let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
 
             if let Some(smoothed) = smoother.push(prediction) {
                 let kind = match smoothed.argmax()?.1 {
@@ -229,18 +229,22 @@ fn processing_worker(
                     x => unreachable!("Unexpected label {x}"),
                 };
 
+                // Since frame has been resampled, it needs to count how many original frames
+                // fits into DRAIN_DURATION, it is likely to be constant value for a stream.
                 let frames_to_drain = input_queue
                     .iter()
                     .scan(Duration::ZERO, |acc, frame| {
                         *acc += frame.duration();
                         Some(*acc)
                     })
-                    .take_while(|dur| dur < &DRAIN_DURATION)
+                    .take_while(|dur| dur <= &DRAIN_DURATION)
                     .count();
 
+                // It drains 1 more frame than it should, and `input_frames` empties faster than `samples_queue`.
+                // The rest of samples queue goes into next cycle, causing small variation of output frames.
                 processed_sender.send(
                     input_queue
-                        .drain(0..frames_to_drain)
+                        .drain(0..input_queue.len().min(frames_to_drain + 1))
                         .map(|frame| (kind, frame))
                         .collect(),
                 )?;

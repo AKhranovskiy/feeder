@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<()> {
     analyzer.flush()?;
 
     while !analyzer.is_completed() {
-        while let Some((kind, frame)) = analyzer.pop()? {
+        for (kind, frame) in analyzer.pop()? {
             if prev_kind != kind {
                 eprintln!("{:?} {kind}", frame.pts());
                 prev_kind = kind;

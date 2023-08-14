@@ -13,6 +13,7 @@ use codec::configure_ffmpeg_log;
 
 mod accept_header;
 mod args;
+mod rate;
 mod routes;
 mod stream_saver;
 mod terminate;

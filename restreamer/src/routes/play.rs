@@ -28,6 +28,7 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 use crate::accept_header::Accept;
 use crate::args::Args;
 use crate::{
+    // rate::Rate,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
 };
@@ -83,6 +84,8 @@ fn get_stream(
 
         let mut buf = [0u8;1024];
 
+        // let mut rate = Rate::new();
+
         loop {
             if handle.is_finished() {
                 handle.join().unwrap()?;
@@ -93,6 +96,10 @@ fn get_stream(
             }
 
             let read = reader.read(&mut buf)?;
+
+            // let r = rate.push(read) / 128;
+            // print!("\t{r} kbps");
+
             yield Ok(buf[0..read].to_vec())
         }
     }
@@ -171,7 +178,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
         analyzer.push(frame)?;
 
-        while let Some((kind, frame)) = analyzer.pop()? {
+        for (kind, frame) in analyzer.pop()? {
             if state.terminator.is_terminated() {
                 break;
             }

@@ -28,7 +28,7 @@ pub struct Args {
     pub smooth_behind: u64,
 
     /// Smoothing ahead buffer in ms.
-    #[arg(long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 2000)]
     #[arg(value_parser = value_parser!(u64).range(0..10_000))]
     pub smooth_ahead: u64,
 

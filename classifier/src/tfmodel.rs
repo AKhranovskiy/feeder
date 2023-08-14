@@ -49,7 +49,7 @@ impl TfModel {
     }
 
     pub fn adbanda<P: AsRef<Path>>(dir: P, name: &str) -> anyhow::Result<Self> {
-        Self::load(dir.as_ref().join(name), "embedding", "ouput", 0)
+        Self::load(dir.as_ref().join(name), "embedding", "output", 0)
     }
 
     pub fn run(&self, input: &Tensor<f32>) -> anyhow::Result<Tensor<f32>> {
