@@ -24,7 +24,7 @@ impl Resampler {
     }
 
     pub fn push(&mut self, frame: AudioFrame) -> anyhow::Result<&mut Self> {
-        self.0.try_push(frame).map(|_| self).map_err(Into::into)
+        self.0.try_push(frame).map(|()| self).map_err(Into::into)
     }
 }
 

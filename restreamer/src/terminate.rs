@@ -38,8 +38,8 @@ impl Terminator {
         };
 
         tokio::select! {
-            _ = ctrl_c => { self.terminate(); },
-            _ = terminate => { self.terminate(); },
+            () = ctrl_c => { self.terminate(); },
+            () = terminate => { self.terminate(); },
         }
 
         log::info!("Signal received, starting graceful shutdown");

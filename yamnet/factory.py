@@ -22,7 +22,7 @@ def build_model(config: TrainConfig):
             x = keras.layers.Dropout(layer.dropout, name=f"dropout_{i}")(x)
 
     outputs = keras.layers.Dense(
-        config.num_classes, activation=hp.output_activation, name="ouput"
+        config.num_classes, activation=hp.output_activation, name="output"
     )(x)
 
     model = keras.Model(inputs=inputs, outputs=outputs, name=config.model_name)

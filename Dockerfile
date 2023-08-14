@@ -1,33 +1,18 @@
 # Build restreamer
-FROM rust:slim-bookworm as rust-builder
+FROM rust:latest as rust-builder
 
 WORKDIR /usr/src/app
 
 COPY . .
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    python3-dev libavutil-dev libavcodec-dev libavformat-dev libswscale-dev \
+    libavutil-dev libavcodec-dev libavformat-dev libswscale-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install --path restreamer
 
-# Prepare Python virtual env
-FROM python:3.11-slim-bookworm as python-builder
-
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-WORKDIR /app
-
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-COPY requirements.docker.txt requirements.txt
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
 # final stage
-FROM python:3.11-slim-bookworm as final
+FROM debian:11 as final
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ffmpeg \
@@ -36,12 +21,16 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=rust-builder /usr/local/cargo/bin/restreamer /usr/local/bin/restreamer
-COPY --from=python-builder /opt/venv /opt/venv
 
-COPY models/ models/
+# TODO There should a better way to obtain Tensorflow libraries
+COPY --from=rust-builder /usr/src/app/target/release/build/tensorflow-sys-*/out/libtensorflow.so.2 /usr/local/lib/
+COPY --from=rust-builder /usr/src/app/target/release/build/tensorflow-sys-*/out/libtensorflow_framework.so.2 /usr/local/lib/
+
+RUN ldconfig
+
+COPY yamnet/models/ models/
 COPY restreamer/assets restreamer/assets
 
-ENV PATH="/opt/venv/bin:$PATH"
 ENV TF_CPP_MIN_LOG_LEVEL=3
 
 CMD restreamer --port 8192 --gcp

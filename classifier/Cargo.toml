@@ -1,14 +1,9 @@
 [package]
 name = "classifier"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-lazy_static = { workspace = true }
 ndarray = { workspace = true }
-ndarray-stats = { workspace = true }
-numpy = { workspace = true }
-pyo3 = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true }
+tensorflow = { workspace = true }

@@ -27,8 +27,6 @@ fn main() -> anyhow::Result<()> {
 
     let decoder = Decoder::try_from(input)?;
 
-    BufferedAnalyzer::warmup();
-
     let mut analyzer = BufferedAnalyzer::new(
         LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(400)),
         BitFlags::empty(),

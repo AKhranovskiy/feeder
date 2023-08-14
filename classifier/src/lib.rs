@@ -1,20 +1,12 @@
-use anyhow::anyhow;
-use std::{path::Path, sync::Mutex};
+use std::path::Path;
 
-mod pyvtable;
+use tensorflow::Tensor;
+
+mod tfmodel;
 mod types;
 
-use self::pyvtable::PyVTable;
-use self::types::PyModel;
 pub use self::types::{Data, Labels, PredictedLabels};
-
-#[inline(never)]
-pub fn check_gpu(required: bool) -> anyhow::Result<()> {
-    // Ensure num_gpus is always called first
-    (PyVTable::num_gpus()? > 0 || !required)
-        .then_some(())
-        .ok_or_else(|| anyhow!("GPU is not found"))
-}
+use tfmodel::TfModel;
 
 pub trait Classify: Send + Sync {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels>;
@@ -22,24 +14,22 @@ pub trait Classify: Send + Sync {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ClassifyModel {
-    ATM,
+    AMT,
     MOAT,
     AO,
 }
 
-pub fn create<P>(model: ClassifyModel, dir: P) -> anyhow::Result<Box<dyn Classify>>
-where
-    P: AsRef<Path>,
-{
-    Ok(match model {
-        ClassifyModel::ATM => Box::new(AmtClassifier::load(dir)?),
-        ClassifyModel::MOAT => Box::new(MoatClassifier::load(dir)?),
-        ClassifyModel::AO => Box::new(AoClassifier::load(dir)?),
-    })
+pub fn create<P: AsRef<Path>>(dir: P, model: ClassifyModel) -> anyhow::Result<Box<dyn Classify>> {
+    match model {
+        ClassifyModel::AMT => Ok(Box::new(AmtClassifier::load(dir)?)),
+        ClassifyModel::MOAT => Ok(Box::new(MoatClassifier::load(dir)?)),
+        ClassifyModel::AO => Ok(Box::new(AoClassifier::load(dir)?)),
+    }
 }
 
 struct AmtClassifier {
-    model: Mutex<PyModel>,
+    yamnet: TfModel,
+    adbanda: TfModel,
 }
 
 impl AmtClassifier {
@@ -48,20 +38,29 @@ impl AmtClassifier {
         P: AsRef<Path>,
     {
         Ok(Self {
-            model: Mutex::new(PyVTable::load(&dir.as_ref().join("adbanda_atm"))?),
+            yamnet: TfModel::yamnet(&dir)?,
+            adbanda: TfModel::adbanda(&dir, "adbanda_amt")?,
         })
     }
 }
 
 impl Classify for AmtClassifier {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
-        let model = self.model.lock().unwrap();
-        PyVTable::predict(&model, data)
+        let embedding = self.yamnet.run(&Tensor::from(data))?;
+        let prediction = self.adbanda.run(&embedding)?;
+
+        assert_eq!(prediction.shape(), [1, 3].into());
+        let (ads, music, talk) = (prediction[0], prediction[1], prediction[2]);
+        Ok(PredictedLabels::from_shape_vec(
+            (1, 3),
+            vec![ads, music, talk],
+        )?)
     }
 }
 
 struct AoClassifier {
-    model: Mutex<PyModel>,
+    yamnet: TfModel,
+    adbanda: TfModel,
 }
 
 impl AoClassifier {
@@ -69,19 +68,21 @@ impl AoClassifier {
     where
         P: AsRef<Path>,
     {
-        Ok(Self {
-            model: Mutex::new(PyVTable::load(&dir.as_ref().join("adbanda_ao"))?),
-        })
+        let yamnet = TfModel::yamnet(&dir)?;
+        let adbanda = TfModel::adbanda(&dir, "adbanda_ao/")?;
+
+        Ok(Self { yamnet, adbanda })
     }
 }
 
 impl Classify for AoClassifier {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
         let (ads, other) = {
-            let model = self.model.lock().unwrap();
-            let p = PyVTable::predict(&model, data)?;
-            assert_eq!(p.shape(), &[1, 2]);
-            (p[(0, 0)], p[(0, 1)])
+            let embedding: Tensor<f32> = self.yamnet.run(&Tensor::from(data))?;
+            let prediction = self.adbanda.run(&embedding)?;
+
+            assert_eq!(prediction.shape(), [1, 2].into());
+            (prediction[0], prediction[1])
         };
 
         // Ignore Talk
@@ -93,36 +94,37 @@ impl Classify for AoClassifier {
 }
 
 struct MoatClassifier {
-    model_mo: Mutex<PyModel>,
-    model_at: Mutex<PyModel>,
+    yamnet: TfModel,
+    adbanda_mo: TfModel,
+    adbanda_at: TfModel,
 }
 
 impl MoatClassifier {
-    fn load<P>(dir: P) -> anyhow::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
+    fn load<P: AsRef<Path>>(dir: P) -> anyhow::Result<Self> {
         Ok(Self {
-            model_mo: Mutex::new(PyVTable::load(&dir.as_ref().join("adbanda_mo"))?),
-            model_at: Mutex::new(PyVTable::load(&dir.as_ref().join("adbanda_at"))?),
+            yamnet: TfModel::yamnet(&dir)?,
+            adbanda_at: TfModel::adbanda(&dir, "adbdanda_at")?,
+            adbanda_mo: TfModel::adbanda(&dir, "adbdanda_mo")?,
         })
     }
 }
 
 impl Classify for MoatClassifier {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
+        let embedding: Tensor<f32> = self.yamnet.run(&Tensor::from(data))?;
+
         let (music, other) = {
-            let model = self.model_mo.lock().unwrap();
-            let p = PyVTable::predict(&model, data)?;
-            assert_eq!(p.shape(), &[1, 2]);
-            (p[(0, 0)], p[(0, 1)])
+            let prediction = self.adbanda_mo.run(&embedding)?;
+
+            assert_eq!(prediction.shape(), [1, 2].into());
+            (prediction[0], prediction[1])
         };
 
         let (ads, talk) = {
-            let model = self.model_at.lock().unwrap();
-            let p = PyVTable::predict(&model, data)?;
-            assert_eq!(p.shape(), &[1, 2]);
-            (p[(0, 0)], p[(0, 1)])
+            let prediction = self.adbanda_at.run(&embedding)?;
+
+            assert_eq!(prediction.shape(), [1, 2].into());
+            (prediction[0], prediction[1])
         };
 
         Ok(PredictedLabels::from_shape_vec(

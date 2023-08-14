@@ -1,7 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::net::SocketAddr;
-use std::time::Instant;
 
 use axum::{routing::get_service, Router, Server};
 use clap::Parser;
@@ -9,7 +8,6 @@ use log::LevelFilter;
 use stderrlog::Timestamp;
 use tower_http::services::ServeDir;
 
-use analyzer::BufferedAnalyzer;
 use args::Args;
 use codec::configure_ffmpeg_log;
 
@@ -29,17 +27,6 @@ async fn main() {
 
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
-
-    log::info!("Warming up analyzer...");
-
-    let instant = Instant::now();
-
-    BufferedAnalyzer::warmup();
-
-    log::info!(
-        "Warming up completed in {}ms",
-        instant.elapsed().as_millis()
-    );
 
     let app = Router::new().nest_service("/", serve_dir.clone()).nest(
         "/play",

@@ -37,10 +37,6 @@ const MODEL: ClassifyModel = ClassifyModel::AO;
 const AMPLIFICATION: [f32; 3] = [2., 5., 0.];
 
 impl BufferedAnalyzer {
-    pub fn warmup() {
-        classifier::check_gpu(false).expect("Check succeed");
-    }
-
     #[must_use]
     pub fn new(smoother: LabelSmoother, opts: BitFlags<AnalyzerOpts>) -> Self {
         // Send frame processing stats to printer thread.
@@ -54,7 +50,7 @@ impl BufferedAnalyzer {
         // Receive processing stats.
         let (worker_stats_sender, worker_stats_receiver) = flume::unbounded();
 
-        let classifier = classifier::create(MODEL, "./models").expect("Initialized classifier");
+        let classifier = classifier::create("./models", MODEL).expect("Initialized classifier");
 
         let processing_flag = Arc::new(AtomicBool::new(false));
         let flag = processing_flag.clone();
@@ -216,13 +212,13 @@ fn processing_worker(
                 .iter()
                 .take(FRAME_WIDTH)
                 .copied()
+                .map(f32::from)
                 .collect::<Vec<_>>();
 
             samples_queue.drain(0..DRAIN_WIDTH);
 
-            let data = classifier::Data::from_shape_vec((1, FRAME_WIDTH), samples)?;
+            let data = classifier::Data::from_shape_vec((FRAME_WIDTH,), samples)? / 32768.0;
             let prediction = classifier.classify(&data)?;
-
             let prediction = prediction.amplified(&AMPLIFICATION);
 
             if let Some(smoothed) = smoother.push(prediction) {
