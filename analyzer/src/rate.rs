@@ -24,10 +24,12 @@ impl Rate {
     }
 
     pub fn average(&self) -> Duration {
-        Duration::from_millis(
-            (self.values.iter().map(Duration::as_millis).sum::<u128>() / self.values.len() as u128)
-                as u64,
-        )
+        match self.values.len() {
+            0 => Duration::default(),
+            len => Duration::from_millis(
+                (self.values.iter().map(Duration::as_millis).sum::<u128>() / len as u128) as u64,
+            ),
+        }
     }
 }
 

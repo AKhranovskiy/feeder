@@ -12,7 +12,7 @@ use enumflags2::BitFlags;
 use flume::TryRecvError;
 use ndarray_stats::QuantileExt;
 
-use codec::{resample_16k_mono_s16_frame, AudioFrame, FrameDuration, Timestamp};
+use codec::{resample_16k_mono_s16_frames, AudioFrame, FrameDuration, Timestamp};
 
 use crate::{amplify::Apmlify, rate::Rate, AnalyzerOpts, ContentKind, LabelSmoother};
 
@@ -26,16 +26,14 @@ pub struct BufferedAnalyzer {
     ads_duration: Duration,
     ads_counter: usize,
     processing_flag: Arc<AtomicBool>,
+    last_stat: Stats,
 }
 
-const FRAME_WIDTH: usize = 15_600; // 16_000 * 0.975s
-const DRAIN_WIDTH: usize = 1_600; // 16_000 * 0.1s
 pub(crate) const DRAIN_DURATION: Duration = Duration::from_millis(100);
+const PROCESSING_DURATION: Duration = Duration::from_millis(950);
 
 const MODEL: ClassifyModel = ClassifyModel::AMT;
-// Amplification 2:5:0 does ~72% -> ~50% confidence reduction for Advertisments for AO model.
-// Amplification 2:5:5 does ~75 -> ~55% confidence reduction for Advertisments for AMT model.
-const AMPLIFICATION: [f32; 3] = [0.25, 1., 1.];
+const AMPLIFICATION: [f32; 3] = [1., 2., 2.];
 
 impl BufferedAnalyzer {
     #[must_use]
@@ -77,6 +75,15 @@ impl BufferedAnalyzer {
             ads_duration: Duration::default(),
             ads_counter: 0,
             processing_flag,
+            last_stat: Stats {
+                rate: Duration::default(),
+                buffer: String::default(),
+                frame_duration: Duration::default(),
+                pts: Timestamp::null(),
+                kind: ContentKind::Unknown,
+                ads_duration: Duration::default(),
+                ads_counter: 0,
+            },
         }
     }
 
@@ -116,17 +123,18 @@ impl BufferedAnalyzer {
                 }
             }
             self.last_kind = kind;
-
-            _ = self.stats_sender.send(Stats {
-                rate: stats.0,
+            self.last_stat = Stats {
+                rate: stats.0 / self.output_queue.len() as u32,
                 buffer: stats.1,
                 frame_duration: frame.duration(),
                 pts: frame.pts(),
                 kind,
                 ads_duration: self.ads_duration,
                 ads_counter: self.ads_counter,
-            });
+            };
         }
+
+        _ = self.stats_sender.send(self.last_stat.clone());
 
         Ok(self.output_queue.drain(..).collect())
     }
@@ -155,6 +163,7 @@ impl BufferedAnalyzer {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Stats {
     rate: Duration,
     frame_duration: Duration,
@@ -198,63 +207,89 @@ fn processing_worker(
     processing_flag: &Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     let mut rate = Rate::new();
-    let mut samples_queue = VecDeque::<i16>::new();
     let mut input_queue = VecDeque::<AudioFrame>::new();
 
-    while let Ok(frame) = frame_receiver.recv() {
+    while !frame_receiver.is_disconnected() {
         processing_flag.store(true, atomic::Ordering::SeqCst);
         rate.start();
 
-        input_queue.push_back(frame.clone());
-        samples_queue.extend(resample_16k_mono_s16_frame(frame)?);
+        // Collect all frames from input.
+        while let Ok(frame) = frame_receiver.try_recv() {
+            input_queue.push_back(frame);
+        }
 
-        while samples_queue.len() >= FRAME_WIDTH {
-            let samples = samples_queue
-                .iter()
-                .take(FRAME_WIDTH)
-                .copied()
-                .map(f32::from)
-                .collect::<Vec<_>>();
+        // All frames must have the same duration, so we can calculate exact amount of frames to process.
+        let frame_duration_secs = input_queue
+            .front()
+            .map(FrameDuration::duration)
+            .unwrap_or_default()
+            .as_secs_f64();
 
-            samples_queue.drain(0..DRAIN_WIDTH);
+        let input_duration_secs = frame_duration_secs * input_queue.len() as f64;
+        if input_duration_secs < PROCESSING_DURATION.as_secs_f64() {
+            // Not enough input to process. Let's wait for next frame here.
+            rate.stop();
+            worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
+            processing_flag.store(false, atomic::Ordering::SeqCst);
 
-            let data = classifier::Data::from_shape_vec((FRAME_WIDTH,), samples)? / 32768.0;
-            let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
-
-            if let Some(smoothed) = smoother.push(prediction) {
-                let kind = match smoothed.argmax()?.1 {
-                    0 => ContentKind::Advertisement,
-                    1 => ContentKind::Music,
-                    2 => ContentKind::Talk,
-                    x => unreachable!("Unexpected label {x}"),
-                };
-
-                // Since frame has been resampled, it needs to count how many original frames
-                // fits into DRAIN_DURATION, it is likely to be constant value for a stream.
-                let frames_to_drain = input_queue
-                    .iter()
-                    .scan(Duration::ZERO, |acc, frame| {
-                        *acc += frame.duration();
-                        Some(*acc)
-                    })
-                    .take_while(|dur| dur <= &DRAIN_DURATION)
-                    .count();
-
-                // It drains 1 more frame than it should, and `input_frames` empties faster than `samples_queue`.
-                // The rest of samples queue goes into next cycle, causing small variation of output frames.
-                processed_sender.send(
-                    input_queue
-                        .drain(0..input_queue.len().min(frames_to_drain + 1))
-                        .map(|frame| (kind, frame))
-                        .collect(),
-                )?;
+            if let Ok(frame) = frame_receiver.recv() {
+                input_queue.push_back(frame);
+                continue;
             }
+        }
+
+        // Ok, we have enough input frames to process.
+        let frames_to_take =
+            (PROCESSING_DURATION.as_secs_f64() / frame_duration_secs).ceil() as usize;
+        let frames_to_take = frames_to_take.min(input_queue.len());
+        let frames_to_process = input_queue
+            .iter()
+            .take(frames_to_take)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let frames_to_drain = (DRAIN_DURATION.as_secs_f64() / frame_duration_secs).floor() as usize;
+        let frames_to_drain = frames_to_drain.min(frames_to_process.len());
+        let drained_frames = input_queue.drain(..frames_to_drain).collect::<Vec<_>>();
+
+        let samples = resample_16k_mono_s16_frames(frames_to_process.clone())?
+            .into_iter()
+            .map(f32::from)
+            .collect::<Vec<_>>();
+
+        let data = classifier::Data::from_shape_vec((samples.len(),), samples)?;
+        // Normalize data to [-1., 1.]
+        let data = data / 32768.0;
+
+        let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
+
+        if let Some(smoothed) = smoother.push(prediction) {
+            let kind = match smoothed.argmax()?.1 {
+                0 => ContentKind::Advertisement,
+                1 => ContentKind::Music,
+                2 => ContentKind::Talk,
+                x => unreachable!("Unexpected label {x}"),
+            };
+
+            processed_sender.send(
+                drained_frames
+                    .into_iter()
+                    .map(|frame| (kind, frame))
+                    .collect(),
+            )?;
         }
 
         rate.stop();
         worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
         processing_flag.store(false, atomic::Ordering::SeqCst);
     }
+
+    processed_sender.send(
+        input_queue
+            .into_iter()
+            .map(|frame| (ContentKind::Unknown, frame))
+            .collect(),
+    )?;
 
     Ok(())
 }

@@ -118,29 +118,38 @@ pub fn resample_16k_mono_s16_stream<R: Read>(input: R) -> anyhow::Result<Vec<i16
     Ok(output)
 }
 
-pub fn resample_16k_mono_s16_frame(frame: AudioFrame) -> anyhow::Result<Vec<i16>> {
+pub fn resample_16k_mono_s16_frames(frames: Vec<AudioFrame>) -> anyhow::Result<Vec<i16>> {
+    if frames.is_empty() {
+        return Ok(vec![]);
+    }
+
     let mut output: Vec<i16> = vec![];
 
     let mut resampler = AudioResampler::builder()
-        .source_sample_rate(frame.sample_rate())
-        .source_channel_layout(frame.channel_layout().to_owned())
-        .source_sample_format(frame.sample_format())
-        .source_sample_rate(frame.sample_rate())
+        .source_sample_rate(frames[0].sample_rate())
+        .source_channel_layout(frames[0].channel_layout().to_owned())
+        .source_sample_format(frames[0].sample_format())
+        .source_sample_rate(frames[0].sample_rate())
         .target_channel_layout(AcChannelLayout::from_channels(1).unwrap())
         .target_sample_format(AcSampleFormat::from_str("s16").unwrap())
         .target_sample_rate(16_000)
         .build()?;
 
-    resampler.push(frame)?;
+    for frame in frames {
+        resampler.push(frame)?;
 
-    // Plane data buffer is bigger than required amount,
-    // so take only required amount.
-    while let Some(frame) = resampler.take()? {
-        output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
+        // Plane data buffer is bigger than required amount,
+        // so take only required amount.
+        while let Some(frame) = resampler.take()? {
+            // data() returns &[u8], and contains i16, so multiply number of samples by 2.
+            output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
+        }
     }
 
     resampler.flush()?;
+
     while let Some(frame) = resampler.take()? {
+        // data() returns &[u8], and contains i16, so multiply number of samples by 2.
         output.extend_from_slice(cast_slice(&frame.planes()[0].data()[..frame.samples() * 2]));
     }
 
