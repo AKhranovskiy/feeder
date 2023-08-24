@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use ringbuf::{Rb, StaticRb};
 
-pub(crate) struct Rate {
+pub struct Rate {
     values: StaticRb<Duration, 100>,
     timer: Instant,
 }

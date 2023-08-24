@@ -11,7 +11,7 @@ pub struct Pts {
 
 impl Pts {
     #[must_use]
-    pub fn new(samples_per_frame: u32, sample_rate: u32) -> Pts {
+    pub fn new(samples_per_frame: u32, sample_rate: u32) -> Self {
         let duration = f64::from(samples_per_frame) / f64::from(sample_rate);
         let duration = Duration::from_secs_f64(duration);
         let counter = 0;

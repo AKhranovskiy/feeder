@@ -7,7 +7,7 @@ use axum::{
 };
 use mime::Mime;
 
-pub(crate) struct Accept(Mime);
+pub struct Accept(Mime);
 
 impl Header for Accept {
     fn name() -> &'static HeaderName {

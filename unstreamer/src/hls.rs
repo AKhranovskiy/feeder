@@ -10,9 +10,9 @@ use hls_m3u8::tags::VariantStream;
 use hls_m3u8::{MasterPlaylist, MediaPlaylist, MediaSegment};
 use url::Url;
 
-pub(crate) static MIME_HLS: &str = "application/vnd.apple.mpegurl";
+pub static MIME_HLS: &str = "application/vnd.apple.mpegurl";
 
-pub(crate) struct HLSUnstreamer {
+pub struct HLSUnstreamer {
     data_rx: Receiver<Box<(dyn Read + Send + Sync)>>,
     error_rx: Receiver<anyhow::Error>,
     readers: VecDeque<Box<(dyn Read + Send + Sync)>>,
@@ -36,7 +36,7 @@ impl HLSUnstreamer {
         let source = MasterPlaylist::try_from(content.as_ref())
             .map_err(Into::into)
             .and_then(get_best_media_playlist_url)
-            .or(anyhow::Ok(source))?;
+            .or_else(|_| anyhow::Ok(source))?;
 
         let (data_tx, data_rx) = flume::unbounded();
         let (error_tx, error_rx) = flume::bounded::<anyhow::Error>(1);
@@ -52,7 +52,6 @@ impl HLSUnstreamer {
             let playlist = match fetch_media_playlist(&source) {
                 Ok(playlist) => playlist,
                 Err(error) => {
-                    #[allow(clippy::let_underscore_untyped)]
                     let _ = error_tx.send(error);
                     break;
                 }
@@ -80,14 +79,12 @@ impl HLSUnstreamer {
                             );
                             data_tx.send(resp.into_reader())
                         }) {
-                            #[allow(clippy::let_underscore_untyped)]
                             let _ = error_tx.send(error.into());
                             break;
                         }
                     }
                 }
                 Err(error) => {
-                    #[allow(clippy::let_underscore_untyped)]
                     let _ = error_tx.send(error);
                     break;
                 }

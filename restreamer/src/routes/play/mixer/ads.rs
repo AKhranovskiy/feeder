@@ -65,7 +65,7 @@ impl AdsMixer {
             let ad = self
                 .side_track
                 .pop_front()
-                .unwrap_or(codec::silence_frame(frame));
+                .unwrap_or_else(|| codec::silence_frame(frame));
             let content = self.main_track.pop_front().unwrap();
             self.cross_fader.apply(&ad, &content)
         };
@@ -88,7 +88,7 @@ impl AdsMixer {
             let content = self
                 .side_buffer
                 .pop_front()
-                .unwrap_or(codec::silence_frame(frame));
+                .unwrap_or_else(|| codec::silence_frame(frame));
             let ad = self.side_track.pop_front().unwrap();
             self.cross_fader.apply(&content, &ad)
         } else {

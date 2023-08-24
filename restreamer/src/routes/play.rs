@@ -1,5 +1,7 @@
-use std::io::{Read, Write};
-use std::time::Duration;
+use std::{
+    io::{Read, Write},
+    time::Duration,
+};
 
 use anyhow::anyhow;
 use async_stream::stream;
@@ -25,10 +27,9 @@ use play_params::{PlayAction, PlayParams};
 mod mixer;
 use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
-use crate::accept_header::Accept;
-use crate::args::Args;
 use crate::{
-    // rate::Rate,
+    accept_header::Accept,
+    args::Args,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
 };
@@ -47,7 +48,6 @@ pub fn router(terminator: Terminator, args: Args) -> Router {
         .with_state(PlayState { terminator, args })
 }
 
-#[allow(clippy::unused_async)]
 async fn serve(
     TypedHeader(accept): TypedHeader<Accept>,
     Query(params): Query<PlayParams>,
@@ -131,7 +131,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
 
     let mut decoder = Decoder::try_from(input)?;
     let codec_params = {
-        let first_frame = decoder.next().ok_or(anyhow!("No audio frame"))??;
+        let first_frame = decoder.next().ok_or_else(|| anyhow!("No audio frame"))??;
         decoder
             .codec_params()
             .with_samples_per_frame(first_frame.samples())

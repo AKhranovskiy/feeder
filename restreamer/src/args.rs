@@ -41,15 +41,15 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn is_recording_enabled(&self) -> bool {
+    pub const fn is_recording_enabled(&self) -> bool {
         !self.gcp && !self.no_recordings
     }
 
-    pub fn buffer_stat(&self) -> bool {
+    pub const fn buffer_stat(&self) -> bool {
         !self.gcp && !self.quiet && self.buffer_stat
     }
 
-    pub fn report_slow_processing(&self) -> bool {
+    pub const fn report_slow_processing(&self) -> bool {
         !self.gcp && !self.quiet && self.report_slow_processing
     }
 }

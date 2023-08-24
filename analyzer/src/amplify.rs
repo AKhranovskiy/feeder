@@ -33,11 +33,9 @@ mod tests {
     use super::*;
     use ndarray::array;
 
-    #[allow(clippy::unreadable_literal)]
     #[test]
-
     fn test_amplified() {
         let sut = array![[0.1, 0.7, 0.2]].amplified(&[0.33, 1.00, 0.10]);
-        assert_eq!(sut, array![[0.043824706, 0.9296149, 0.026560428]]);
+        assert_eq!(sut, array![[0.043_824_706, 0.929_614_9, 0.026_560_428]]);
     }
 }

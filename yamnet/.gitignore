@@ -1,4 +1,6 @@
-assets/
-dataset/
+__pycache__/
+.ruff_cache/
+dataset_*/
 logs/
 models/
+verification_set/

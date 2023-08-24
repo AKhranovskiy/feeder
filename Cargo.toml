@@ -1,9 +1,10 @@
 [workspace]
 resolver = "2"
-
 members = ["analyzer", "classifier", "codec", "restreamer", "unstreamer"]
 
-exclude = ["mfcc", "mongodb2sqlite", "tools"]
+[workspace.package]
+authors = ["Andrey Khranovsky <andrey.khranovsky@gmail.com>"]
+edition = "2021"
 
 [workspace.dependencies]
 ac-ffmpeg = "0.18.1"
@@ -12,13 +13,13 @@ async-stream = "0.3.5"
 axum = { version = "0.6.20", features = ["headers"] }
 bytemuck = "1.13.1"
 chrono = "0.4.26"
-clap = { version = "4.3.23", features = ["derive"] }
+clap = { version = "4.3.24", features = ["derive"] }
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 enumflags2 = "0.7.7"
 flume = { version = "0.11.0", default-features = false }
 futures = { version = "0.3.28" }
 hls_m3u8 = "0.4.1"
-kdam = "0.4.0"
+kdam = "0.4.1"
 lazy_static = "1.4.0"
 log = "0.4.20"
 mime = "0.3.17"
@@ -28,7 +29,7 @@ numpy = "0.19.0"
 os_pipe = "1.1.4"
 rand = { version = "0.8.5", features = ["small_rng"] }
 ringbuf = "0.3.3"
-serde = { version = "1.0.183", features = ["derive"] }
+serde = { version = "1.0.186", features = ["derive"] }
 stderrlog = "0.5.4"
 tensorflow = { version = "0.21.0", features = ["ndarray"] }
 tokio = { version = "1.32.0", features = [
@@ -45,4 +46,5 @@ url = { version = "2.4.0", features = ["serde"] }
 analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }
 codec = { version = "*", path = "./codec" }
+restreamer = { version = "*", path = "./restreamer" }
 unstreamer = { version = "*", path = "./unstreamer" }

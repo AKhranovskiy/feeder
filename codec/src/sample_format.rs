@@ -12,9 +12,9 @@ pub enum SampleFormat {
 impl From<SampleFormat> for AcSampleFormat {
     fn from(format: SampleFormat) -> Self {
         match format {
-            SampleFormat::S16 => AcSampleFormat::from_str("s16").expect("s16"),
-            SampleFormat::Flt => AcSampleFormat::from_str("flt").expect("flt"),
-            SampleFormat::FltPlanar => AcSampleFormat::from_str("fltp").expect("flt"),
+            SampleFormat::S16 => Self::from_str("s16").expect("s16"),
+            SampleFormat::Flt => Self::from_str("flt").expect("flt"),
+            SampleFormat::FltPlanar => Self::from_str("fltp").expect("flt"),
         }
     }
 }
@@ -22,9 +22,9 @@ impl From<SampleFormat> for AcSampleFormat {
 impl From<AcSampleFormat> for SampleFormat {
     fn from(format: AcSampleFormat) -> Self {
         match format.name() {
-            "s16" => SampleFormat::S16,
-            "flt" => SampleFormat::Flt,
-            "fltp" => SampleFormat::FltPlanar,
+            "s16" => Self::S16,
+            "flt" => Self::Flt,
+            "fltp" => Self::FltPlanar,
             x => unreachable!("Unknown format {}", x),
         }
     }

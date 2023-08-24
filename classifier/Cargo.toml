@@ -1,7 +1,8 @@
 [package]
+authors = { workspace = true }
+edition = { workspace = true }
 name = "classifier"
 version = "0.9.0"
-edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }

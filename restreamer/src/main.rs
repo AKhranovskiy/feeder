@@ -1,5 +1,3 @@
-#![allow(clippy::module_name_repetitions)]
-
 use std::net::SocketAddr;
 
 use axum::{routing::get_service, Router, Server};

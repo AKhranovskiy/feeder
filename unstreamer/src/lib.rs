@@ -11,7 +11,7 @@ static MIME_AUDIO: &str = "audio/";
 pub struct Unstreamer(Box<dyn Read + Send>);
 
 impl Unstreamer {
-    pub fn open(source: &str) -> anyhow::Result<Unstreamer> {
+    pub fn open(source: &str) -> anyhow::Result<Self> {
         if let Ok(url) = Url::parse(source) {
             let resp = ureq::get(url.as_ref()).call()?;
             if resp.content_type() == hls::MIME_HLS {

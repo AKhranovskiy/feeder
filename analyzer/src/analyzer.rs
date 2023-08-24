@@ -29,7 +29,7 @@ pub struct BufferedAnalyzer {
     last_stat: Stats,
 }
 
-pub(crate) const DRAIN_DURATION: Duration = Duration::from_millis(100);
+pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
 const PROCESSING_DURATION: Duration = Duration::from_millis(950);
 
 const MODEL: ClassifyModel = ClassifyModel::AMT;
@@ -250,7 +250,7 @@ fn processing_worker(
 
         let frames_to_drain = (DRAIN_DURATION.as_secs_f64() / frame_duration_secs).floor() as usize;
         let frames_to_drain = frames_to_drain.min(frames_to_process.len());
-        let drained_frames = input_queue.drain(..frames_to_drain).collect::<Vec<_>>();
+        let drained_frames = input_queue.drain(..frames_to_drain);
 
         let samples = resample_16k_mono_s16_frames(frames_to_process.clone())?
             .into_iter()
@@ -271,12 +271,7 @@ fn processing_worker(
                 x => unreachable!("Unexpected label {x}"),
             };
 
-            processed_sender.send(
-                drained_frames
-                    .into_iter()
-                    .map(|frame| (kind, frame))
-                    .collect(),
-            )?;
+            processed_sender.send(drained_frames.map(|frame| (kind, frame)).collect())?;
         }
 
         rate.stop();

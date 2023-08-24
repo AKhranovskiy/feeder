@@ -8,11 +8,18 @@ protocol = "sparse"
 [build]
 rustflags = [
     "-Wclippy::all",
+    "-Wclippy::complexity",
+    "-Wclippy::correctness",
+    "-Wclippy::nursery",
     "-Wclippy::pedantic",
-    "-Aclippy::missing-panics-doc",
-    "-Aclippy::missing-errors-doc",
-    "-Aclippy::module-name-repetitions",
-    "-Aclippy::cast_precision_loss",
+    "-Wclippy::perf",
+    "-Wclippy::style",
+    "-Wclippy::suspicious",
+    #
     "-Aclippy::cast-possible-truncation",
     "-Aclippy::cast-sign-loss",
+    "-Aclippy::cast_precision_loss",
+    "-Aclippy::missing-errors-doc",
+    "-Aclippy::missing-panics-doc",
+    "-Aclippy::module-name-repetitions",
 ]

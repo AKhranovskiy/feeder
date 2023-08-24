@@ -10,12 +10,12 @@ pub enum ContentKind {
 
 impl ContentKind {
     #[must_use]
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
-            ContentKind::Advertisement => "Advertisement",
-            ContentKind::Music => "Music",
-            ContentKind::Talk => "Talk",
-            ContentKind::Unknown => "Unknown",
+            Self::Advertisement => "Advertisement",
+            Self::Music => "Music",
+            Self::Talk => "Talk",
+            Self::Unknown => "Unknown",
         }
     }
 }
@@ -24,10 +24,10 @@ impl TryFrom<&str> for ContentKind {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "Advertisement" => Ok(ContentKind::Advertisement),
-            "Music" => Ok(ContentKind::Music),
-            "Talk" => Ok(ContentKind::Talk),
-            "Unknown" => Ok(ContentKind::Unknown),
+            "Advertisement" => Ok(Self::Advertisement),
+            "Music" => Ok(Self::Music),
+            "Talk" => Ok(Self::Talk),
+            "Unknown" => Ok(Self::Unknown),
             _ => anyhow::bail!("Unknown content kind: {value}"),
         }
     }

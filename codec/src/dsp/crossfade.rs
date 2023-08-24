@@ -11,7 +11,7 @@ impl Mul<(f32, f32)> for CrossFadePair {
     type Output = f32;
 
     fn mul(self, rhs: (f32, f32)) -> Self::Output {
-        (self.0 * f64::from(rhs.0) + self.1 * f64::from(rhs.1)) as Self::Output
+        self.0.mul_add(f64::from(rhs.0), self.1 * f64::from(rhs.1)) as Self::Output
     }
 }
 
@@ -84,25 +84,25 @@ trait Clamp {
 }
 
 impl CrossFadePair {
-    pub const BEGIN: CrossFadePair = CrossFadePair(1.0, 0.0);
-    pub const END: CrossFadePair = CrossFadePair(0.0, 1.0);
+    pub const BEGIN: Self = Self(1.0, 0.0);
+    pub const END: Self = Self(0.0, 1.0);
 
     #[must_use]
-    pub fn new(fade_out: f64, fade_in: f64) -> Self {
+    pub const fn new(fade_out: f64, fade_in: f64) -> Self {
         Self(fade_out, fade_in)
     }
 
     #[must_use]
     pub fn apply(&self, left: f32, right: f32) -> f32 {
-        (self.0 * f64::from(left) + self.1 * f64::from(right)) as f32
+        self.0.mul_add(f64::from(left), self.1 * f64::from(right)) as f32
     }
 
     #[must_use]
-    pub fn fade_out(&self) -> f64 {
+    pub const fn fade_out(&self) -> f64 {
         self.0
     }
     #[must_use]
-    pub fn fade_in(&self) -> f64 {
+    pub const fn fade_in(&self) -> f64 {
         self.1
     }
 }
@@ -164,7 +164,7 @@ impl CrossFade for EqualPowerCrossFade {
         // https://signalsmith-audio.co.uk/writing/2021/cheap-energy-crossfade/
         let x2 = 1_f64 - x;
         let a = x * x2;
-        let b = a + 1.4186_f64 * a.powi(2);
+        let b = 1.4186_f64.mul_add(a.powi(2), a);
         let fin = (b + x).powi(2);
         let fout = (b + x2).powi(2);
 
@@ -197,13 +197,14 @@ pub struct SemicircleCrossFade;
 impl CrossFade for SemicircleCrossFade {
     fn calculate(x: f64) -> CrossFadePair {
         let y1 = if x <= 1_f64 {
-            (1_f64 - x.powi(2)).sqrt()
+            x.mul_add(-x, 1_f64).sqrt()
         } else {
             0_f64
         };
 
         let y2 = if x >= 1_f64 {
-            (1_f64 - (x - 2_f64).powi(2)).sqrt()
+            let a = x - 2_f64;
+            a.mul_add(-a, 1_f64).sqrt()
         } else {
             0_f64
         };
@@ -220,7 +221,11 @@ pub struct ParabolicCrossFade;
 
 impl CrossFade for ParabolicCrossFade {
     fn calculate(x: f64) -> CrossFadePair {
-        ((1.0 - 3.0 * x.powi(2)), (1.0 - 3.0 * (x - 1.0).powi(2))).into()
+        (
+            3.0f64.mul_add(-x.powi(2), 1.0),
+            3.0f64.mul_add(-(x - 1.0).powi(2), 1.0),
+        )
+            .into()
     }
 }
 

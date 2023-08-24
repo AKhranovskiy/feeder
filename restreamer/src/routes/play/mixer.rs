@@ -5,16 +5,15 @@ mod ads;
 mod passthrough;
 mod silence;
 
-pub(crate) use ads::AdsMixer;
-pub(crate) use passthrough::PassthroughMixer;
-pub(crate) use silence::SilenceMixer;
+pub use ads::AdsMixer;
+pub use passthrough::PassthroughMixer;
+pub use silence::SilenceMixer;
 
 pub trait Mixer {
     fn push(&mut self, kind: ContentKind, frame: &AudioFrame) -> AudioFrame;
 }
 
 #[cfg(test)]
-#[allow(clippy::float_cmp)]
 mod tests {
     use ac_ffmpeg::codec::audio::{AudioFrame, AudioFrameMut, ChannelLayout};
     use ac_ffmpeg::time::Timestamp;
@@ -56,6 +55,7 @@ mod tests {
     // TODO add macro verify_pts
     // TOOD add macro verify_frame_content
 
+    #[allow(clippy::float_cmp)]
     #[test]
     fn test_new_frame() {
         let frame = frame_with_content(0.3);

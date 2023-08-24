@@ -59,7 +59,6 @@ impl Mixer for SilenceMixer {
 }
 
 #[cfg(test)]
-#[allow(clippy::float_cmp)]
 mod tests {
     use analyzer::ContentKind;
     use codec::dsp::ParabolicCrossFade;
@@ -70,6 +69,7 @@ mod tests {
     use super::Mixer;
     use super::SilenceMixer;
 
+    #[allow(clippy::float_cmp)]
     #[test]
     fn test_music_to_advertisement() {
         let music = create_frames(20, 1.0);
