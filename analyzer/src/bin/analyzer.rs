@@ -28,7 +28,7 @@ fn main() -> anyhow::Result<()> {
     let decoder = Decoder::try_from(input)?;
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(0)),
+        LabelSmoother::new(Duration::from_millis(300), Duration::from_millis(1500)),
         BitFlags::empty(),
     );
 
@@ -59,31 +59,29 @@ fn main() -> anyhow::Result<()> {
 
     analyzer.flush()?;
 
-    while !analyzer.is_completed() {
-        for (kind, frame) in analyzer.pop()? {
-            if prev_kind != kind {
-                eprintln!("{:?} {kind}", frame.pts());
-                prev_kind = kind;
-            }
-
-            if kind == ContentKind::Advertisement {
-                pb_ads.update(1)?;
-            }
-
-            let k = match kind {
-                ContentKind::Advertisement => 'A',
-                ContentKind::Music => 'M',
-                ContentKind::Talk => 'T',
-                ContentKind::Unknown => 'U',
-            };
-
-            buf.push(k as u8);
-            if buf.len() == BUFFER_SIZE {
-                std::io::stdout().write_all(&buf)?;
-                buf.clear();
-            }
-            pb_frames.update(1)?;
+    for (kind, frame) in analyzer.pop()? {
+        if prev_kind != kind {
+            eprintln!("{:?} {kind}", frame.pts());
+            prev_kind = kind;
         }
+
+        if kind == ContentKind::Advertisement {
+            pb_ads.update(1)?;
+        }
+
+        let k = match kind {
+            ContentKind::Advertisement => 'A',
+            ContentKind::Music => 'M',
+            ContentKind::Talk => 'T',
+            ContentKind::Unknown => 'U',
+        };
+
+        buf.push(k as u8);
+        if buf.len() == BUFFER_SIZE {
+            std::io::stdout().write_all(&buf)?;
+            buf.clear();
+        }
+        pb_frames.update(1)?;
     }
 
     println!(

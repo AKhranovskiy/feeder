@@ -33,7 +33,7 @@ pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
 const PROCESSING_DURATION: Duration = Duration::from_millis(950);
 
 const MODEL: ClassifyModel = ClassifyModel::AMT;
-const AMPLIFICATION: [f32; 3] = [1., 2., 2.];
+const AMPLIFICATION: [f32; 3] = [1., 3., 3.];
 
 impl BufferedAnalyzer {
     #[must_use]
@@ -140,26 +140,15 @@ impl BufferedAnalyzer {
     }
 
     pub fn flush(&mut self) -> anyhow::Result<()> {
-        while !self.frame_sender.is_empty() {
+        while !self.frame_sender.is_empty() || self.processing_flag.load(atomic::Ordering::SeqCst) {
             std::thread::yield_now();
         }
 
+        while let Ok(frames) = self.processed_receiver.try_recv() {
+            self.output_queue.extend(frames);
+        }
+
         Ok(())
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.frame_sender.is_empty() && self.output_queue.is_empty()
-    }
-
-    #[must_use]
-    pub fn is_processing(&self) -> bool {
-        self.processing_flag.load(atomic::Ordering::SeqCst)
-    }
-
-    #[must_use]
-    pub fn is_completed(&self) -> bool {
-        self.is_empty() && !self.is_processing()
     }
 }
 
@@ -210,8 +199,9 @@ fn processing_worker(
     let mut input_queue = VecDeque::<AudioFrame>::new();
 
     while !frame_receiver.is_disconnected() {
-        processing_flag.store(true, atomic::Ordering::SeqCst);
         rate.start();
+
+        processing_flag.store(true, atomic::Ordering::SeqCst);
 
         // Collect all frames from input.
         while let Ok(frame) = frame_receiver.try_recv() {
@@ -230,6 +220,7 @@ fn processing_worker(
             // Not enough input to process. Let's wait for next frame here.
             rate.stop();
             worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
+
             processing_flag.store(false, atomic::Ordering::SeqCst);
 
             if let Ok(frame) = frame_receiver.recv() {
@@ -238,44 +229,47 @@ fn processing_worker(
             }
         }
 
-        // Ok, we have enough input frames to process.
-        let frames_to_take =
-            (PROCESSING_DURATION.as_secs_f64() / frame_duration_secs).ceil() as usize;
-        let frames_to_take = frames_to_take.min(input_queue.len());
-        let frames_to_process = input_queue
-            .iter()
-            .take(frames_to_take)
-            .cloned()
-            .collect::<Vec<_>>();
+        while (frame_duration_secs * input_queue.len() as f64) > PROCESSING_DURATION.as_secs_f64() {
+            // Ok, we have enough input frames to process.
+            let frames_to_take =
+                (PROCESSING_DURATION.as_secs_f64() / frame_duration_secs).ceil() as usize;
+            let frames_to_take = frames_to_take.min(input_queue.len());
 
-        let frames_to_drain = (DRAIN_DURATION.as_secs_f64() / frame_duration_secs).floor() as usize;
-        let frames_to_drain = frames_to_drain.min(frames_to_process.len());
-        let drained_frames = input_queue.drain(..frames_to_drain);
+            let frames_to_process = input_queue
+                .iter()
+                .take(frames_to_take)
+                .cloned()
+                .collect::<Vec<_>>();
 
-        let samples = resample_16k_mono_s16_frames(frames_to_process.clone())?
-            .into_iter()
-            .map(f32::from)
-            .collect::<Vec<_>>();
+            let frames_to_drain =
+                (DRAIN_DURATION.as_secs_f64() / frame_duration_secs).floor() as usize;
+            let frames_to_drain = frames_to_drain.min(frames_to_process.len());
+            let drained_frames = input_queue.drain(..frames_to_drain);
 
-        let data = classifier::Data::from_shape_vec((samples.len(),), samples)?;
-        // Normalize data to [-1., 1.]
-        let data = data / 32768.0;
+            let samples = resample_16k_mono_s16_frames(frames_to_process.clone())?
+                .into_iter()
+                .map(f32::from)
+                .collect::<Vec<_>>();
 
-        let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
+            let data = classifier::Data::from_shape_vec((samples.len(),), samples)?;
+            // Normalize data to [-1., 1.]
+            let data = data / 32768.0;
 
-        if let Some(smoothed) = smoother.push(prediction) {
-            let kind = match smoothed.argmax()?.1 {
-                0 => ContentKind::Advertisement,
-                1 => ContentKind::Music,
-                2 => ContentKind::Talk,
-                x => unreachable!("Unexpected label {x}"),
-            };
+            let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
+            if let Some(smoothed) = smoother.push(&prediction) {
+                let kind = match smoothed.argmax()?.1 {
+                    0 => ContentKind::Advertisement,
+                    1 => ContentKind::Music,
+                    2 => ContentKind::Talk,
+                    x => unreachable!("Unexpected label {x}"),
+                };
 
-            processed_sender.send(drained_frames.map(|frame| (kind, frame)).collect())?;
+                processed_sender.send(drained_frames.map(|frame| (kind, frame)).collect())?;
+            }
+
+            worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
         }
-
         rate.stop();
-        worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
         processing_flag.store(false, atomic::Ordering::SeqCst);
     }
 

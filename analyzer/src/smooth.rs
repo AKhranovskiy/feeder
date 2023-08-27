@@ -1,7 +1,8 @@
-use std::{collections::VecDeque, time::Duration};
+use std::time::Duration;
 
 use classifier::PredictedLabels;
 use log::info;
+use ndarray::{Axis, Slice};
 use ndarray_stats::QuantileExt;
 
 use crate::analyzer::DRAIN_DURATION;
@@ -10,7 +11,8 @@ use crate::analyzer::DRAIN_DURATION;
 pub struct LabelSmoother {
     behind: usize,
     ahead: usize,
-    buffer: VecDeque<PredictedLabels>,
+    buffer: ndarray::Array3<f32>,
+    max_size: usize,
     ads_label: PredictedLabels,
     music_label: PredictedLabels,
     talk_label: PredictedLabels,
@@ -37,7 +39,8 @@ impl LabelSmoother {
         Self {
             behind: behind_size,
             ahead: ahead_size,
-            buffer: VecDeque::with_capacity(behind_size + ahead_size + 1),
+            buffer: ndarray::Array3::zeros((0, 1, 3)), //VecDeque::with_capacity(behind_size + ahead_size + 1),
+            max_size: behind_size + ahead_size + 1,
             ads_label: PredictedLabels::from_shape_vec((1, 3), vec![1.0, 0.0, 0.0]).unwrap(),
             music_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
             talk_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 0.0, 1.0]).unwrap(),
@@ -47,68 +50,26 @@ impl LabelSmoother {
 
     #[must_use]
     pub fn get_buffer_content(&self) -> String {
-        let (ads, music, talk) = self.get_ratio();
-
-        format!(
-            "{} {ads:.2}/{music:.2}/{talk:.2}",
-            self.buffer
-                .iter()
-                .map(|item| { "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_') })
-                .collect::<String>(),
-        )
+        self.buffer
+            .axis_iter(Axis(0))
+            .map(|item| "#-.".chars().nth(item.argmax().unwrap().1).unwrap_or('_'))
+            .collect::<String>()
     }
 
-    fn get_ratio(&self) -> (f32, f32, f32) {
-        if self.buffer.is_empty() {
-            return (0.0, 0.0, 0.0);
-        }
+    pub fn push(&mut self, labels: &PredictedLabels) -> Option<PredictedLabels> {
+        self.buffer
+            .append(Axis(0), labels.view().into_shape((1, 1, 3)).ok()?)
+            .unwrap();
 
-        let ads = self
-            .buffer
-            .iter()
-            .filter(|x| x.argmax().unwrap_or((0, 0)).1 == 0)
-            .count();
-
-        let music = self
-            .buffer
-            .iter()
-            .filter(|x| x.argmax().unwrap_or((0, 1)).1 == 1)
-            .count();
-
-        let talk = self
-            .buffer
-            .iter()
-            .filter(|x| x.argmax().unwrap_or((0, 2)).1 == 2)
-            .count();
-
-        let len = self.buffer.len() as f32;
-
-        (ads as f32 / len, music as f32 / len, talk as f32 / len)
-    }
-
-    pub fn push(&mut self, labels: PredictedLabels) -> Option<PredictedLabels> {
-        self.buffer.push_back(labels);
-
-        if self.buffer.len() < self.ahead {
+        if self.buffer.shape()[0] < self.ahead {
             return None;
         }
 
-        if self.buffer.len() > (self.ahead + self.behind + 1) {
-            self.buffer.pop_front();
+        if let Some(start) = self.buffer.shape()[0].checked_sub(self.ahead) {
+            self.buffer
+                .slice_axis_inplace(Axis(0), Slice::from(start..));
         }
 
-        let (ads, music, talk) = self.get_ratio();
-
-        // dbg!((ads, music, talk));
-
-        if ads >= RATIO_THRESHOLD {
-            Some(self.ads_label.clone())
-        } else if music >= RATIO_THRESHOLD {
-            Some(self.music_label.clone())
-        } else if talk >= RATIO_THRESHOLD {
-            Some(self.talk_label.clone())
-        } else {
-            Some(self.last.clone())
-        }
+        self.buffer.mean_axis(Axis(0))
     }
 }
