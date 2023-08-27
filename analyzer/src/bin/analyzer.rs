@@ -25,7 +25,7 @@ fn main() -> anyhow::Result<()> {
     let decoder = Decoder::try_from(input)?;
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(1600)),
+        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(3000)),
         BitFlags::empty(),
     );
 

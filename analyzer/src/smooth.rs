@@ -69,7 +69,7 @@ impl LabelSmoother {
 
         let mean = self.buffer.mean_axis(Axis(0)).map(|v| 1.0 / v).unwrap();
         let total = mean.sum();
-        let confidence = mean.mapv(|v| (v / (total - v) - 2.0).max(0.0));
+        let confidence = mean.mapv(|v| (v / (total - v) - 1.5).max(0.0));
         if confidence == array![0.0, 0.0, 0.0] {
             // println!();
             return Ok(None);
