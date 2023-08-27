@@ -1,9 +1,8 @@
 import os
 from multiprocessing import Pool
 
-import tensorflow as tf
-
 import args
+import tensorflow as tf
 import util
 
 dataset_root = args.parse_embeddings()
@@ -39,5 +38,5 @@ def process(name):
     print(f"{name}: {len(ds)} embeddings")
 
 
-with Pool(3) as p:
-    p.map(process, ["advert", "music", "talk"])
+for name in ["advert", "music", "talk"]:
+    process(name)

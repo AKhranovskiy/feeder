@@ -29,11 +29,11 @@ pub struct BufferedAnalyzer {
     last_stat: Stats,
 }
 
-pub const DRAIN_DURATION: Duration = Duration::from_millis(100);
+pub const DRAIN_DURATION: Duration = Duration::from_millis(200);
 const PROCESSING_DURATION: Duration = Duration::from_millis(950);
 
 const MODEL: ClassifyModel = ClassifyModel::AMT;
-const AMPLIFICATION: [f32; 3] = [1., 3., 3.];
+const AMPLIFICATION: [f32; 3] = [1., 5., 5.];
 
 impl BufferedAnalyzer {
     #[must_use]
@@ -197,6 +197,7 @@ fn processing_worker(
 ) -> anyhow::Result<()> {
     let mut rate = Rate::new();
     let mut input_queue = VecDeque::<AudioFrame>::new();
+    let mut last_kind = ContentKind::Unknown;
 
     while !frame_receiver.is_disconnected() {
         rate.start();
@@ -256,16 +257,18 @@ fn processing_worker(
             let data = data / 32768.0;
 
             let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
-            if let Some(smoothed) = smoother.push(&prediction) {
-                let kind = match smoothed.argmax()?.1 {
+            // print!("{:?}", frames_to_process[0].pts());
+            if let Some(smoothed) = smoother.push(&prediction)? {
+                let kind = match smoothed.argmax()? {
                     0 => ContentKind::Advertisement,
                     1 => ContentKind::Music,
                     2 => ContentKind::Talk,
                     x => unreachable!("Unexpected label {x}"),
                 };
 
-                processed_sender.send(drained_frames.map(|frame| (kind, frame)).collect())?;
+                last_kind = kind;
             }
+            processed_sender.send(drained_frames.map(|frame| (last_kind, frame)).collect())?;
 
             worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
         }
