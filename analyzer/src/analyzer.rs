@@ -217,6 +217,7 @@ fn processing_worker(
             .as_secs_f64();
 
         let input_duration_secs = frame_duration_secs * input_queue.len() as f64;
+
         if input_duration_secs < PROCESSING_DURATION.as_secs_f64() {
             // Not enough input to process. Let's wait for next frame here.
             rate.stop();
@@ -257,7 +258,6 @@ fn processing_worker(
             let data = data / 32768.0;
 
             let prediction = classifier.classify(&data)?.amplified(&AMPLIFICATION);
-            // print!("{:?}", frames_to_process[0].pts());
             if let Some(smoothed) = smoother.push(&prediction)? {
                 let kind = match smoothed.argmax()? {
                     0 => ContentKind::Advertisement,

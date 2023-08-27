@@ -58,7 +58,6 @@ impl LabelSmoother {
         let len = self.buffer.shape()[0];
 
         if len < self.ahead {
-            // println!();
             return Ok(None);
         }
 
@@ -71,23 +70,23 @@ impl LabelSmoother {
         let total = mean.sum();
         let confidence = mean.mapv(|v| (v / (total - v) - 1.5).max(0.0));
         if confidence == array![0.0, 0.0, 0.0] {
-            // println!();
             return Ok(None);
         }
 
-        // println!(
-        //     " {:?} {:?}",
-        //     mean.as_slice().unwrap(),
-        //     confidence.as_slice().unwrap()
-        // );
-
+        // TODO How to eliminate short segments?
+        // Second buffer on confidence? ATA -> A, MMMMAAMM -> MMMMMMMMMMM
         Ok(Some(confidence))
     }
 
     fn dist(&self, labels: &PredictedLabels) -> anyhow::Result<Array2<f32>> {
-        let ads = labels.sq_l2_dist(&self.ads_label)?;
-        let music = labels.sq_l2_dist(&self.music_label)?;
-        let talk = labels.sq_l2_dist(&self.talk_label)?;
+        let repeat = |a: &PredictedLabels| {
+            ndarray::concatenate(Axis(0), &[a.view()].repeat(labels.shape()[0]))
+        };
+
+        let ads = labels.sq_l2_dist(&repeat(&self.ads_label)?)?;
+        let music = labels.sq_l2_dist(&repeat(&self.music_label)?)?;
+        let talk = labels.sq_l2_dist(&repeat(&self.talk_label)?)?;
+
         Ok(array![[ads, music, talk]])
     }
 }
