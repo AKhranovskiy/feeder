@@ -12,7 +12,7 @@ RUN apt-get update \
 RUN cargo install --path restreamer
 
 # final stage
-FROM debian:11 as final
+FROM debian:12 as final
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ffmpeg \
