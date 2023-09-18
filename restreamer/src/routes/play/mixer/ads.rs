@@ -14,8 +14,7 @@ enum Track {
 }
 
 pub struct AdsMixer {
-    ads: Vec<AudioFrame>,
-    _ad_provider: AdProvider,
+    ad_provider: AdProvider,
     cross_fader: CrossFader,
     pts: Pts,
     main_track: VecDeque<AudioFrame>,
@@ -37,16 +36,15 @@ impl Mixer for AdsMixer {
 }
 
 impl AdsMixer {
-    pub fn new(ad_provider: AdProvider, cross_fader: CrossFader) -> Self {
+    pub fn new(ad_provider: AdProvider, pts: Pts, cross_fader: CrossFader) -> Self {
         cross_fader.drain();
         Self {
-            ads: (*ad_provider.next().unwrap()).clone(),
-            _ad_provider: ad_provider,
+            ad_provider,
             cross_fader,
             main_track: VecDeque::new(),
             side_track: VecDeque::new(),
             side_buffer: VecDeque::new(),
-            pts: Pts::new(2_048, 48_000),
+            pts,
             active_track: Track::Main,
         }
     }
@@ -86,7 +84,7 @@ impl AdsMixer {
             }
 
             if self.side_track.is_empty() {
-                self.side_track.extend(self.ads.clone());
+                self.side_track.extend(self.ad_provider.next().unwrap());
             }
 
             let content = self
@@ -105,9 +103,11 @@ impl AdsMixer {
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
+    use std::time::Duration;
+
     use analyzer::ContentKind;
     use codec::dsp::{CrossFader, ParabolicCrossFade};
-    use codec::{AudioFrame, Timestamp};
+    use codec::{AudioFrame, Pts, Timestamp};
     use nearly::assert_nearly_eq;
 
     use crate::ad_provider::AdProvider;
@@ -115,10 +115,13 @@ mod tests {
 
     use super::{AdsMixer, Mixer};
 
+    const PTS: Pts = Pts::const_new(Duration::from_secs(1));
+
     #[test]
     fn test_one_ads_block_short_buffer() {
         let mut player = Player::new(AdsMixer::new(
             AdProvider::new_testing(create_frames(10, 0.5)),
+            PTS,
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
         player.content(5).advertisement(5).content(10).silence(2);
@@ -165,6 +168,7 @@ mod tests {
     fn test_ads_blocks_overlaps() {
         let mut player = Player::new(AdsMixer::new(
             AdProvider::new_testing(create_frames(10, 0.5)),
+            PTS,
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
 
@@ -227,6 +231,7 @@ mod tests {
     fn test_filled_buffer_skips_ads() {
         let mut player = Player::new(AdsMixer::new(
             AdProvider::new_testing(create_frames(10, 0.5)),
+            PTS,
             CrossFader::exact::<ParabolicCrossFade>(2),
         ));
 

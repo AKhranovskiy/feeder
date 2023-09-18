@@ -81,7 +81,13 @@ fn get_stream(
     state: PlayState,
 ) -> StreamBody<impl Stream<Item = anyhow::Result<Vec<u8>>>> {
     stream! {
-        let (mut reader, writer) = os_pipe::pipe()?;
+        let (mut reader, writer) = match os_pipe::pipe() {
+            Ok((r,w)) => (r,w),
+            Err(err) => {
+                log::error!("Error: failed to open pipe, {err:?}");
+                Err(err)?
+            },
+        };
 
         let handle = {
             let state= state.clone();
@@ -94,17 +100,26 @@ fn get_stream(
 
         loop {
             if handle.is_finished() {
-                handle.join().unwrap()?;
+                if let Err(err) = handle.join().unwrap(){
+                    log::error!("Analyzer failed: {err:?}");
+                    Err(err)?;
+                }
                 break;
             }
             if state.terminator.is_terminated() {
                 break;
             }
 
-            let read = reader.read(&mut buf)?;
+            let read = match reader.read(&mut buf){
+                Ok(read) =>read,
+                Err(err) => {
+                    log::error!("Reader failed: {err:?}");
+                    Err(err)?
+                },
+            };
 
             // let r = rate.push(read) / 128;
-            // print!("\t{r} kbps");
+            // print!("\r{r} kbps");
 
             yield Ok(buf[0..read].to_vec())
         }
@@ -150,6 +165,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
         PlayAction::Replace => Box::new(AdsMixer::new(
             AdProvider::new(state.ad_cache.clone(), codec_params),
+            encoder.pts()?,
             cross_fader,
         )),
     };

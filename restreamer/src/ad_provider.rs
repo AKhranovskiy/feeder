@@ -27,13 +27,15 @@ impl AdProvider {
         }
     }
 
-    pub fn next(&self) -> anyhow::Result<Arc<Vec<AudioFrame>>> {
+    pub fn next(&self) -> anyhow::Result<Vec<AudioFrame>> {
         let next_item = (self.next_item.get() + 1) % self.plan.len();
         self.next_item.set(next_item);
         assert!(next_item < self.plan.len());
 
         let next_id = self.plan[next_item];
-        self.ad_cache.get(next_id, self.codec_params)
+        self.ad_cache
+            .get(next_id, self.codec_params)
+            .map(|frames| (*frames).clone())
     }
 }
 
