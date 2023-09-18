@@ -302,9 +302,9 @@ mod tests {
                 CrossFadePair(0.979_795_897_113_271_2, 0.0),
                 CrossFadePair(0.916_515_138_991_168, 0.0),
                 CrossFadePair(0.799_999_999_999_999_9, 0.0),
-                CrossFadePair(0.599_999_999_999_999_9, 0.0),
-                CrossFadePair(0.0, 0.0), // middle point
-                CrossFadePair(0.0, 0.600_000_000_000_000_3),
+                CrossFadePair(0.6, 0.0),
+                CrossFadePair(0.0, 0.0),
+                CrossFadePair(0.0, 0.600_000_000_000_000_2),
                 CrossFadePair(0.0, 0.8),
                 CrossFadePair(0.0, 0.916_515_138_991_168_1),
                 CrossFadePair(0.0, 0.979_795_897_113_271_2),
@@ -325,7 +325,7 @@ mod tests {
                 CrossFadePair(0.519_999_999_999_999_9, 0.0),
                 CrossFadePair(0.25, 0.25),
                 CrossFadePair(0.0, 0.520_000_000_000_000_2),
-                CrossFadePair(0.0, 0.730_000_000_000_000_2),
+                CrossFadePair(0.0, 0.730_000_000_000_000_1),
                 CrossFadePair(0.0, 0.880_000_000_000_000_1),
                 CrossFadePair(0.0, 0.97),
                 CrossFadePair(0.0, 1.0)

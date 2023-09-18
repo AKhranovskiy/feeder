@@ -48,7 +48,7 @@ mod tests {
     }
 
     pub(super) fn pts_seq(length: usize) -> Vec<Timestamp> {
-        let mut pts = Pts::new(2_048, 48_000);
+        let mut pts = Pts::new(4, 4);
         (0..length).map(|_| pts.next()).collect()
     }
 

@@ -31,6 +31,7 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 use crate::{
     accept_header::Accept,
     ad_cache::AdCache,
+    ad_provider::AdProvider,
     args::Args,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
@@ -147,10 +148,10 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
-        PlayAction::Replace => {
-            let sample_audio_frames = (*state.ad_cache.get(0, codec_params)?).clone();
-            Box::new(AdsMixer::new(sample_audio_frames, cross_fader))
-        }
+        PlayAction::Replace => Box::new(AdsMixer::new(
+            AdProvider::new(state.ad_cache.clone(), codec_params),
+            cross_fader,
+        )),
     };
 
     for frame in decoder {

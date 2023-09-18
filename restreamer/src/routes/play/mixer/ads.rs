@@ -3,6 +3,8 @@ use std::collections::VecDeque;
 use codec::dsp::CrossFader;
 use codec::{AudioFrame, Pts};
 
+use crate::ad_provider::AdProvider;
+
 use super::Mixer;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -13,6 +15,7 @@ enum Track {
 
 pub struct AdsMixer {
     ads: Vec<AudioFrame>,
+    _ad_provider: AdProvider,
     cross_fader: CrossFader,
     pts: Pts,
     main_track: VecDeque<AudioFrame>,
@@ -34,10 +37,11 @@ impl Mixer for AdsMixer {
 }
 
 impl AdsMixer {
-    pub fn new(ad_frames: Vec<AudioFrame>, cross_fader: CrossFader) -> Self {
+    pub fn new(ad_provider: AdProvider, cross_fader: CrossFader) -> Self {
         cross_fader.drain();
         Self {
-            ads: ad_frames,
+            ads: (*ad_provider.next().unwrap()).clone(),
+            _ad_provider: ad_provider,
             cross_fader,
             main_track: VecDeque::new(),
             side_track: VecDeque::new(),
@@ -105,6 +109,7 @@ mod tests {
     use codec::dsp::{CrossFader, ParabolicCrossFade};
     use codec::{AudioFrame, Timestamp};
 
+    use crate::ad_provider::AdProvider;
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
 
     use super::{AdsMixer, Mixer};
@@ -112,7 +117,7 @@ mod tests {
     #[test]
     fn test_one_ads_block_short_buffer() {
         let mut player = Player::new(AdsMixer::new(
-            create_frames(10, 0.5),
+            AdProvider::new_testing(create_frames(10, 0.5)),
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
         player.content(5).advertisement(5).content(10).silence(2);
@@ -156,7 +161,7 @@ mod tests {
     #[test]
     fn test_ads_blocks_overlaps() {
         let mut player = Player::new(AdsMixer::new(
-            create_frames(10, 0.5),
+            AdProvider::new_testing(create_frames(10, 0.5)),
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
 
@@ -216,7 +221,7 @@ mod tests {
     #[test]
     fn test_filled_buffer_skips_ads() {
         let mut player = Player::new(AdsMixer::new(
-            create_frames(10, 0.5),
+            AdProvider::new_testing(create_frames(10, 0.5)),
             CrossFader::exact::<ParabolicCrossFade>(2),
         ));
 

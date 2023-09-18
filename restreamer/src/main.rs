@@ -12,6 +12,7 @@ use codec::configure_ffmpeg_log;
 
 mod accept_header;
 mod ad_cache;
+mod ad_provider;
 mod args;
 mod rate;
 mod routes;
@@ -28,11 +29,8 @@ async fn main() {
 
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
-    let ad_cache = Arc::new(
-        AdCache::build(&[include_bytes!("../sample.aac").to_vec()])
-            .await
-            .expect("Ad Cache"),
-    );
+    let ad_cache =
+        Arc::new(AdCache::build(&[include_bytes!("../sample.aac").to_vec()]).expect("Ad Cache"));
 
     let app = Router::new().nest_service("/", serve_dir.clone()).nest(
         "/play",
