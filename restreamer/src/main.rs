@@ -1,5 +1,6 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
+use ad_cache::AdCache;
 use axum::{routing::get_service, Router, Server};
 use clap::Parser;
 use log::LevelFilter;
@@ -27,10 +28,15 @@ async fn main() {
 
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
+    let ad_cache = Arc::new(
+        AdCache::build(&[include_bytes!("../sample.aac").to_vec()])
+            .await
+            .expect("Ad Cache"),
+    );
 
     let app = Router::new().nest_service("/", serve_dir.clone()).nest(
         "/play",
-        routes::play::router(terminator.clone(), args.clone()),
+        routes::play::router(terminator.clone(), ad_cache, args.clone()),
     );
 
     Server::bind(&get_addr(&args))

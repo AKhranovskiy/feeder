@@ -1,5 +1,6 @@
 use std::{
     io::{Read, Write},
+    sync::Arc,
     time::Duration,
 };
 
@@ -18,7 +19,7 @@ use futures::Stream;
 use analyzer::{BufferedAnalyzer, LabelSmoother};
 use codec::{
     dsp::{CrossFader, LinearCrossFade, ParabolicCrossFade},
-    AudioFrame, CodecParams, Decoder, Encoder, FrameDuration, Resampler,
+    Decoder, Encoder, FrameDuration,
 };
 
 mod play_params;
@@ -29,6 +30,7 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
 use crate::{
     accept_header::Accept,
+    ad_cache::AdCache,
     args::Args,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
@@ -39,13 +41,16 @@ const OUTPUT_MIME: &str = "audio/aac";
 #[derive(Clone)]
 struct PlayState {
     terminator: Terminator,
+    ad_cache: Arc<AdCache>,
     args: Args,
 }
 
-pub fn router(terminator: Terminator, args: Args) -> Router {
-    Router::new()
-        .route("/", get(serve))
-        .with_state(PlayState { terminator, args })
+pub fn router(terminator: Terminator, ad_cache: Arc<AdCache>, args: Args) -> Router {
+    Router::new().route("/", get(serve)).with_state(PlayState {
+        terminator,
+        ad_cache,
+        args,
+    })
 }
 
 async fn serve(
@@ -78,7 +83,7 @@ fn get_stream(
         let (mut reader, writer) = os_pipe::pipe()?;
 
         let handle = {
-            let state = state.clone();
+            let state= state.clone();
             std::thread::spawn(move || analyze(params, writer, &state))
         };
 
@@ -106,43 +111,22 @@ fn get_stream(
     .into()
 }
 
-pub fn prepare_sample_audio(params: CodecParams) -> anyhow::Result<Vec<AudioFrame>> {
-    let sample_audio = include_bytes!("../../sample.aac");
-    let decoder = Decoder::try_from(std::io::Cursor::new(sample_audio))?;
-    let mut resampler = Resampler::new(decoder.codec_params(), params);
-    let mut frames = vec![];
-
-    for frame in decoder {
-        for frame in resampler.push(frame?)? {
-            frames.push(frame?);
-        }
-    }
-
-    frames.truncate(100);
-    Ok(frames)
-}
-
 const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 
 fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow::Result<()> {
-    let action = params.action.unwrap_or(PlayAction::Passthrough);
-
     let input = unstreamer::Unstreamer::open(&params.source)?;
 
     let mut decoder = Decoder::try_from(input)?;
-    let codec_params = {
-        let first_frame = decoder.next().ok_or_else(|| anyhow!("No audio frame"))??;
-        decoder
-            .codec_params()
-            .with_samples_per_frame(first_frame.samples())
-    };
+    let first_frame = decoder.next().ok_or_else(|| anyhow!("No audio frame"))??;
+
+    let codec_params = decoder
+        .codec_params()
+        .with_samples_per_frame(first_frame.samples());
 
     log::info!("Input media info {codec_params:?}");
 
     let mut encoder = Encoder::aac(codec_params, writer)?;
     log::info!("Output media info {:?}", encoder.codec_params());
-
-    let sample_audio_frames = prepare_sample_audio(codec_params)?;
 
     let mut stream_saver = StreamSaver::new(state.args.is_recording_enabled(), codec_params)?;
 
@@ -154,18 +138,19 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
         state.args.clone().into(),
     );
 
-    let cross_fader = CrossFader::new::<ParabolicCrossFade>(
-        CROSS_FADE_DURATION,
-        sample_audio_frames[0].duration(),
-    );
+    let cross_fader =
+        CrossFader::new::<ParabolicCrossFade>(CROSS_FADE_DURATION, first_frame.duration());
 
-    let entry =
-        CrossFader::new::<LinearCrossFade>(CROSS_FADE_DURATION, sample_audio_frames[0].duration());
+    let entry = CrossFader::new::<LinearCrossFade>(CROSS_FADE_DURATION, first_frame.duration());
 
+    let action = params.action.unwrap_or(PlayAction::Passthrough);
     let mut mixer: Box<dyn Mixer> = match action {
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
-        PlayAction::Replace => Box::new(AdsMixer::new(sample_audio_frames, cross_fader)),
+        PlayAction::Replace => {
+            let sample_audio_frames = (*state.ad_cache.get(0, codec_params)?).clone();
+            Box::new(AdsMixer::new(sample_audio_frames, cross_fader))
+        }
     };
 
     for frame in decoder {
