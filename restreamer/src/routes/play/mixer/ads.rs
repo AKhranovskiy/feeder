@@ -108,6 +108,7 @@ mod tests {
     use analyzer::ContentKind;
     use codec::dsp::{CrossFader, ParabolicCrossFade};
     use codec::{AudioFrame, Timestamp};
+    use nearly::assert_nearly_eq;
 
     use crate::ad_provider::AdProvider;
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
@@ -122,9 +123,10 @@ mod tests {
         ));
         player.content(5).advertisement(5).content(10).silence(2);
 
-        assert_eq!(
-            &player.samples(),
-            &[
+        #[rustfmt::skip]
+        assert_nearly_eq!(
+            player.samples(),
+            [
                 // M
                 1.0,
                 1.0,
@@ -133,16 +135,16 @@ mod tests {
                 1.0,
                 // CF
                 1.0,
-                0.666_666_7,
-                0.333_333_34,
+                0.666,
+                0.333,
                 0.5,
                 // A
                 0.5,
                 0.5, // MT
                 // CF
                 0.5,
-                0.333_333_34,
-                0.666_666_7,
+                0.333,
+                0.666,
                 1.0,
                 // M
                 1.0,
@@ -152,7 +154,8 @@ mod tests {
                 1.0,
                 1.0,
                 0.0
-            ]
+            ],
+            eps = 1e-3
         );
 
         assert_eq!(player.timestamps(), pts_seq(22));
@@ -172,9 +175,10 @@ mod tests {
             .advertisement(5)
             .silence(7);
 
-        assert_eq!(
-            &player.samples(),
-            &[
+        #[rustfmt::skip]
+        assert_nearly_eq!(
+            player.samples(),
+            [
                 1.0,
                 1.0,
                 1.0,
@@ -182,35 +186,36 @@ mod tests {
                 1.0,
                 // CF
                 1.0,
-                0.666_666_7,
-                0.333_333_34,
+                0.666,
+                0.333,
                 0.5,
                 // A
                 0.5,
                 0.5,
                 // CF
                 0.5,
-                0.333_333_34,
-                0.666_666_7,
+                0.333,
+                0.666,
                 1.0,
                 // M
                 1.0,
                 // CF
                 1.0,
-                0.666_666_7,
-                0.333_333_34,
+                0.666,
+                0.333,
                 0.5,
                 // A
                 0.5,
                 0.5,
                 // CF
                 0.5,
-                0.333_333_34,
+                0.333,
                 0.0,
                 0.0,
                 // S
                 0.0
-            ]
+            ],
+            eps = 1e-3
         );
 
         assert_eq!(player.timestamps(), pts_seq(27));

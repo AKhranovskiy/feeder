@@ -141,7 +141,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_get() {
         const TARGET_PARAMS: CodecParams =
             CodecParams::new(44100, codec::SampleFormat::FltPlanar, 2).with_samples_per_frame(512);
