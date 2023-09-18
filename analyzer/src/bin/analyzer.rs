@@ -1,15 +1,12 @@
-use std::io::Write;
+// use std::io::Write;
 use std::time::Duration;
 
 use enumflags2::BitFlags;
 use kdam::{tqdm, BarExt};
 use log::LevelFilter;
-use stderrlog::Timestamp;
 
 use analyzer::{BufferedAnalyzer, ContentKind, LabelSmoother};
 use codec::Decoder;
-
-const BUFFER_SIZE: usize = 2 * 1024;
 
 fn main() -> anyhow::Result<()> {
     stderrlog::new()
@@ -18,7 +15,7 @@ fn main() -> anyhow::Result<()> {
         .module("analyzer::smooth")
         .module("analyzer::analyzer")
         .verbosity(LevelFilter::Debug)
-        .timestamp(Timestamp::Second)
+        .timestamp(stderrlog::Timestamp::Second)
         .init()
         .unwrap();
 
@@ -28,11 +25,11 @@ fn main() -> anyhow::Result<()> {
     let decoder = Decoder::try_from(input)?;
 
     let mut analyzer = BufferedAnalyzer::new(
-        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(0)),
+        LabelSmoother::new(Duration::from_millis(0), Duration::from_millis(1000)),
         BitFlags::empty(),
     );
 
-    let mut buf = Vec::with_capacity(BUFFER_SIZE);
+    // let mut buf = Vec::with_capacity(BUFFER_SIZE);
 
     let mut pb_frames = tqdm!(
         total = decoder.frames() as usize,
@@ -53,38 +50,35 @@ fn main() -> anyhow::Result<()> {
     );
 
     let mut prev_kind = ContentKind::Unknown;
+
     for frame in decoder {
         analyzer.push(frame?)?;
     }
 
     analyzer.flush()?;
 
-    while !analyzer.is_completed() {
-        for (kind, frame) in analyzer.pop()? {
-            if prev_kind != kind {
-                eprintln!("{:?} {kind}", frame.pts());
-                prev_kind = kind;
-            }
-
-            if kind == ContentKind::Advertisement {
-                pb_ads.update(1)?;
-            }
-
-            let k = match kind {
-                ContentKind::Advertisement => 'A',
-                ContentKind::Music => 'M',
-                ContentKind::Talk => 'T',
-                ContentKind::Unknown => 'U',
-            };
-
-            buf.push(k as u8);
-            if buf.len() == BUFFER_SIZE {
-                std::io::stdout().write_all(&buf)?;
-                buf.clear();
-            }
-            pb_frames.update(1)?;
+    for (kind, frame) in analyzer.pop()? {
+        if prev_kind != kind {
+            println!("{:?} {kind}", frame.pts());
+            prev_kind = kind;
         }
+
+        if kind == ContentKind::Advertisement {
+            pb_ads.update(1)?;
+        }
+
+        // let k = match kind {
+        //     ContentKind::Advertisement => 'A',
+        //     ContentKind::Music => 'M',
+        //     ContentKind::Talk => 'T',
+        //     ContentKind::Unknown => 'U',
+        // };
+
+        // buf.push(k as u8);
+        pb_frames.update(1)?;
     }
+
+    // std::io::stdout().write_all(&buf)?;
 
     println!(
         "\nTotal {}, ads={} / {}%",
@@ -92,7 +86,6 @@ fn main() -> anyhow::Result<()> {
         pb_ads.fmt_counter(),
         ((pb_ads.counter as f64) / (pb_frames.counter as f64) * 100.0).trunc() as u32
     );
-    std::io::stdout().write_all(&buf)?;
 
     Ok(())
 }

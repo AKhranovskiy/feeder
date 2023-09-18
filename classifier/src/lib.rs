@@ -48,12 +48,10 @@ impl Classify for AmtClassifier {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
         let embedding = self.yamnet.run(&Tensor::from(data))?;
         let prediction = self.adbanda.run(&embedding)?;
-
-        assert_eq!(prediction.shape(), [1, 3].into());
-        let (ads, music, talk) = (prediction[0], prediction[1], prediction[2]);
+        let dims = prediction.dims();
         Ok(PredictedLabels::from_shape_vec(
-            (1, 3),
-            vec![ads, music, talk],
+            (dims[0] as usize, dims[1] as usize),
+            prediction.to_vec(),
         )?)
     }
 }

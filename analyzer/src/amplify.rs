@@ -1,13 +1,12 @@
 use classifier::PredictedLabels;
+use ndarray::{Array1, Axis};
 
 pub trait Apmlify {
     fn amplified(self, coefficients: &[f32]) -> Self;
 }
 
 impl Apmlify for PredictedLabels {
-    fn amplified(self, coefficients: &[f32]) -> Self {
-        assert!((1.0 - self.iter().sum::<f32>()).abs() < 1e-6);
-        assert_eq!(self.shape(), [1, coefficients.len()]);
+    fn amplified(mut self, coefficients: &[f32]) -> Self {
         assert!(coefficients.iter().all(|f| *f >= 0.0));
 
         let coeff_sum = coefficients.iter().sum::<f32>();
@@ -18,13 +17,17 @@ impl Apmlify for PredictedLabels {
             .map(|c| *c / coeff_sum)
             .collect::<Vec<_>>();
 
-        let amplified_values =
-            self * Self::from_shape_vec((1, normalized_coeffs.len()), normalized_coeffs).unwrap();
+        for mut t in self.axis_iter_mut(Axis(0)) {
+            assert_eq!(t.shape(), [coefficients.len(),]);
+            assert!((1.0 - t.iter().sum::<f32>()).abs() < 1e-6);
 
-        let amplified_sum = amplified_values.iter().sum::<f32>();
-        assert!(amplified_sum > 0.0);
+            let amplified_values = t.to_owned() * Array1::from_vec(normalized_coeffs.clone());
+            let amplified_sum = amplified_values.iter().sum::<f32>();
+            assert!(amplified_sum > 0.0);
 
-        amplified_values / amplified_sum
+            t.assign(&(amplified_values / amplified_sum));
+        }
+        self
     }
 }
 
