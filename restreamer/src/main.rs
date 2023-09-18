@@ -10,6 +10,7 @@ use args::Args;
 use codec::configure_ffmpeg_log;
 
 mod accept_header;
+mod ad_cache;
 mod args;
 mod rate;
 mod routes;
