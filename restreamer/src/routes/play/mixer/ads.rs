@@ -4,7 +4,7 @@ use axum::async_trait;
 use codec::dsp::CrossFader;
 use codec::{AudioFrame, Pts};
 
-use crate::ads_planner::AdsPlanner;
+use crate::ads_management::AdsPlanner;
 
 use super::Mixer;
 
@@ -113,7 +113,7 @@ mod tests {
     use codec::{AudioFrame, Pts, Timestamp};
     use nearly::assert_nearly_eq;
 
-    use crate::ads_planner::AdsPlanner;
+    use crate::ads_management::AdsPlanner;
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
 
     use super::{AdsMixer, Mixer};

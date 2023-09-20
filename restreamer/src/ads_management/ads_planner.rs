@@ -5,7 +5,7 @@ use std::sync::{
 
 use codec::{AudioFrame, CodecParams};
 
-use crate::{ad_cache::AdId, ads_provider::AdsProvider};
+use super::{AdId, AdsProvider};
 
 pub struct AdsPlanner {
     ads_provider: Arc<AdsProvider>,
@@ -57,8 +57,6 @@ impl AdsPlanner {
 impl AdsPlanner {
     pub async fn testing(track: Vec<AudioFrame>) -> Self {
         let ads_provider = Arc::new(AdsProvider::testing(track).await);
-        Self::new(ads_provider, crate::ad_cache::AdCache::CODEC_PARAMS)
-            .await
-            .unwrap()
+        Self::new(ads_provider, super::CODEC_PARAMS).await.unwrap()
     }
 }

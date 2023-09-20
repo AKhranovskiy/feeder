@@ -1,12 +1,10 @@
-#![allow(dead_code)]
-
 use std::{hash::Hash, str::FromStr, sync::Arc};
 
 use codec::{AudioFrame, CodecParams};
 use sqlx::{sqlite::SqliteRow, Row, SqlitePool};
 use uuid::Uuid;
 
-use crate::ad_cache::{AdCache, AdId};
+use super::{AdCache, AdId};
 
 type Track = Vec<AudioFrame>;
 
@@ -104,7 +102,7 @@ async fn fill_db(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::query(r#"INSERT INTO "advertisements" (id, name, content) VALUES(?,?,?)"#)
         .bind(Uuid::new_v4().to_string())
         .bind("Sample Advert")
-        .bind(&(include_bytes!("../sample.aac"))[..])
+        .bind(&(include_bytes!("../../sample.aac"))[..])
         .execute(pool)
         .await?;
 

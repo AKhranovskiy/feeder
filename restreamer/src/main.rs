@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use ads_provider::AdsProvider;
+use ads_management::AdsProvider;
 use axum::{routing::get_service, Router, Server};
 use clap::Parser;
 use log::LevelFilter;
@@ -11,9 +11,7 @@ use args::Args;
 use codec::configure_ffmpeg_log;
 
 mod accept_header;
-mod ad_cache;
-mod ads_planner;
-mod ads_provider;
+mod ads_management;
 mod args;
 mod rate;
 mod routes;

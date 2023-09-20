@@ -30,8 +30,7 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
 use crate::{
     accept_header::Accept,
-    ads_planner::AdsPlanner,
-    ads_provider::AdsProvider,
+    ads_management::{AdsPlanner, AdsProvider},
     args::Args,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,

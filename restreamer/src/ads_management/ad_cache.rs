@@ -96,7 +96,7 @@ impl AdCache {
     }
 
     #[cfg(test)]
-    pub async fn build(tracks: &[Vec<u8>]) -> anyhow::Result<Self> {
+    pub async fn testing(tracks: &[Vec<u8>]) -> anyhow::Result<Self> {
         let this = Self::new();
         futures::future::try_join_all(tracks.iter().map(|track| this.insert(AdId::new(), track)))
             .await?;
@@ -158,16 +158,13 @@ impl AdCache {
 
 #[cfg(test)]
 impl AdCache {
-    pub const CODEC_PARAMS: CodecParams =
-        CodecParams::new(4, codec::SampleFormat::Flt, 1).with_samples_per_frame(4);
-
     pub fn build_testing(id: AdId, track: Vec<AudioFrame>) -> Self {
         Self {
             tracks: Arc::new(RwLock::new(
                 std::iter::once((
                     id,
                     TrackCacheItem {
-                        params: Self::CODEC_PARAMS,
+                        params: super::CODEC_PARAMS,
                         track: track.clone(),
                         duration: Duration::from_secs(track.len() as u64),
                     },
@@ -175,7 +172,7 @@ impl AdCache {
                 .collect(),
             )),
             resampled: Arc::new(RwLock::new(
-                std::iter::once(((id, Self::CODEC_PARAMS), Arc::new(track))).collect(),
+                std::iter::once(((id, super::CODEC_PARAMS), Arc::new(track))).collect(),
             )),
         }
     }
@@ -187,7 +184,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_build() {
-        let cache = AdCache::build(&[include_bytes!("../sample.aac").to_vec()])
+        let cache = AdCache::testing(&[include_bytes!("../../sample.aac").to_vec()])
             .await
             .expect("Ad cache");
 
@@ -199,7 +196,7 @@ mod tests {
         const TARGET_PARAMS: CodecParams =
             CodecParams::new(44100, codec::SampleFormat::FltPlanar, 2).with_samples_per_frame(512);
 
-        let cache = AdCache::build(&[include_bytes!("../sample.aac").to_vec()])
+        let cache = AdCache::testing(&[include_bytes!("../../sample.aac").to_vec()])
             .await
             .expect("Ad cache");
 
