@@ -30,8 +30,8 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
 use crate::{
     accept_header::Accept,
-    ad_cache::AdCache,
-    ad_provider::AdProvider,
+    ads_planner::AdsPlanner,
+    ads_provider::AdsProvider,
     args::Args,
     stream_saver::{Destination, StreamSaver},
     terminate::Terminator,
@@ -42,14 +42,14 @@ const OUTPUT_MIME: &str = "audio/aac";
 #[derive(Clone)]
 struct PlayState {
     terminator: Terminator,
-    ad_cache: Arc<AdCache>,
+    ads_provider: Arc<AdsProvider>,
     args: Args,
 }
 
-pub fn router(terminator: Terminator, ad_cache: Arc<AdCache>, args: Args) -> Router {
+pub fn router(terminator: Terminator, ads_provider: Arc<AdsProvider>, args: Args) -> Router {
     Router::new().route("/", get(serve)).with_state(PlayState {
         terminator,
-        ad_cache,
+        ads_provider,
         args,
     })
 }
@@ -91,7 +91,10 @@ fn get_stream(
 
         let handle = {
             let state= state.clone();
-            std::thread::spawn(move || analyze(params, writer, &state))
+            std::thread::spawn(move || {
+                tokio::runtime::Runtime::new()?.block_on(async move {
+                    analyze(params, writer, &state).await
+                })})
         };
 
         let mut buf = [0u8;1024];
@@ -129,7 +132,11 @@ fn get_stream(
 
 const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 
-fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow::Result<()> {
+async fn analyze<W: Write + Send>(
+    params: PlayParams,
+    writer: W,
+    state: &PlayState,
+) -> anyhow::Result<()> {
     let input = unstreamer::Unstreamer::open(&params.source)?;
 
     let mut decoder = Decoder::try_from(input)?;
@@ -164,7 +171,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
         PlayAction::Passthrough => Box::new(PassthroughMixer::new()),
         PlayAction::Silence => Box::new(SilenceMixer::new(cross_fader)),
         PlayAction::Replace => Box::new(AdsMixer::new(
-            AdProvider::new(state.ad_cache.clone(), codec_params),
+            AdsPlanner::new(state.ads_provider.clone(), codec_params).await?,
             encoder.pts()?,
             cross_fader,
         )),
@@ -185,7 +192,7 @@ fn analyze<W: Write>(params: PlayParams, writer: W, state: &PlayState) -> anyhow
                 break;
             }
 
-            let frame = mixer.push(kind, &frame);
+            let frame = mixer.push(kind, &frame).await;
             let frame = entry.apply(&codec::silence_frame(&frame), &frame);
 
             stream_saver.push(Destination::Processed, frame.clone());

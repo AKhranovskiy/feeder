@@ -1,9 +1,10 @@
 use std::collections::VecDeque;
 
+use axum::async_trait;
 use codec::dsp::CrossFader;
 use codec::{AudioFrame, Pts};
 
-use crate::ad_provider::AdProvider;
+use crate::ads_planner::AdsPlanner;
 
 use super::Mixer;
 
@@ -14,7 +15,7 @@ enum Track {
 }
 
 pub struct AdsMixer {
-    ad_provider: AdProvider,
+    ads_planner: AdsPlanner,
     cross_fader: CrossFader,
     pts: Pts,
     main_track: VecDeque<AudioFrame>,
@@ -23,11 +24,12 @@ pub struct AdsMixer {
     active_track: Track,
 }
 
+#[async_trait]
 impl Mixer for AdsMixer {
-    fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
+    async fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
         self.pts.update(frame);
         match kind {
-            analyzer::ContentKind::Advertisement => self.advertisement(frame),
+            analyzer::ContentKind::Advertisement => self.advertisement(frame).await,
             analyzer::ContentKind::Music
             | analyzer::ContentKind::Talk
             | analyzer::ContentKind::Unknown => self.content(frame),
@@ -36,10 +38,10 @@ impl Mixer for AdsMixer {
 }
 
 impl AdsMixer {
-    pub fn new(ad_provider: AdProvider, pts: Pts, cross_fader: CrossFader) -> Self {
+    pub fn new(ads_planner: AdsPlanner, pts: Pts, cross_fader: CrossFader) -> Self {
         cross_fader.drain();
         Self {
-            ad_provider,
+            ads_planner,
             cross_fader,
             main_track: VecDeque::new(),
             side_track: VecDeque::new(),
@@ -74,7 +76,7 @@ impl AdsMixer {
         self.pts(output)
     }
 
-    fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
+    async fn advertisement(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.side_buffer.push_back(frame.clone());
 
         let output = if self.main_track.is_empty() {
@@ -84,7 +86,8 @@ impl AdsMixer {
             }
 
             if self.side_track.is_empty() {
-                self.side_track.extend(self.ad_provider.next().unwrap());
+                self.side_track
+                    .extend(self.ads_planner.next().await.unwrap());
             }
 
             let content = self
@@ -110,21 +113,29 @@ mod tests {
     use codec::{AudioFrame, Pts, Timestamp};
     use nearly::assert_nearly_eq;
 
-    use crate::ad_provider::AdProvider;
+    use crate::ads_planner::AdsPlanner;
     use crate::routes::play::mixer::tests::{create_frames, pts_seq, SamplesAsVec};
 
     use super::{AdsMixer, Mixer};
 
     const PTS: Pts = Pts::const_new(Duration::from_secs(1));
 
-    #[test]
-    fn test_one_ads_block_short_buffer() {
+    #[tokio::test]
+    async fn test_one_ads_block_short_buffer() {
         let mut player = Player::new(AdsMixer::new(
-            AdProvider::new_testing(create_frames(10, 0.5)),
+            AdsPlanner::testing(create_frames(10, 0.5)).await,
             PTS,
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
-        player.content(5).advertisement(5).content(10).silence(2);
+        player
+            .content(5)
+            .await
+            .advertisement(5)
+            .await
+            .content(10)
+            .await
+            .silence(2)
+            .await;
 
         #[rustfmt::skip]
         assert_nearly_eq!(
@@ -164,20 +175,25 @@ mod tests {
         assert_eq!(player.timestamps(), pts_seq(22));
     }
 
-    #[test]
-    fn test_ads_blocks_overlaps() {
+    #[tokio::test]
+    async fn test_ads_blocks_overlaps() {
         let mut player = Player::new(AdsMixer::new(
-            AdProvider::new_testing(create_frames(10, 0.5)),
+            AdsPlanner::testing(create_frames(10, 0.5)).await,
             PTS,
             CrossFader::exact::<ParabolicCrossFade>(4),
         ));
 
         player
             .content(5)
+            .await
             .advertisement(5)
+            .await
             .content(5)
+            .await
             .advertisement(5)
-            .silence(7);
+            .await
+            .silence(7)
+            .await;
 
         #[rustfmt::skip]
         assert_nearly_eq!(
@@ -227,20 +243,25 @@ mod tests {
         assert_eq!(2, player.mixer.main_track.len());
     }
 
-    #[test]
-    fn test_filled_buffer_skips_ads() {
+    #[tokio::test]
+    async fn test_filled_buffer_skips_ads() {
         let mut player = Player::new(AdsMixer::new(
-            AdProvider::new_testing(create_frames(10, 0.5)),
+            AdsPlanner::testing(create_frames(10, 0.5)).await,
             PTS,
             CrossFader::exact::<ParabolicCrossFade>(2),
         ));
 
         player
             .content(1)
+            .await
             .advertisement(1)
+            .await
             .content(10)
+            .await
             .advertisement(1)
-            .silence(7);
+            .await
+            .silence(7)
+            .await;
 
         assert_eq!(
             &player.samples(),
@@ -269,25 +290,30 @@ mod tests {
             }
         }
 
-        fn content(&mut self, length: usize) -> &mut Self {
-            self.output
-                .extend((0..length).map(|_| self.mixer.push(ContentKind::Music, &self.frame)));
+        async fn content(&mut self, length: usize) -> &mut Self {
+            for _ in 0..length {
+                self.output
+                    .push(self.mixer.push(ContentKind::Music, &self.frame).await);
+            }
             self
         }
 
-        fn advertisement(&mut self, length: usize) -> &mut Self {
-            self.output.extend(
-                (0..length).map(|_| self.mixer.push(ContentKind::Advertisement, &self.frame)),
-            );
+        async fn advertisement(&mut self, length: usize) -> &mut Self {
+            for _ in 0..length {
+                self.output.push(
+                    self.mixer
+                        .push(ContentKind::Advertisement, &self.frame)
+                        .await,
+                );
+            }
             self
         }
 
-        fn silence(&mut self, length: usize) -> &mut Self {
-            self.output.extend(
-                create_frames(length, 0.0)
-                    .into_iter()
-                    .map(|frame| self.mixer.push(ContentKind::Music, &frame)),
-            );
+        async fn silence(&mut self, length: usize) -> &mut Self {
+            for frame in create_frames(length, 0.0) {
+                self.output
+                    .push(self.mixer.push(ContentKind::Music, &frame).await);
+            }
             self
         }
 

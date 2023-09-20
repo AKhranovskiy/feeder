@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use ad_cache::AdCache;
+use ads_provider::AdsProvider;
 use axum::{routing::get_service, Router, Server};
 use clap::Parser;
 use log::LevelFilter;
@@ -12,7 +12,7 @@ use codec::configure_ffmpeg_log;
 
 mod accept_header;
 mod ad_cache;
-mod ad_provider;
+mod ads_planner;
 mod ads_provider;
 mod args;
 mod rate;
@@ -30,12 +30,11 @@ async fn main() {
 
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
-    let ad_cache =
-        Arc::new(AdCache::build(&[include_bytes!("../sample.aac").to_vec()]).expect("Ad Cache"));
+    let ads_provider = Arc::new(AdsProvider::init().await.expect("AdsProvider"));
 
     let app = Router::new().nest_service("/", serve_dir.clone()).nest(
         "/play",
-        routes::play::router(terminator.clone(), ad_cache, args.clone()),
+        routes::play::router(terminator.clone(), ads_provider, args.clone()),
     );
 
     Server::bind(&get_addr(&args))

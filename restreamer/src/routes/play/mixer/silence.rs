@@ -1,3 +1,4 @@
+use axum::async_trait;
 use codec::{dsp::CrossFader, AudioFrame, Pts};
 
 use super::Mixer;
@@ -32,8 +33,9 @@ impl SilenceMixer {
     }
 }
 
+#[async_trait]
 impl Mixer for SilenceMixer {
-    fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
+    async fn push(&mut self, kind: analyzer::ContentKind, frame: &AudioFrame) -> AudioFrame {
         self.pts.update(frame);
         let silence = codec::silence_frame(frame);
 
@@ -69,34 +71,25 @@ mod tests {
     use super::Mixer;
     use super::SilenceMixer;
 
-    #[allow(clippy::float_cmp)]
-    #[test]
-    fn test_music_to_advertisement() {
+    #[tokio::test]
+    async fn test_music_to_advertisement() {
         let music = create_frames(20, 1.0);
 
         let mut sut = SilenceMixer::new(CrossFader::exact::<ParabolicCrossFade>(3));
 
         let mut output = vec![];
 
-        output.extend(
-            music
-                .iter()
-                .take(5)
-                .map(|frame| sut.push(ContentKind::Music, frame)),
-        );
-        output.extend(
-            music
-                .iter()
-                .skip(5)
-                .take(10)
-                .map(|frame| sut.push(ContentKind::Advertisement, frame)),
-        );
-        output.extend(
-            music
-                .iter()
-                .skip(15)
-                .map(|frame| sut.push(ContentKind::Music, frame)),
-        );
+        for frame in music.iter().take(5) {
+            output.push(sut.push(ContentKind::Music, frame).await);
+        }
+
+        for frame in music.iter().skip(5).take(10) {
+            output.push(sut.push(ContentKind::Advertisement, frame).await);
+        }
+
+        for frame in music.iter().skip(15) {
+            output.push(sut.push(ContentKind::Music, frame).await);
+        }
 
         let samples = output
             .iter()
