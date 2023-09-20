@@ -31,6 +31,11 @@ os_pipe = "1.1.4"
 rand = { version = "0.8.5", features = ["small_rng"] }
 ringbuf = "0.3.3"
 serde = { version = "1.0.186", features = ["derive"] }
+sqlx = { version = "0.7.1", features = [
+    "runtime-tokio-native-tls",
+    "sqlite",
+    "macros",
+] }
 stderrlog = "0.5.4"
 tensorflow = { version = "0.21.0", features = ["ndarray"] }
 tokio = { version = "1.32.0", features = [
@@ -43,6 +48,7 @@ tower = "0.4.13"
 tower-http = { version = "0.4.3", features = ["full"] }
 ureq = { version = "2.7.1", features = ["json"] }
 url = { version = "2.4.0", features = ["serde"] }
+uuid = { version = "1.4.1", features = ["v4"] }
 
 analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }

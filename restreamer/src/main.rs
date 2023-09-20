@@ -13,6 +13,7 @@ use codec::configure_ffmpeg_log;
 mod accept_header;
 mod ad_cache;
 mod ad_provider;
+mod ads_provider;
 mod args;
 mod rate;
 mod routes;

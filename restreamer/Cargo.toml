@@ -22,12 +22,14 @@ nearly = { workspace = true }
 os_pipe = { workspace = true }
 ringbuf = { workspace = true }
 serde = { workspace = true }
+sqlx = { workspace = true }
 stderrlog = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 unstreamer = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 ac-ffmpeg = { workspace = true }
