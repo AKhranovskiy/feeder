@@ -19,17 +19,10 @@ impl AdsPlanner {
         ads_provider: Arc<AdsProvider>,
         codec_params: CodecParams,
     ) -> anyhow::Result<Self> {
-        let plan = ads_provider
-            .content()
-            .await?
-            .iter()
-            .inspect(|item| log::info!("Ad item: {:?}", item))
-            .map(|(id, _)| id)
-            .copied()
-            .collect();
+        let content = ads_provider.content().await?;
 
-        // TODO arrange plan
-        // TODO prepare the first item
+        let plan = arrange_plan(content);
+
         Ok(Self {
             ads_provider,
             codec_params,
@@ -40,10 +33,9 @@ impl AdsPlanner {
 
     pub async fn next(&self) -> anyhow::Result<Vec<AudioFrame>> {
         let next_item = self.next_item.fetch_add(1, Ordering::Relaxed) % self.plan.len();
-        self.next_item.store(next_item, Ordering::Relaxed);
         assert!(next_item < self.plan.len());
-
         let next_id = self.plan[next_item];
+
         Ok((*self
             .ads_provider
             .get(next_id, self.codec_params)
@@ -51,6 +43,12 @@ impl AdsPlanner {
             .ok_or_else(|| anyhow::anyhow!("No track"))?)
         .clone())
     }
+}
+
+fn arrange_plan(content: Vec<(AdId, String)>) -> Vec<AdId> {
+    assert!(!content.is_empty());
+    dbg!(&content);
+    content.into_iter().map(|(id, _)| id).collect()
 }
 
 #[cfg(test)]
