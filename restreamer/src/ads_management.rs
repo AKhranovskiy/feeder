@@ -1,11 +1,13 @@
 mod ad_cache;
+mod ad_id;
 mod ads_planner;
 mod ads_provider;
 
-use ad_cache::{AdCache, AdId};
+use ad_cache::AdCache;
 
+pub use ad_id::AdId;
 pub use ads_planner::AdsPlanner;
-pub use ads_provider::AdsProvider;
+pub use ads_provider::{AdsProvider, ContentItem};
 
 #[cfg(test)]
 pub const CODEC_PARAMS: codec::CodecParams =

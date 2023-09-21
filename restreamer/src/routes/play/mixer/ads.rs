@@ -32,7 +32,7 @@ impl Mixer for AdsMixer {
             analyzer::ContentKind::Advertisement => self.advertisement(frame).await,
             analyzer::ContentKind::Music
             | analyzer::ContentKind::Talk
-            | analyzer::ContentKind::Unknown => self.content(frame),
+            | analyzer::ContentKind::Unknown => self.content(frame).await,
         }
     }
 }
@@ -55,7 +55,7 @@ impl AdsMixer {
         frame.with_pts(self.pts.next())
     }
 
-    fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
+    async fn content(&mut self, frame: &AudioFrame) -> AudioFrame {
         self.main_track.push_back(frame.clone());
         self.side_buffer.clear();
 
@@ -71,6 +71,10 @@ impl AdsMixer {
                 .pop_front()
                 .unwrap_or_else(|| codec::silence_frame(frame));
             let content = self.main_track.pop_front().unwrap();
+
+            if self.side_track.is_empty() {
+                self.ads_planner.finished().await;
+            }
             self.cross_fader.apply(&ad, &content)
         };
         self.pts(output)
@@ -86,6 +90,7 @@ impl AdsMixer {
             }
 
             if self.side_track.is_empty() {
+                self.ads_planner.finished().await;
                 self.side_track
                     .extend(self.ads_planner.next().await.unwrap());
             }

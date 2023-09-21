@@ -36,6 +36,7 @@ sqlx = { version = "0.7.1", features = [
     "sqlite",
     "macros",
     "uuid",
+    "chrono",
 ] }
 stderrlog = "0.5.4"
 tensorflow = { version = "0.21.0", features = ["ndarray"] }

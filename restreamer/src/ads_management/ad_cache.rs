@@ -2,12 +2,14 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     io::Cursor,
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::bail;
 use codec::{AudioFrame, CodecParams, Decoder, FrameDuration, Resampler};
-use std::time::Duration;
 use tokio::sync::RwLock;
+
+use super::AdId;
 
 type Track = Vec<AudioFrame>;
 
@@ -17,28 +19,6 @@ struct TrackCacheItem {
     track: Track,
     #[allow(dead_code)]
     duration: Duration,
-}
-
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
-pub struct AdId(uuid::Uuid);
-
-impl AdId {
-    #[allow(dead_code)]
-    pub fn new() -> Self {
-        Self(uuid::Uuid::new_v4())
-    }
-}
-
-impl AsRef<uuid::Uuid> for AdId {
-    fn as_ref(&self) -> &uuid::Uuid {
-        &self.0
-    }
-}
-
-impl From<uuid::Uuid> for AdId {
-    fn from(id: uuid::Uuid) -> Self {
-        Self(id)
-    }
 }
 
 type TrackCache = HashMap<AdId, TrackCacheItem>;
