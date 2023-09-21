@@ -12,7 +12,7 @@ anyhow = "1.0.75"
 async-stream = "0.3.5"
 axum = { version = "0.6.20", features = ["headers"] }
 bytemuck = "1.13.1"
-chrono = "0.4.26"
+chrono = { version = "0.4.26", features = ["serde"] }
 clap = { version = "4.3.24", features = ["derive"] }
 derive_builder = { version = "0.12.0", features = ["clippy"] }
 enumflags2 = "0.7.7"
@@ -23,6 +23,7 @@ kdam = "0.4.1"
 lazy_static = "1.4.0"
 log = "0.4.20"
 mime = "0.3.17"
+minijinja = { version = "1.0.8", features = ["builtins", "speedups"] }
 ndarray = { version = "0.15.6", features = ["serde"] }
 ndarray-stats = "0.5.1"
 nearly = "0.2.0"
@@ -50,7 +51,7 @@ tower = "0.4.13"
 tower-http = { version = "0.4.3", features = ["full"] }
 ureq = { version = "2.7.1", features = ["json"] }
 url = { version = "2.4.0", features = ["serde"] }
-uuid = { version = "1.4.1", features = ["v4"] }
+uuid = { version = "1.4.1", features = ["v4", "serde"] }
 
 analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }

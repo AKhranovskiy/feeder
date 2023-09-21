@@ -34,11 +34,12 @@ pub struct AdsProvider {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, FromRow)]
+#[derive(Debug, Clone, FromRow)]
 pub struct PlaybackRecord {
-    id: AdId,
-    started: DateTime<Utc>,
-    finished: DateTime<Utc>,
+    pub id: AdId,
+    pub name: String,
+    pub started: DateTime<Utc>,
+    pub finished: DateTime<Utc>,
 }
 
 impl AdsProvider {
@@ -96,7 +97,7 @@ impl AdsProvider {
 
     pub async fn report_finished(&self, id: AdId, started: DateTime<Utc>) -> anyhow::Result<()> {
         log::info!("Finished playing item {}", id.as_ref());
-        sqlx::query(r#"INSERT INTO "playbacks" (id, start, stop) VALUES(?,?,?)"#)
+        sqlx::query(r#"INSERT INTO "playbacks" (id, started, finished) VALUES(?,?,?)"#)
             .bind(id)
             .bind(started)
             .bind(Utc::now())
@@ -107,10 +108,15 @@ impl AdsProvider {
 
     #[allow(dead_code)]
     pub async fn playbacks(&self) -> anyhow::Result<Vec<PlaybackRecord>> {
-        let records =
-            sqlx::query_as::<_, PlaybackRecord>(r#"SELECT id, started, finished FROM "playbacks""#)
-                .fetch_all(&self.db_pool)
-                .await?;
+        let records = sqlx::query_as::<_, PlaybackRecord>(
+            r#"
+                SELECT p.id, a.name, p.started, p.finished FROM "playbacks" p
+                LEFT JOIN advertisements a ON a.id = p.id
+                ORDER BY p.finished DESC, p.started DESC;
+            "#,
+        )
+        .fetch_all(&self.db_pool)
+        .await?;
 
         Ok(records)
     }
@@ -118,7 +124,12 @@ impl AdsProvider {
     #[allow(dead_code)]
     pub async fn playbacks_by_id(&self, id: AdId) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
-            r#"SELECT id, started, finished FROM "playbacks" WHERE id = ?"#,
+            r#"
+                SELECT p.id, a.name, p.started, p.finished FROM "playbacks" p
+                LEFT JOIN advertisements a ON a.id = p.id
+                WHERE p.id = ?
+                ORDER BY p.finished DESC, p.started DESC;
+            "#,
         )
         .bind(id)
         .fetch_all(&self.db_pool)
@@ -143,8 +154,8 @@ async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::query(
         r#"CREATE TABLE "playbacks" (
             "id"	    TEXT NOT NULL COLLATE BINARY,
-            "start"	    TEXT NOT NULL COLLATE NOCASE,
-            "stop"	    TEXT NOT NULL COLLATE NOCASE
+            "started"	    TEXT NOT NULL COLLATE NOCASE,
+            "finished"	    TEXT NOT NULL COLLATE NOCASE
         )"#,
     )
     .execute(pool)
@@ -189,6 +200,8 @@ impl AdsProvider {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[tokio::test]
@@ -203,5 +216,23 @@ mod tests {
 
         assert_eq!(1, content.len());
         assert_eq!("Sample Advert", content[0].name);
+    }
+
+    #[tokio::test]
+    async fn test_playbacks() {
+        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let content = sut.content().await.expect("Content items");
+        let id = content[0].id;
+
+        let started = Utc::now();
+        sut.report_started(id).await.expect("Started");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        sut.report_finished(id, started).await.expect("Finished");
+
+        let playbacks = sut.playbacks().await.expect("Playback records");
+
+        dbg!(&playbacks);
+
+        assert_eq!(1, playbacks.len());
     }
 }

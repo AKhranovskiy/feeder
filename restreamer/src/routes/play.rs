@@ -1,6 +1,5 @@
 use std::{
     io::{Read, Write},
-    sync::Arc,
     time::Duration,
 };
 
@@ -30,33 +29,21 @@ use mixer::{AdsMixer, Mixer, PassthroughMixer, SilenceMixer};
 
 use crate::{
     accept_header::Accept,
-    ads_management::{AdsPlanner, AdsProvider},
-    args::Args,
+    ads_management::AdsPlanner,
+    state::AppState,
     stream_saver::{Destination, StreamSaver},
-    terminate::Terminator,
 };
 
 const OUTPUT_MIME: &str = "audio/aac";
 
-#[derive(Clone)]
-struct PlayState {
-    terminator: Terminator,
-    ads_provider: Arc<AdsProvider>,
-    args: Args,
-}
-
-pub fn router(terminator: Terminator, ads_provider: Arc<AdsProvider>, args: Args) -> Router {
-    Router::new().route("/", get(serve)).with_state(PlayState {
-        terminator,
-        ads_provider,
-        args,
-    })
+pub fn router(state: AppState) -> Router {
+    Router::new().route("/", get(serve)).with_state(state)
 }
 
 async fn serve(
     TypedHeader(accept): TypedHeader<Accept>,
     Query(params): Query<PlayParams>,
-    State(state): State<PlayState>,
+    State(state): State<AppState>,
 ) -> impl IntoResponse {
     log::info!(
         "Serve {}, action={:?}",
@@ -77,7 +64,7 @@ async fn serve(
 
 fn get_stream(
     params: PlayParams,
-    state: PlayState,
+    state: AppState,
 ) -> StreamBody<impl Stream<Item = anyhow::Result<Vec<u8>>>> {
     stream! {
         let (mut reader, writer) = match os_pipe::pipe() {
@@ -134,7 +121,7 @@ const CROSS_FADE_DURATION: Duration = Duration::from_millis(1_500);
 async fn analyze<W: Write + Send>(
     params: PlayParams,
     writer: W,
-    state: &PlayState,
+    state: &AppState,
 ) -> anyhow::Result<()> {
     let input = unstreamer::Unstreamer::open(&params.source)?;
 
@@ -186,12 +173,14 @@ async fn analyze<W: Write + Send>(
 
         analyzer.push(frame)?;
 
-        for (kind, frame) in analyzer.pop()? {
+        for (_kind, frame) in analyzer.pop()? {
             if state.terminator.is_terminated() {
                 break;
             }
 
-            let frame = mixer.push(kind, &frame).await;
+            let frame = mixer
+                .push(analyzer::ContentKind::Advertisement, &frame)
+                .await;
             let frame = entry.apply(&codec::silence_frame(&frame), &frame);
 
             stream_saver.push(Destination::Processed, frame.clone());

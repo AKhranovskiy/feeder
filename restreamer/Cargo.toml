@@ -18,6 +18,7 @@ flume = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
 mime = { workspace = true }
+minijinja = { workspace = true }
 nearly = { workspace = true }
 os_pipe = { workspace = true }
 ringbuf = { workspace = true }

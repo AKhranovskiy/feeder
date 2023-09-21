@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Playbacks</title>
+
+    <style>
+        tr {
+            border: 1px solid #b4b6b6;
+            border-bottom: 1px solid #212020;
+        }
+
+        tr:nth-child(even) {
+            background-color: #b4b6b6;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Started</th>
+            <th>Finished</th>
+        </tr>
+        {% for record in records %}
+        <tr>
+            <td>{{ record.id }}</td>
+            <td>{{ record.name }}</td>
+            <td>{{ record.started }}</td>
+            <td>{{ record.finished }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>

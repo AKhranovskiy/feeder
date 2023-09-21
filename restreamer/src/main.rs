@@ -15,9 +15,11 @@ mod ads_management;
 mod args;
 mod rate;
 mod routes;
+mod state;
 mod stream_saver;
 mod terminate;
 
+use state::AppState;
 use terminate::Terminator;
 
 #[tokio::main]
@@ -30,14 +32,20 @@ async fn main() {
     let terminator = Terminator::new();
     let ads_provider = Arc::new(AdsProvider::init().await.expect("AdsProvider"));
 
-    let app = Router::new().nest_service("/", serve_dir.clone()).nest(
-        "/play",
-        routes::play::router(terminator.clone(), ads_provider, args.clone()),
-    );
+    let state = AppState {
+        terminator,
+        ads_provider,
+        args,
+    };
 
-    Server::bind(&get_addr(&args))
+    let app = Router::new()
+        .nest_service("/", serve_dir.clone())
+        .nest("/play", routes::play::router(state.clone()))
+        .nest("/management", routes::management::router(state.clone()));
+
+    Server::bind(&get_addr(&state.args))
         .serve(app.into_make_service())
-        .with_graceful_shutdown(terminator.signal())
+        .with_graceful_shutdown(state.terminator.signal())
         .await
         .unwrap();
 }

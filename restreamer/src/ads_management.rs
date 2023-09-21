@@ -7,7 +7,7 @@ use ad_cache::AdCache;
 
 pub use ad_id::AdId;
 pub use ads_planner::AdsPlanner;
-pub use ads_provider::{AdsProvider, ContentItem};
+pub use ads_provider::{AdsProvider, ContentItem, PlaybackRecord};
 
 #[cfg(test)]
 pub const CODEC_PARAMS: codec::CodecParams =
