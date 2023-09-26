@@ -7,6 +7,7 @@ use crate::state::AppState;
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/playbacks", get(playbacks))
+        .route("/tracks", get(tracks))
         .with_state(state)
 }
 
@@ -14,6 +15,10 @@ pub fn router(state: AppState) -> Router {
 
 fn live_playback_template() -> String {
     std::fs::read_to_string("restreamer/templates/playbacks.html").unwrap()
+}
+
+fn live_tracks_template() -> String {
+    std::fs::read_to_string("restreamer/templates/tracks.html").unwrap()
 }
 
 async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
@@ -25,6 +30,18 @@ async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
     log::debug!("Playback records: {records:?}");
 
     let r = render!(&live_playback_template(), records => records);
+    Ok(Html(r))
+}
+
+async fn tracks(State(state): State<AppState>) -> Result<Html<String>, ()> {
+    let records = state.ads_provider.tracks().await.map_err(|_| ())?;
+    let records = records
+        .into_iter()
+        .map(TrackRecord::from)
+        .collect::<Vec<_>>();
+    log::debug!("Track records: {records:?}");
+
+    let r = render!(&live_tracks_template(), records => records);
     Ok(Html(r))
 }
 
@@ -45,6 +62,27 @@ impl From<crate::ads_management::PlaybackRecord> for PlaybackRecord {
             name: record.name,
             started: record.started.format("%Y-%m-%d %H:%M:%S").to_string(),
             finished: record.finished.format("%Y-%m-%d %H:%M:%S").to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct TrackRecord {
+    track_id: String,
+    name: String,
+    duration: String,
+    added: String,
+    played: String,
+}
+
+impl From<crate::ads_management::TrackRecord> for TrackRecord {
+    fn from(record: crate::ads_management::TrackRecord) -> Self {
+        Self {
+            track_id: record.id.to_string(),
+            name: record.name,
+            duration: format!("{} s", record.duration),
+            added: record.added.format("%Y-%m-%d %H:%M:%S").to_string(),
+            played: record.played.to_string(),
         }
     }
 }

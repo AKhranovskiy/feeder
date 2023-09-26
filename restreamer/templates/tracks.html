@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Tracks</title>
+
+    <style>
+        tr {
+            border: 1px solid #b4b6b6;
+            border-bottom: 1px solid #212020;
+        }
+
+        tr:nth-child(even) {
+            background-color: #b4b6b6;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <th>Track ID</th>
+            <th>Name</th>
+            <th>Duration</th>
+            <th>Added</th>
+            <th>Played</th>
+        </tr>
+        {% for record in records %}
+        <tr>
+            <td>{{ record.track_id }}</td>
+            <td>{{ record.name }}</td>
+            <td>{{ record.duration }}</td>
+            <td>{{ record.added }}</td>
+            <td>{{ record.played }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>

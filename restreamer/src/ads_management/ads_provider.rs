@@ -13,6 +13,7 @@ type Track = Vec<AudioFrame>;
 pub struct ContentItem {
     pub id: AdId,
     pub name: String,
+    pub duration: u32,
 }
 
 impl PartialEq for ContentItem {
@@ -34,7 +35,6 @@ pub struct AdsProvider {
     cache: AdCache,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 pub struct PlaybackRecord {
     pub client_id: Uuid,
@@ -42,6 +42,15 @@ pub struct PlaybackRecord {
     pub name: String,
     pub started: DateTime<Utc>,
     pub finished: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct TrackRecord {
+    pub id: AdId,
+    pub name: String,
+    pub added: DateTime<Utc>,
+    pub duration: u32,
+    pub played: u32,
 }
 
 impl AdsProvider {
@@ -59,7 +68,7 @@ impl AdsProvider {
     }
 
     pub async fn content(&self) -> anyhow::Result<Vec<ContentItem>> {
-        let items = sqlx::query_as::<_, ContentItem>(r#"SELECT id, name FROM advertisements"#)
+        let items = sqlx::query_as::<_, ContentItem>(r#"SELECT id, name, duration FROM tracks"#)
             .fetch_all(&self.db_pool)
             .await?;
 
@@ -71,14 +80,14 @@ impl AdsProvider {
         id: AdId,
         target_params: CodecParams,
     ) -> anyhow::Result<Option<Arc<Track>>> {
-        log::info!("Get advertisement, id={}", id.as_ref().to_string());
+        log::info!("Get track, id={}", id.as_ref().to_string());
 
         let item = self.cache.get(id, target_params).await?;
         if item.is_some() {
             return Ok(item);
         }
 
-        let content: Vec<u8> = sqlx::query(r#"SELECT content FROM advertisements WHERE id=?"#)
+        let content: Vec<u8> = sqlx::query(r#"SELECT content FROM tracks WHERE id=?"#)
             .bind(id)
             .map(|row: SqliteRow| row.get("content"))
             .fetch_optional(&self.db_pool)
@@ -109,7 +118,7 @@ impl AdsProvider {
             track_id.as_ref()
         );
         sqlx::query(
-            r#"INSERT INTO "playbacks" (client_id, track_id, started, finished) VALUES(?,?,?,?)"#,
+            r#"INSERT INTO playbacks (client_id, track_id, started, finished) VALUES(?,?,?,?)"#,
         )
         .bind(client_id)
         .bind(track_id)
@@ -123,8 +132,8 @@ impl AdsProvider {
     pub async fn playbacks(&self) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
             r#"
-                SELECT p.client_id, p.track_id, a.name, p.started, p.finished FROM "playbacks" p
-                LEFT JOIN advertisements a ON a.id = p.track_id
+                SELECT p.client_id, p.track_id, t.name, p.started, p.finished FROM playbacks p
+                LEFT JOIN tracks t ON t.id = p.track_id
                 ORDER BY p.finished DESC, p.started DESC;
             "#,
         )
@@ -138,8 +147,8 @@ impl AdsProvider {
     pub async fn playbacks_by_id(&self, id: AdId) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
             r#"
-                SELECT p.client_id, p.track_id, a.name, p.started, p.finished FROM "playbacks" p
-                LEFT JOIN advertisements a ON a.id = p.id
+                SELECT p.client_id, p.track_id, t.name, p.started, p.finished FROM playbacks p
+                LEFT JOIN tracks  ON t.id = p.id
                 WHERE p.id = ?
                 ORDER BY p.finished DESC, p.started DESC;
             "#,
@@ -150,14 +159,31 @@ impl AdsProvider {
 
         Ok(records)
     }
+
+    pub async fn tracks(&self) -> anyhow::Result<Vec<TrackRecord>> {
+        let records = sqlx::query_as::<_, TrackRecord>(
+            r#"
+                SELECT t.id, t.name, t.duration, t.added,
+                    (SELECT count(*) FROM playbacks p WHERE p.track_id = t.id) as played
+                FROM tracks t
+                ORDER BY t.added DESC;
+            "#,
+        )
+        .fetch_all(&self.db_pool)
+        .await?;
+
+        Ok(records)
+    }
 }
 
 async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::query(
-        r#"CREATE TABLE "advertisements" (
+        r#"CREATE TABLE tracks (
             "id"	    TEXT NOT NULL UNIQUE,
             "name"	    TEXT NOT NULL,
             "content"	BLOB NOT NULL,
+            "added"     TEXT NOT NULL,
+            "duration"  INTEGER NOT NULL,
             PRIMARY KEY("id")
         )"#,
     )
@@ -165,7 +191,7 @@ async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
     .await?;
 
     sqlx::query(
-        r#"CREATE TABLE "playbacks" (
+        r#"CREATE TABLE playbacks (
             "client_id"     TEXT NOT NULL,
             "track_id"	    TEXT NOT NULL,
             "started"	    TEXT NOT NULL,
@@ -179,10 +205,12 @@ async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
 }
 
 async fn fill_db(pool: &SqlitePool) -> anyhow::Result<()> {
-    sqlx::query(r#"INSERT INTO "advertisements" (id, name, content) VALUES(?,?,?)"#)
+    sqlx::query(r#"INSERT INTO "tracks" (id, name, content, added, duration) VALUES(?,?,?,?,?)"#)
         .bind(AdId::new())
         .bind("Sample Advert")
         .bind(&(include_bytes!("../../sample.aac"))[..])
+        .bind(Utc::now())
+        .bind(100)
         .execute(pool)
         .await?;
 
@@ -197,10 +225,12 @@ impl AdsProvider {
         init_db(&db_pool).await.unwrap();
 
         let id = AdId::new();
-        sqlx::query(r#"INSERT INTO "advertisements" (id, name, content) VALUES(?,?,?)"#)
+        sqlx::query(r#"INSERT INTO tracks (id, name, content, added, duration) VALUES(?,?,?,?,?)"#)
             .bind(id)
             .bind("Test")
             .bind(&[0, 1, 2][..])
+            .bind(Utc::now())
+            .bind(3)
             .execute(&db_pool)
             .await
             .unwrap();
@@ -251,5 +281,27 @@ mod tests {
         dbg!(&playbacks);
 
         assert_eq!(1, playbacks.len());
+    }
+
+    #[tokio::test]
+    async fn test_tracks() {
+        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let content = sut.content().await.expect("Content items");
+        let id = content[0].id;
+        let client_id = Uuid::new_v4();
+
+        let started = Utc::now();
+        sut.report_started(client_id, id).await.expect("Started");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        sut.report_finished(client_id, id, started)
+            .await
+            .expect("Finished");
+
+        let tracks = sut.tracks().await.expect("Track records");
+
+        dbg!(&tracks);
+
+        assert_eq!(1, tracks.len());
+        assert_eq!(1, tracks[0].played);
     }
 }
