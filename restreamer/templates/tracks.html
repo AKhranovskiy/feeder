@@ -28,7 +28,7 @@
         </tr>
         {% for record in records %}
         <tr>
-            <td>{{ record.track_id }}</td>
+            <td><a href="playbacks/{{ record.track_id }}">{{ record.track_id }}</a></td>
             <td>{{ record.name }}</td>
             <td>{{ record.duration }}</td>
             <td>{{ record.added }}</td>

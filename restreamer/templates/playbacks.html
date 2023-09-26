@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Playbacks</title>
+    <title>Playbacks {{ track }}</title>
 
     <style>
         tr {
@@ -21,7 +21,10 @@
     <table>
         <tr>
             <th>Client ID</th>
+            {% if track %}
+            {% else %}
             <th>Track ID</th>
+            {% endif %}
             <th>Name</th>
             <th>Started</th>
             <th>Finished</th>
@@ -29,7 +32,10 @@
         {% for record in records %}
         <tr>
             <td>{{ record.client_id }}</td>
-            <td>{{ record.track_id }}</td>
+            {% if track %}
+            {% else %}
+            <td><a href="playbacks/{{ record.track_id }}">{{ record.track_id }}</a></td>
+            {% endif %}
             <td>{{ record.name }}</td>
             <td>{{ record.started }}</td>
             <td>{{ record.finished }}</td>

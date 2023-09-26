@@ -33,7 +33,7 @@ impl FromStr for AdId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let id = uuid::Uuid::from_str(s)?;
+        let id = uuid::Uuid::from_str(s).map_err(Self::Err::from)?;
         Ok(Self(id))
     }
 }

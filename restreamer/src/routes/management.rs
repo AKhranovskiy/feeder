@@ -1,4 +1,9 @@
-use axum::{extract::State, response::Html, routing::get, Router};
+use axum::{
+    extract::{Path, State},
+    response::Html,
+    routing::get,
+    Router,
+};
 use minijinja::render;
 use serde::Serialize;
 
@@ -7,6 +12,7 @@ use crate::state::AppState;
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/playbacks", get(playbacks))
+        .route("/playbacks/:track_id", get(playbacks_by_id))
         .route("/tracks", get(tracks))
         .with_state(state)
 }
@@ -23,6 +29,7 @@ fn live_tracks_template() -> String {
 
 async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
     let records = state.ads_provider.playbacks().await.map_err(|_| ())?;
+
     let records = records
         .into_iter()
         .map(PlaybackRecord::from)
@@ -30,6 +37,26 @@ async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
     log::debug!("Playback records: {records:?}");
 
     let r = render!(&live_playback_template(), records => records);
+    Ok(Html(r))
+}
+
+async fn playbacks_by_id(
+    Path(track_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Html<String>, ()> {
+    let records = state
+        .ads_provider
+        .playbacks_by_id(track_id.parse().map_err(|_| ())?)
+        .await
+        .map_err(|_| ())?;
+
+    let records = records
+        .into_iter()
+        .map(PlaybackRecord::from)
+        .collect::<Vec<_>>();
+    log::debug!("Playback records: {records:?}");
+
+    let r = render!(&live_playback_template(), track => track_id, records => records);
     Ok(Html(r))
 }
 

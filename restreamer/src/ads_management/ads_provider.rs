@@ -143,13 +143,12 @@ impl AdsProvider {
         Ok(records)
     }
 
-    #[allow(dead_code)]
     pub async fn playbacks_by_id(&self, id: AdId) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
             r#"
                 SELECT p.client_id, p.track_id, t.name, p.started, p.finished FROM playbacks p
-                LEFT JOIN tracks  ON t.id = p.id
-                WHERE p.id = ?
+                LEFT JOIN tracks t ON t.id = p.track_id
+                WHERE p.track_id = ?
                 ORDER BY p.finished DESC, p.started DESC;
             "#,
         )
@@ -277,6 +276,27 @@ mod tests {
             .expect("Finished");
 
         let playbacks = sut.playbacks().await.expect("Playback records");
+
+        dbg!(&playbacks);
+
+        assert_eq!(1, playbacks.len());
+    }
+
+    #[tokio::test]
+    async fn test_playback_by_id() {
+        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let content = sut.content().await.expect("Content items");
+        let id = content[0].id;
+        let client_id = Uuid::new_v4();
+
+        let started = Utc::now();
+        sut.report_started(client_id, id).await.expect("Started");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        sut.report_finished(client_id, id, started)
+            .await
+            .expect("Finished");
+
+        let playbacks = sut.playbacks_by_id(id).await.expect("Playback records");
 
         dbg!(&playbacks);
 
