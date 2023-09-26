@@ -1,11 +1,15 @@
+use std::path::PathBuf;
+
 use axum::{
-    extract::{Path, State},
-    response::Html,
+    extract::{DefaultBodyLimit, Multipart, Path, State},
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
     routing::get,
     Router,
 };
 use minijinja::render;
 use serde::Serialize;
+use tower_http::limit::RequestBodyLimitLayer;
 
 use crate::state::AppState;
 
@@ -13,7 +17,9 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/playbacks", get(playbacks))
         .route("/playbacks/:track_id", get(playbacks_by_id))
-        .route("/tracks", get(tracks))
+        .route("/tracks", get(tracks).post(upload))
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(25 * 1024 * 1024 /* 25mb */))
         .with_state(state)
 }
 
@@ -27,8 +33,8 @@ fn live_tracks_template() -> String {
     std::fs::read_to_string("restreamer/templates/tracks.html").unwrap()
 }
 
-async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
-    let records = state.ads_provider.playbacks().await.map_err(|_| ())?;
+async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, AppError> {
+    let records = state.ads_provider.playbacks().await?;
 
     let records = records
         .into_iter()
@@ -43,12 +49,11 @@ async fn playbacks(State(state): State<AppState>) -> Result<Html<String>, ()> {
 async fn playbacks_by_id(
     Path(track_id): Path<String>,
     State(state): State<AppState>,
-) -> Result<Html<String>, ()> {
+) -> Result<Html<String>, AppError> {
     let records = state
         .ads_provider
-        .playbacks_by_id(track_id.parse().map_err(|_| ())?)
-        .await
-        .map_err(|_| ())?;
+        .playbacks_by_id(track_id.parse()?)
+        .await?;
 
     let records = records
         .into_iter()
@@ -60,8 +65,8 @@ async fn playbacks_by_id(
     Ok(Html(r))
 }
 
-async fn tracks(State(state): State<AppState>) -> Result<Html<String>, ()> {
-    let records = state.ads_provider.tracks().await.map_err(|_| ())?;
+async fn tracks(State(state): State<AppState>) -> Result<Html<String>, AppError> {
+    let records = state.ads_provider.tracks().await?;
     let records = records
         .into_iter()
         .map(TrackRecord::from)
@@ -70,6 +75,56 @@ async fn tracks(State(state): State<AppState>) -> Result<Html<String>, ()> {
 
     let r = render!(&live_tracks_template(), records => records);
     Ok(Html(r))
+}
+
+async fn upload(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<Html<String>, AppError> {
+    if let Some(field) = multipart.next_field().await? {
+        let file_name = field
+            .file_name()
+            .ok_or_else(|| anyhow::anyhow!("No file name"))?
+            .to_string();
+
+        let track_name = PathBuf::from(file_name)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?
+            .to_owned();
+
+        let data = field.bytes().await?;
+
+        log::info!("Uploaded `{track_name}` of size {} bytes", data.len());
+
+        state.ads_provider.add_track(&track_name, &data).await?;
+    } else {
+        log::info!("No file uploaded");
+        Err(anyhow::anyhow!("No file uploaded"))?;
+    }
+
+    tracks(State(state)).await
+}
+
+struct AppError(anyhow::Error);
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+impl<E> From<E> for AppError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
 }
 
 #[derive(Debug, Serialize)]

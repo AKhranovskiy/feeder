@@ -32,6 +32,11 @@ async fn main() {
     let terminator = Terminator::new();
     let ads_provider = Arc::new(AdsProvider::init().await.expect("AdsProvider"));
 
+    ads_provider
+        .add_track("Sample Track", include_bytes!("../sample.aac"))
+        .await
+        .expect("Sample Track is loaded");
+
     let state = AppState {
         terminator,
         ads_provider,

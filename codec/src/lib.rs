@@ -1,5 +1,6 @@
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::str::FromStr;
+use std::time::Duration;
 
 pub use ac_ffmpeg::codec::audio::AudioFrame;
 pub use ac_ffmpeg::packet::Packet;
@@ -165,4 +166,12 @@ pub fn silence_frame(frame: &AudioFrame) -> AudioFrame {
         frame.samples(),
     )
     .freeze()
+}
+
+pub fn track_duration(input: &[u8]) -> anyhow::Result<Duration> {
+    Ok(Decoder::try_from(Cursor::new(input))?
+        .take_while(Result::is_ok)
+        .map(Result::unwrap)
+        .map(|frame| frame.duration())
+        .sum())
 }

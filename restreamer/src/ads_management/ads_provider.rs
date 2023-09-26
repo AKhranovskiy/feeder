@@ -59,7 +59,6 @@ impl AdsProvider {
         let db_pool = SqlitePool::connect_with(options).await?;
 
         init_db(&db_pool).await?;
-        fill_db(&db_pool).await?;
 
         Ok(Self {
             db_pool,
@@ -173,6 +172,24 @@ impl AdsProvider {
 
         Ok(records)
     }
+
+    pub async fn add_track(&self, name: &str, content: &[u8]) -> anyhow::Result<AdId> {
+        let duration = codec::track_duration(content)?.as_secs();
+        let id = AdId::new();
+
+        sqlx::query(
+            r#"INSERT INTO tracks (id, name, content, added, duration) VALUES (?, ?, ?, ?, ?)"#,
+        )
+        .bind(id)
+        .bind(name)
+        .bind(content)
+        .bind(Utc::now())
+        .bind(duration as u32)
+        .execute(&self.db_pool)
+        .await?;
+
+        Ok(id)
+    }
 }
 
 async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
@@ -203,19 +220,6 @@ async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn fill_db(pool: &SqlitePool) -> anyhow::Result<()> {
-    sqlx::query(r#"INSERT INTO "tracks" (id, name, content, added, duration) VALUES(?,?,?,?,?)"#)
-        .bind(AdId::new())
-        .bind("Sample Advert")
-        .bind(&(include_bytes!("../../sample.aac"))[..])
-        .bind(Utc::now())
-        .bind(100)
-        .execute(pool)
-        .await?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 impl AdsProvider {
     pub async fn testing(track: Track) -> Self {
@@ -226,7 +230,7 @@ impl AdsProvider {
         let id = AdId::new();
         sqlx::query(r#"INSERT INTO tracks (id, name, content, added, duration) VALUES(?,?,?,?,?)"#)
             .bind(id)
-            .bind("Test")
+            .bind("Test track")
             .bind(&[0, 1, 2][..])
             .bind(Utc::now())
             .bind(3)
@@ -254,16 +258,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_content() {
-        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let sut = AdsProvider::testing(vec![]).await;
         let content = sut.content().await.expect("Content items");
 
         assert_eq!(1, content.len());
-        assert_eq!("Sample Advert", content[0].name);
+        assert_eq!("Test track", content[0].name);
     }
 
     #[tokio::test]
     async fn test_playbacks() {
-        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let sut = AdsProvider::testing(vec![]).await;
         let content = sut.content().await.expect("Content items");
         let id = content[0].id;
         let client_id = Uuid::new_v4();
@@ -277,14 +281,12 @@ mod tests {
 
         let playbacks = sut.playbacks().await.expect("Playback records");
 
-        dbg!(&playbacks);
-
         assert_eq!(1, playbacks.len());
     }
 
     #[tokio::test]
     async fn test_playback_by_id() {
-        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let sut = AdsProvider::testing(vec![]).await;
         let content = sut.content().await.expect("Content items");
         let id = content[0].id;
         let client_id = Uuid::new_v4();
@@ -298,14 +300,12 @@ mod tests {
 
         let playbacks = sut.playbacks_by_id(id).await.expect("Playback records");
 
-        dbg!(&playbacks);
-
         assert_eq!(1, playbacks.len());
     }
 
     #[tokio::test]
     async fn test_tracks() {
-        let sut = AdsProvider::init().await.expect("Initialized provider");
+        let sut = AdsProvider::testing(vec![]).await;
         let content = sut.content().await.expect("Content items");
         let id = content[0].id;
         let client_id = Uuid::new_v4();

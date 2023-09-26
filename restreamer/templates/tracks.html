@@ -14,10 +14,28 @@
         tr:nth-child(even) {
             background-color: #b4b6b6;
         }
+
+        label {
+            display: block;
+            font:
+                1rem 'Fira Sans',
+                sans-serif;
+        }
+
+        input,
+        label {
+            margin: 0.4rem 0;
+        }
     </style>
 </head>
 
 <body>
+    <form action="tracks" method="post" enctype="multipart/form-data">
+        <label for="track">Choose an audio file:</label>
+        <input type="file" id="track" name="track" accept="audio/aac, audio/wav, audio/mp3" />
+        <button>Upload</button>
+    </form>
+
     <table>
         <tr>
             <th>Track ID</th>
