@@ -3,6 +3,7 @@ use std::{hash::Hash, str::FromStr, sync::Arc};
 use chrono::{DateTime, Utc};
 use codec::{AudioFrame, CodecParams};
 use sqlx::{sqlite::SqliteRow, FromRow, Row, SqlitePool};
+use uuid::Uuid;
 
 use super::{AdCache, AdId};
 
@@ -36,7 +37,8 @@ pub struct AdsProvider {
 #[allow(dead_code)]
 #[derive(Debug, Clone, FromRow)]
 pub struct PlaybackRecord {
-    pub id: AdId,
+    pub client_id: Uuid,
+    pub track_id: AdId,
     pub name: String,
     pub started: DateTime<Utc>,
     pub finished: DateTime<Utc>,
@@ -89,29 +91,40 @@ impl AdsProvider {
     }
 
     #[allow(clippy::unused_async)]
-    pub async fn report_started(&self, id: AdId) -> anyhow::Result<()> {
-        log::info!("Start playing item {}", id.as_ref());
+    pub async fn report_started(&self, client_id: Uuid, id: AdId) -> anyhow::Result<()> {
+        log::info!("Client {}: start playing item {}", client_id, id.as_ref());
 
         Ok(())
     }
 
-    pub async fn report_finished(&self, id: AdId, started: DateTime<Utc>) -> anyhow::Result<()> {
-        log::info!("Finished playing item {}", id.as_ref());
-        sqlx::query(r#"INSERT INTO "playbacks" (id, started, finished) VALUES(?,?,?)"#)
-            .bind(id)
-            .bind(started)
-            .bind(Utc::now())
-            .execute(&self.db_pool)
-            .await?;
+    pub async fn report_finished(
+        &self,
+        client_id: Uuid,
+        track_id: AdId,
+        started: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        log::info!(
+            "Client {}: finished playing item {}",
+            client_id,
+            track_id.as_ref()
+        );
+        sqlx::query(
+            r#"INSERT INTO "playbacks" (client_id, track_id, started, finished) VALUES(?,?,?,?)"#,
+        )
+        .bind(client_id)
+        .bind(track_id)
+        .bind(started)
+        .bind(Utc::now())
+        .execute(&self.db_pool)
+        .await?;
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub async fn playbacks(&self) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
             r#"
-                SELECT p.id, a.name, p.started, p.finished FROM "playbacks" p
-                LEFT JOIN advertisements a ON a.id = p.id
+                SELECT p.client_id, p.track_id, a.name, p.started, p.finished FROM "playbacks" p
+                LEFT JOIN advertisements a ON a.id = p.track_id
                 ORDER BY p.finished DESC, p.started DESC;
             "#,
         )
@@ -125,7 +138,7 @@ impl AdsProvider {
     pub async fn playbacks_by_id(&self, id: AdId) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
             r#"
-                SELECT p.id, a.name, p.started, p.finished FROM "playbacks" p
+                SELECT p.client_id, p.track_id, a.name, p.started, p.finished FROM "playbacks" p
                 LEFT JOIN advertisements a ON a.id = p.id
                 WHERE p.id = ?
                 ORDER BY p.finished DESC, p.started DESC;
@@ -142,9 +155,9 @@ impl AdsProvider {
 async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
     sqlx::query(
         r#"CREATE TABLE "advertisements" (
-            "id"	    TEXT NOT NULL UNIQUE COLLATE BINARY,
-            "name"	    TEXT NOT NULL COLLATE NOCASE,
-            "content"	BLOB NOT NULL COLLATE BINARY,
+            "id"	    TEXT NOT NULL UNIQUE,
+            "name"	    TEXT NOT NULL,
+            "content"	BLOB NOT NULL,
             PRIMARY KEY("id")
         )"#,
     )
@@ -153,9 +166,10 @@ async fn init_db(pool: &SqlitePool) -> anyhow::Result<()> {
 
     sqlx::query(
         r#"CREATE TABLE "playbacks" (
-            "id"	    TEXT NOT NULL COLLATE BINARY,
-            "started"	    TEXT NOT NULL COLLATE NOCASE,
-            "finished"	    TEXT NOT NULL COLLATE NOCASE
+            "client_id"     TEXT NOT NULL,
+            "track_id"	    TEXT NOT NULL,
+            "started"	    TEXT NOT NULL,
+            "finished"	    TEXT NOT NULL
         )"#,
     )
     .execute(pool)
@@ -223,11 +237,14 @@ mod tests {
         let sut = AdsProvider::init().await.expect("Initialized provider");
         let content = sut.content().await.expect("Content items");
         let id = content[0].id;
+        let client_id = Uuid::new_v4();
 
         let started = Utc::now();
-        sut.report_started(id).await.expect("Started");
+        sut.report_started(client_id, id).await.expect("Started");
         tokio::time::sleep(Duration::from_millis(200)).await;
-        sut.report_finished(id, started).await.expect("Finished");
+        sut.report_finished(client_id, id, started)
+            .await
+            .expect("Finished");
 
         let playbacks = sut.playbacks().await.expect("Playback records");
 

@@ -6,6 +6,7 @@ use std::sync::{
 use chrono::{DateTime, Utc};
 use codec::{AudioFrame, CodecParams};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use super::{AdId, AdsProvider, ContentItem};
 
@@ -16,6 +17,7 @@ struct ActiveItem {
 }
 
 pub struct AdsPlanner {
+    client_id: Uuid,
     ads_provider: Arc<AdsProvider>,
     codec_params: CodecParams,
     plan: Vec<AdId>,
@@ -33,6 +35,7 @@ impl AdsPlanner {
         let plan = arrange_plan(content);
 
         Ok(Self {
+            client_id: Uuid::new_v4(),
             ads_provider,
             codec_params,
             plan,
@@ -43,7 +46,11 @@ impl AdsPlanner {
 
     pub async fn next(&self) -> anyhow::Result<Vec<AudioFrame>> {
         if self.active_item.read().await.is_some() {
-            log::error!("Track is not completed: {:?}", self.active_item);
+            log::error!(
+                "Client {} Track is not completed: {:?}",
+                self.client_id,
+                self.active_item
+            );
         }
 
         let active_item = self.cursor.fetch_add(1, Ordering::Relaxed) % self.plan.len();
@@ -55,13 +62,20 @@ impl AdsPlanner {
             started: Utc::now(),
         });
 
-        self.ads_provider.report_started(active_id).await?;
+        self.ads_provider
+            .report_started(self.client_id, active_id)
+            .await?;
 
         Ok((*self
             .ads_provider
             .get(active_id, self.codec_params)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("No track"))?)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Client {}: failed to obtain track {active_id}",
+                    self.client_id,
+                )
+            })?)
         .clone())
     }
 
@@ -71,13 +85,16 @@ impl AdsPlanner {
         if let Some(item) = active_item {
             if let Err(err) = self
                 .ads_provider
-                .report_finished(item.id, item.started)
+                .report_finished(self.client_id, item.id, item.started)
                 .await
             {
-                log::error!("Failed to report finished: {:?}", err);
+                log::error!(
+                    "Client {}: failed to report finished: {err:#}",
+                    self.client_id,
+                );
             }
         } else {
-            log::error!("No active item");
+            log::error!("Client {}: no active item", self.client_id);
         }
     }
 }

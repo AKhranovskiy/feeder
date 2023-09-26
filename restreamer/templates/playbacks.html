@@ -20,14 +20,16 @@
 <body>
     <table>
         <tr>
-            <th>ID</th>
+            <th>Client ID</th>
+            <th>Track ID</th>
             <th>Name</th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
         {% for record in records %}
         <tr>
-            <td>{{ record.id }}</td>
+            <td>{{ record.client_id }}</td>
+            <td>{{ record.track_id }}</td>
             <td>{{ record.name }}</td>
             <td>{{ record.started }}</td>
             <td>{{ record.finished }}</td>
