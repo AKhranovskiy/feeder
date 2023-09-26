@@ -1,5 +1,6 @@
 use std::{hash::Hash, str::FromStr, sync::Arc};
 
+use anyhow::ensure;
 use chrono::{DateTime, Utc};
 use codec::{AudioFrame, CodecParams};
 use sqlx::{sqlite::SqliteRow, FromRow, Row, SqlitePool};
@@ -174,6 +175,9 @@ impl AdsProvider {
     }
 
     pub async fn add_track(&self, name: &str, content: &[u8]) -> anyhow::Result<AdId> {
+        let codec_params = codec::track_codec_params(content)?;
+        ensure!(codec_params.is_valid(), "Invalid codec params");
+
         let duration = codec::track_duration(content)?.as_secs();
         let id = AdId::new();
 

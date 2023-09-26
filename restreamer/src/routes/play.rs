@@ -173,13 +173,20 @@ async fn analyze<W: Write + Send>(
 
         analyzer.push(frame)?;
 
-        for (_kind, frame) in analyzer.pop()? {
+        for (kind, frame) in analyzer.pop()? {
             if state.terminator.is_terminated() {
                 break;
             }
 
             let frame = mixer
-                .push(analyzer::ContentKind::Advertisement, &frame)
+                .push(
+                    if state.args.advert {
+                        analyzer::ContentKind::Advertisement
+                    } else {
+                        kind
+                    },
+                    &frame,
+                )
                 .await;
             let frame = entry.apply(&codec::silence_frame(&frame), &frame);
 

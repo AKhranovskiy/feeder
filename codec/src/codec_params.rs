@@ -60,6 +60,11 @@ impl CodecParams {
             ..self
         }
     }
+
+    #[must_use]
+    pub const fn is_valid(&self) -> bool {
+        self.sample_rate > 0 && self.channels > 0
+    }
 }
 
 impl From<&AudioCodecParameters> for CodecParams {

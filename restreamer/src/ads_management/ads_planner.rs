@@ -93,8 +93,6 @@ impl AdsPlanner {
                     self.client_id,
                 );
             }
-        } else {
-            log::error!("Client {}: no active item", self.client_id);
         }
     }
 }

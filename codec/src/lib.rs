@@ -175,3 +175,7 @@ pub fn track_duration(input: &[u8]) -> anyhow::Result<Duration> {
         .map(|frame| frame.duration())
         .sum())
 }
+
+pub fn track_codec_params(input: &[u8]) -> anyhow::Result<CodecParams> {
+    Ok(Decoder::try_from(Cursor::new(input))?.codec_params())
+}
