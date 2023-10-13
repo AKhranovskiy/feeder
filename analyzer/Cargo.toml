@@ -19,5 +19,3 @@ ndarray = { workspace = true }
 ndarray-stats = { workspace = true }
 ringbuf = { workspace = true }
 stderrlog = { workspace = true }
-unstreamer = { workspace = true }
-url = { workspace = true }

@@ -2,7 +2,7 @@
 authors = { workspace = true }
 edition = { workspace = true }
 name = "restreamer"
-version = "0.10.0"
+version = "0.11.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -18,15 +18,19 @@ flume = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
 mime = { workspace = true }
+minijinja = { workspace = true }
+nearly = { workspace = true }
 os_pipe = { workspace = true }
 ringbuf = { workspace = true }
 serde = { workspace = true }
+sqlx = { workspace = true }
 stderrlog = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 unstreamer = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 ac-ffmpeg = { workspace = true }

@@ -1,5 +1,6 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
+use ads_management::AdsProvider;
 use axum::{routing::get_service, Router, Server};
 use clap::Parser;
 use log::LevelFilter;
@@ -10,12 +11,15 @@ use args::Args;
 use codec::configure_ffmpeg_log;
 
 mod accept_header;
+mod ads_management;
 mod args;
 mod rate;
 mod routes;
+mod state;
 mod stream_saver;
 mod terminate;
 
+use state::AppState;
 use terminate::Terminator;
 
 #[tokio::main]
@@ -26,15 +30,27 @@ async fn main() {
 
     let serve_dir = get_service(ServeDir::new("restreamer/assets"));
     let terminator = Terminator::new();
+    let ads_provider = Arc::new(AdsProvider::init().await.expect("AdsProvider"));
 
-    let app = Router::new().nest_service("/", serve_dir.clone()).nest(
-        "/play",
-        routes::play::router(terminator.clone(), args.clone()),
-    );
+    ads_provider
+        .add_track("Sample Track", include_bytes!("../sample.aac"))
+        .await
+        .expect("Sample Track is loaded");
 
-    Server::bind(&get_addr(&args))
+    let state = AppState {
+        terminator,
+        ads_provider,
+        args,
+    };
+
+    let app = Router::new()
+        .nest_service("/", serve_dir.clone())
+        .nest("/play", routes::play::router(state.clone()))
+        .nest("/management", routes::management::router(state.clone()));
+
+    Server::bind(&get_addr(&state.args))
         .serve(app.into_make_service())
-        .with_graceful_shutdown(terminator.signal())
+        .with_graceful_shutdown(state.terminator.signal())
         .await
         .unwrap();
 }

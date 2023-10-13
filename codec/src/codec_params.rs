@@ -4,7 +4,7 @@ use derive_builder::Builder;
 
 use crate::SampleFormat;
 
-#[derive(Debug, Copy, Clone, Builder, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Builder, PartialEq, Eq, Hash)]
 pub struct CodecParams {
     pub(crate) sample_rate: u32,
     pub(crate) sample_format: SampleFormat,
@@ -59,6 +59,11 @@ impl CodecParams {
             samples_per_frame: Some(samples),
             ..self
         }
+    }
+
+    #[must_use]
+    pub const fn is_valid(&self) -> bool {
+        self.sample_rate > 0 && self.channels > 0
     }
 }
 

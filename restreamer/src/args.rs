@@ -38,6 +38,10 @@ pub struct Args {
     /// Print Error if frame processing time exceeds frame duration.
     #[arg(long, default_value_t = false)]
     pub report_slow_processing: bool,
+
+    /// Ignore classification and use advert
+    #[arg(long, default_value_t = false)]
+    pub advert: bool,
 }
 
 impl Args {

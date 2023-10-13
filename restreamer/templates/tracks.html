@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Tracks</title>
+
+    <style>
+        tr {
+            border: 1px solid #b4b6b6;
+            border-bottom: 1px solid #212020;
+        }
+
+        tr:nth-child(even) {
+            background-color: #b4b6b6;
+        }
+
+        label {
+            display: block;
+            font:
+                1rem 'Fira Sans',
+                sans-serif;
+        }
+
+        input,
+        label {
+            margin: 0.4rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <form action="tracks" method="post" enctype="multipart/form-data">
+        <label for="track">Choose an audio file:</label>
+        <input type="file" id="track" name="track" accept="audio/aac, audio/wav, audio/mp3" />
+        <button>Upload</button>
+    </form>
+
+    <table>
+        <tr>
+            <th>Track ID</th>
+            <th>Name</th>
+            <th>Duration</th>
+            <th>Added</th>
+            <th>Played</th>
+        </tr>
+        {% for record in records %}
+        <tr>
+            <td><a href="playbacks/{{ record.track_id }}">{{ record.track_id }}</a></td>
+            <td>{{ record.name }}</td>
+            <td>{{ record.duration }}</td>
+            <td>{{ record.added }}</td>
+            <td>{{ record.played }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>

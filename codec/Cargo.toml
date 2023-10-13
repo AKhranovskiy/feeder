@@ -11,3 +11,4 @@ anyhow = { workspace = true }
 bytemuck = { workspace = true }
 derive_builder = { workspace = true }
 log = { workspace = true }
+nearly = { workspace = true }

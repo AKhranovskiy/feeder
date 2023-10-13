@@ -4,6 +4,7 @@ use ac_ffmpeg::{codec::audio::AudioFrame, time::Timestamp};
 
 use crate::FrameDuration;
 
+#[derive(Debug)]
 pub struct Pts {
     duration: Duration,
     counter: u32,
@@ -17,6 +18,14 @@ impl Pts {
         let counter = 0;
 
         Self { duration, counter }
+    }
+
+    #[must_use]
+    pub const fn const_new(duration: Duration) -> Self {
+        Self {
+            duration,
+            counter: 0,
+        }
     }
 
     #[allow(clippy::should_implement_trait)]

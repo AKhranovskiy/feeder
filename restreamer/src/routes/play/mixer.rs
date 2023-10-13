@@ -1,4 +1,5 @@
 use analyzer::ContentKind;
+use axum::async_trait;
 use codec::AudioFrame;
 
 mod ads;
@@ -9,8 +10,9 @@ pub use ads::AdsMixer;
 pub use passthrough::PassthroughMixer;
 pub use silence::SilenceMixer;
 
-pub trait Mixer {
-    fn push(&mut self, kind: ContentKind, frame: &AudioFrame) -> AudioFrame;
+#[async_trait]
+pub trait Mixer: Send {
+    async fn push(&mut self, kind: ContentKind, frame: &AudioFrame) -> AudioFrame;
 }
 
 #[cfg(test)]
@@ -48,7 +50,7 @@ mod tests {
     }
 
     pub(super) fn pts_seq(length: usize) -> Vec<Timestamp> {
-        let mut pts = Pts::new(2_048, 48_000);
+        let mut pts = Pts::new(4, 4);
         (0..length).map(|_| pts.next()).collect()
     }
 

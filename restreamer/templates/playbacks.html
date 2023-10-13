@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Playbacks {{ track }}</title>
+
+    <style>
+        tr {
+            border: 1px solid #b4b6b6;
+            border-bottom: 1px solid #212020;
+        }
+
+        tr:nth-child(even) {
+            background-color: #b4b6b6;
+        }
+    </style>
+</head>
+
+<body>
+    <table>
+        <tr>
+            <th>Client ID</th>
+            {% if track %}
+            {% else %}
+            <th>Track ID</th>
+            {% endif %}
+            <th>Name</th>
+            <th>Started</th>
+            <th>Finished</th>
+        </tr>
+        {% for record in records %}
+        <tr>
+            <td>{{ record.client_id }}</td>
+            {% if track %}
+            {% else %}
+            <td><a href="playbacks/{{ record.track_id }}">{{ record.track_id }}</a></td>
+            {% endif %}
+            <td>{{ record.name }}</td>
+            <td>{{ record.started }}</td>
+            <td>{{ record.finished }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+
+</html>

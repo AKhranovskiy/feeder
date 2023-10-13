@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ac_ffmpeg::codec::audio::SampleFormat as AcSampleFormat;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SampleFormat {
     S16,
     Flt,

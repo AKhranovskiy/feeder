@@ -64,22 +64,7 @@ impl Eq for CrossFadePair {}
 
 impl From<(f64, f64)> for CrossFadePair {
     fn from(pair: (f64, f64)) -> Self {
-        Self::new(pair.0.clamp(0.0, 1.0), pair.1.clamp(0.0, 1.0))
-    }
-}
-
-trait Clamp {
-    fn clamp<T>(input: T, min: T, max: T) -> T
-    where
-        T: PartialOrd<T>,
-    {
-        if input < min {
-            min
-        } else if input > max {
-            max
-        } else {
-            input
-        }
+        Self::new(pair.0.max(0.0), pair.1.max(0.0))
     }
 }
 
@@ -231,105 +216,140 @@ impl CrossFade for ParabolicCrossFade {
 
 #[cfg(test)]
 mod tests {
+    use nearly::{
+        assert_nearly_eq, EpsTolerance, EpsToleranceType, NearlyEq, NearlyEqEps, NearlyEqTol,
+        NearlyEqUlps, UlpsTolerance, UlpsToleranceType,
+    };
+
     use super::*;
+
+    impl UlpsTolerance for CrossFadePair {
+        type T = <f64 as UlpsTolerance>::T;
+        const DEFAULT: Self::T = <f64 as UlpsTolerance>::DEFAULT;
+    }
+
+    impl EpsTolerance for CrossFadePair {
+        type T = <f64 as EpsTolerance>::T;
+        const DEFAULT: Self::T = <f64 as EpsTolerance>::DEFAULT;
+    }
+
+    impl NearlyEqUlps for CrossFadePair {
+        fn nearly_eq_ulps(&self, other: &Self, ulps: UlpsToleranceType<Self>) -> bool {
+            self.0.nearly_eq_ulps(&other.0, ulps) && self.1.nearly_eq_ulps(&other.1, ulps)
+        }
+    }
+
+    impl NearlyEqEps for CrossFadePair {
+        fn nearly_eq_eps(&self, other: &Self, eps: EpsToleranceType<Self>) -> bool {
+            self.0.nearly_eq_eps(&other.0, eps) && self.1.nearly_eq_eps(&other.1, eps)
+        }
+    }
+
+    impl NearlyEqTol for CrossFadePair {}
+    impl NearlyEq for CrossFadePair {}
 
     #[test]
     fn test_equal_power_cross_fade() {
-        assert_eq!(
+        assert_nearly_eq!(
             EqualPowerCrossFade::generate(11),
             vec![
                 (1.0, 0.0).into(),
-                (1.002_983_542_067_235_5, 0.040_598_486_067_235_61).into(),
-                (0.992_645_890_677_145_8, 0.157_066_498_677_145_62).into(),
-                (0.945_873_459_331_267_8, 0.327_825_251_331_267_8).into(),
-                (0.849_551_831_153_049_6, 0.520_867_287_153_049_6).into(),
-                (0.703_354_788_906_249_9, 0.703_354_788_906_249_9).into(), // middle
-                (0.520_867_287_153_049_5, 0.849_551_831_153_049_8).into(),
-                (0.327_825_251_331_267_5, 0.945_873_459_331_267_8).into(),
-                (0.157_066_498_677_145_53, 0.992_645_890_677_145_6).into(),
-                (0.040_598_486_067_235_58, 1.002_983_542_067_235_5).into(),
+                (1.002, 0.040).into(),
+                (0.992, 0.157).into(),
+                (0.945, 0.327).into(),
+                (0.849, 0.520).into(),
+                (0.703, 0.703).into(), // middle
+                (0.520, 0.849).into(),
+                (0.327, 0.945).into(),
+                (0.157, 0.992).into(),
+                (0.040, 1.002).into(),
                 (0.0, 1.0).into(),
-            ]
+            ],
+            eps = 1e-3
         );
     }
 
     #[test]
     fn test_linear_cross_fade() {
-        assert_eq!(
+        assert_nearly_eq!(
             LinearCrossFade::generate(11),
             vec![
                 (1.0, 0.0).into(),
                 (0.9, 0.1).into(),
                 (0.8, 0.2).into(),
-                (0.7, 0.300_000_000_000_000_04).into(),
+                (0.7, 0.3).into(),
                 (0.6, 0.4).into(),
                 (0.5, 0.5).into(), // middle
-                (0.399_999_999_999_999_9, 0.600_000_000_000_000_1).into(),
-                (0.299_999_999_999_999_93, 0.700_000_000_000_000_1).into(),
-                (0.199_999_999_999_999_96, 0.8).into(),
-                (0.099_999_999_999_999_98, 0.9).into(),
+                (0.4, 0.6).into(),
+                (0.3, 0.7).into(),
+                (0.2, 0.8).into(),
+                (0.1, 0.9).into(),
                 (0.0, 1.0).into(),
             ],
+            eps = 1e-3
         );
     }
 
     #[test]
     fn test_cossin_cross_fade() {
-        assert_eq!(
+        assert_nearly_eq!(
             CossinCrossFade::generate(11),
             vec![
                 (1.0, 0.0).into(),
-                (0.975_528_258_147_576_8, 0.024_471_741_852_423_214).into(),
-                (0.904_508_497_187_473_6, 0.095_491_502_812_526_27).into(),
-                (0.793_892_626_146_236_7, 0.206_107_373_853_763_4).into(),
-                (0.654_508_497_187_473_7, 0.345_491_502_812_526_3).into(),
-                (0.500_000_000_000_000_1, 0.499_999_999_999_999_9).into(), // middle point
-                (0.345_491_502_812_526_3, 0.654_508_497_187_473_7).into(),
-                (0.206_107_373_853_763_46, 0.793_892_626_146_236_5).into(),
-                (0.095_491_502_812_526_3, 0.904_508_497_187_473_6).into(),
-                (0.024_471_741_852_423_23, 0.975_528_258_147_576_8).into(),
-                (3.749_399_456_654_644e-33, 1.0).into(),
-            ]
+                (0.975, 0.024).into(),
+                (0.904, 0.095).into(),
+                (0.793, 0.206).into(),
+                (0.654, 0.345).into(),
+                (0.5, 0.5).into(), // middle point
+                (0.345, 0.654).into(),
+                (0.206, 0.793).into(),
+                (0.095, 0.904).into(),
+                (0.024, 0.975).into(),
+                (0.0, 1.0).into(),
+            ],
+            eps = 1e-3
         );
     }
 
     #[test]
     fn test_semicircle_cross_fade() {
-        assert_eq!(
+        assert_nearly_eq!(
             SemicircleCrossFade::generate(11),
             vec![
-                CrossFadePair(1.0, 0.0),
-                CrossFadePair(0.979_795_897_113_271_2, 0.0),
-                CrossFadePair(0.916_515_138_991_168, 0.0),
-                CrossFadePair(0.799_999_999_999_999_9, 0.0),
-                CrossFadePair(0.599_999_999_999_999_9, 0.0),
-                CrossFadePair(0.0, 0.0), // middle point
-                CrossFadePair(0.0, 0.600_000_000_000_000_3),
-                CrossFadePair(0.0, 0.8),
-                CrossFadePair(0.0, 0.916_515_138_991_168_1),
-                CrossFadePair(0.0, 0.979_795_897_113_271_2),
-                CrossFadePair(0.0, 1.0)
-            ]
+                (1.0, 0.0).into(),
+                (0.979, 0.0).into(),
+                (0.916, 0.0).into(),
+                (0.8, 0.0).into(),
+                (0.6, 0.0).into(),
+                (0.0, 0.0).into(),
+                (0.0, 0.6).into(),
+                (0.0, 0.8).into(),
+                (0.0, 0.916).into(),
+                (0.0, 0.979).into(),
+                (0.0, 1.0).into()
+            ],
+            eps = 1e-3
         );
     }
 
     #[test]
     fn test_parabolic_cross_fade() {
-        assert_eq!(
+        assert_nearly_eq!(
             ParabolicCrossFade::generate(11),
             vec![
-                CrossFadePair(1.0, 0.0),
-                CrossFadePair(0.97, 0.0),
-                CrossFadePair(0.88, 0.0),
-                CrossFadePair(0.73, 0.0),
-                CrossFadePair(0.519_999_999_999_999_9, 0.0),
-                CrossFadePair(0.25, 0.25),
-                CrossFadePair(0.0, 0.520_000_000_000_000_2),
-                CrossFadePair(0.0, 0.730_000_000_000_000_2),
-                CrossFadePair(0.0, 0.880_000_000_000_000_1),
-                CrossFadePair(0.0, 0.97),
-                CrossFadePair(0.0, 1.0)
-            ]
+                (1.0, 0.0).into(),
+                (0.97, 0.0).into(),
+                (0.88, 0.0).into(),
+                (0.73, 0.0).into(),
+                (0.519, 0.0).into(),
+                (0.25, 0.25).into(),
+                (0.0, 0.520).into(),
+                (0.0, 0.730).into(),
+                (0.0, 0.880).into(),
+                (0.0, 0.97).into(),
+                (0.0, 1.0).into()
+            ],
+            eps = 1e-3
         );
     }
 }

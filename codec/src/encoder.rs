@@ -8,6 +8,7 @@ use ac_ffmpeg::format::muxer::Muxer;
 use ac_ffmpeg::format::muxer::OutputFormat;
 
 use crate::CodecParams;
+use crate::Pts;
 use crate::Resampler;
 use crate::SampleFormat;
 
@@ -113,5 +114,14 @@ impl<W: Write> Encoder<W> {
     #[must_use]
     pub fn codec_params(&self) -> CodecParams {
         self.encoder.codec_parameters().into()
+    }
+
+    pub fn pts(&self) -> anyhow::Result<Pts> {
+        Ok(Pts::new(
+            self.encoder
+                .samples_per_frame()
+                .ok_or_else(|| anyhow::anyhow!("No samples per frame"))? as u32,
+            self.encoder.codec_parameters().sample_rate(),
+        ))
     }
 }
