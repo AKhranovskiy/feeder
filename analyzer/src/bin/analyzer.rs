@@ -10,12 +10,10 @@ use codec::Decoder;
 
 fn main() -> anyhow::Result<()> {
     stderrlog::new()
-        .show_module_names(false)
-        .show_level(false)
-        .module("analyzer::smooth")
-        .module("analyzer::analyzer")
+        .show_module_names(true)
+        .show_level(true)
         .verbosity(LevelFilter::Debug)
-        .timestamp(stderrlog::Timestamp::Second)
+        .timestamp(stderrlog::Timestamp::Millisecond)
         .init()
         .unwrap();
 
@@ -29,15 +27,13 @@ fn main() -> anyhow::Result<()> {
         BitFlags::empty(),
     );
 
-    // let mut buf = Vec::with_capacity(BUFFER_SIZE);
-
     let mut pb_frames = tqdm!(
         total = decoder.frames() as usize,
         desc = "Processed",
         unit = "f",
         force_refresh = true,
         position = 0,
-        disable = true
+        disable = false
     );
 
     let mut pb_ads = tqdm!(
@@ -46,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         unit = "f",
         force_refresh = true,
         position = 1,
-        disable = true
+        disable = false
     );
 
     let mut prev_kind = ContentKind::Unknown;
@@ -55,30 +51,23 @@ fn main() -> anyhow::Result<()> {
         analyzer.push(frame?)?;
     }
 
+    pb_frames.write("Decoded")?;
+
     analyzer.flush()?;
 
+    pb_frames.write("Flushed")?;
+
     for (kind, frame) in analyzer.pop()? {
+        pb_frames.update(1)?;
         if prev_kind != kind {
-            println!("{:?} {kind}", frame.pts());
+            pb_frames.write(format!("{:?} {kind}", frame.pts()))?;
             prev_kind = kind;
         }
 
         if kind == ContentKind::Advertisement {
             pb_ads.update(1)?;
         }
-
-        // let k = match kind {
-        //     ContentKind::Advertisement => 'A',
-        //     ContentKind::Music => 'M',
-        //     ContentKind::Talk => 'T',
-        //     ContentKind::Unknown => 'U',
-        // };
-
-        // buf.push(k as u8);
-        pb_frames.update(1)?;
     }
-
-    // std::io::stdout().write_all(&buf)?;
 
     println!(
         "\nTotal {}, ads={} / {}%",

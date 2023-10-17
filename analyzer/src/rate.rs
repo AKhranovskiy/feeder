@@ -19,8 +19,10 @@ impl Rate {
         self.timer = Instant::now();
     }
 
-    pub fn stop(&mut self) {
-        self.values.push_overwrite(self.timer.elapsed());
+    pub fn stop(&mut self) -> Duration {
+        let elapsed = self.timer.elapsed();
+        self.values.push_overwrite(elapsed);
+        elapsed
     }
 
     pub fn average(&self) -> Duration {

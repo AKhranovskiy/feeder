@@ -31,6 +31,8 @@ pub struct BufferedAnalyzer {
 
 pub const DRAIN_DURATION: Duration = Duration::from_millis(200);
 const PROCESSING_DURATION: Duration = Duration::from_millis(950);
+// Duplicate samples N times to increase prediction accuracy.
+const REPEAT_SAMPLE: usize = 4;
 
 const MODEL: ClassifyModel = ClassifyModel::AMT;
 const AMPLIFICATION: [f32; 3] = [1., 5., 5.];
@@ -197,11 +199,9 @@ fn processing_worker(
 ) -> anyhow::Result<()> {
     let mut rate = Rate::new();
     let mut input_queue = VecDeque::<AudioFrame>::new();
-    let mut last_kind = ContentKind::Unknown;
+    let mut output_queue = VecDeque::<AudioFrame>::new();
 
     while !frame_receiver.is_disconnected() {
-        rate.start();
-
         processing_flag.store(true, atomic::Ordering::SeqCst);
 
         // Collect all frames from input.
@@ -220,7 +220,7 @@ fn processing_worker(
 
         if input_duration_secs < PROCESSING_DURATION.as_secs_f64() {
             // Not enough input to process. Let's wait for next frame here.
-            rate.stop();
+            // rate.stop();
             worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
 
             processing_flag.store(false, atomic::Ordering::SeqCst);
@@ -232,6 +232,10 @@ fn processing_worker(
         }
 
         while (frame_duration_secs * input_queue.len() as f64) > PROCESSING_DURATION.as_secs_f64() {
+            if output_queue.is_empty() {
+                rate.start();
+            }
+
             // Ok, we have enough input frames to process.
             let frames_to_take =
                 (PROCESSING_DURATION.as_secs_f64() / frame_duration_secs).ceil() as usize;
@@ -246,12 +250,16 @@ fn processing_worker(
             let frames_to_drain =
                 (DRAIN_DURATION.as_secs_f64() / frame_duration_secs).floor() as usize;
             let frames_to_drain = frames_to_drain.min(frames_to_process.len());
-            let drained_frames = input_queue.drain(..frames_to_drain);
+            output_queue.extend(input_queue.drain(..frames_to_drain));
 
-            let samples = resample_16k_mono_s16_frames(frames_to_process.clone())?
-                .into_iter()
-                .map(f32::from)
-                .collect::<Vec<_>>();
+            let samples = match resample_16k_mono_s16_frames(frames_to_process.clone()) {
+                Ok(samples) => samples.into_iter().map(f32::from).collect::<Vec<_>>(),
+                Err(err) => {
+                    eprintln!("Failed to resample frames: {err}");
+                    anyhow::bail!(err);
+                }
+            };
+            let samples = samples.repeat(REPEAT_SAMPLE);
 
             let data = classifier::Data::from_shape_vec((samples.len(),), samples)?;
             // Normalize data to [-1., 1.]
@@ -266,13 +274,17 @@ fn processing_worker(
                     x => unreachable!("Unexpected label {x}"),
                 };
 
-                last_kind = kind;
-            }
-            processed_sender.send(drained_frames.map(|frame| (last_kind, frame)).collect())?;
+                let _elapsed = rate.stop();
 
-            worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
+                // println!("{}ms", elapsed.as_millis() / output_queue.len() as u128);
+
+                #[allow(clippy::iter_with_drain)]
+                processed_sender
+                    .send(output_queue.drain(..).map(|frame| (kind, frame)).collect())?;
+
+                worker_stats_sender.send((rate.average(), smoother.get_buffer_content()))?;
+            }
         }
-        rate.stop();
         processing_flag.store(false, atomic::Ordering::SeqCst);
     }
 

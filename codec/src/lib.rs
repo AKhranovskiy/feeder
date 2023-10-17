@@ -53,7 +53,7 @@ pub fn configure_ffmpeg_log() {
             // Quiet
             -8 => return,
             // FFMpeg is going to crash.
-            0 => panic!("FFMPEG panics: {}", message),
+            0 => panic!("FFMPEG panics: {message}"),
             // PANIC and ERROR
             8 | 16 => Level::Error,
             24 => Level::Warn,
@@ -126,7 +126,7 @@ pub fn resample_16k_mono_s16_frames(frames: Vec<AudioFrame>) -> anyhow::Result<V
 
     let mut output: Vec<i16> = vec![];
 
-    let mut resampler = AudioResampler::builder()
+    let mut resampler = match AudioResampler::builder()
         .source_sample_rate(frames[0].sample_rate())
         .source_channel_layout(frames[0].channel_layout().to_owned())
         .source_sample_format(frames[0].sample_format())
@@ -134,7 +134,14 @@ pub fn resample_16k_mono_s16_frames(frames: Vec<AudioFrame>) -> anyhow::Result<V
         .target_channel_layout(AcChannelLayout::from_channels(1).unwrap())
         .target_sample_format(AcSampleFormat::from_str("s16").unwrap())
         .target_sample_rate(16_000)
-        .build()?;
+        .build()
+    {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!("Failed to create resampler: {err}");
+            anyhow::bail!(err);
+        }
+    };
 
     for frame in frames {
         resampler.push(frame)?;
