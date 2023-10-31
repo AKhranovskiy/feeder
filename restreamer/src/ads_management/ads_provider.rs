@@ -68,7 +68,7 @@ impl AdsProvider {
     }
 
     pub async fn content(&self) -> anyhow::Result<Vec<ContentItem>> {
-        let items = sqlx::query_as::<_, ContentItem>(r#"SELECT id, name, duration FROM tracks"#)
+        let items = sqlx::query_as::<_, ContentItem>("SELECT id, name, duration FROM tracks")
             .fetch_all(&self.db_pool)
             .await?;
 
@@ -87,7 +87,7 @@ impl AdsProvider {
             return Ok(item);
         }
 
-        let content: Vec<u8> = sqlx::query(r#"SELECT content FROM tracks WHERE id=?"#)
+        let content: Vec<u8> = sqlx::query("SELECT content FROM tracks WHERE id=?")
             .bind(id)
             .map(|row: SqliteRow| row.get("content"))
             .fetch_optional(&self.db_pool)
@@ -118,7 +118,7 @@ impl AdsProvider {
             track_id.as_ref()
         );
         sqlx::query(
-            r#"INSERT INTO playbacks (client_id, track_id, started, finished) VALUES(?,?,?,?)"#,
+            "INSERT INTO playbacks (client_id, track_id, started, finished) VALUES(?,?,?,?)",
         )
         .bind(client_id)
         .bind(track_id)
@@ -131,11 +131,11 @@ impl AdsProvider {
 
     pub async fn playbacks(&self) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
-            r#"
+            r"
                 SELECT p.client_id, p.track_id, t.name, p.started, p.finished FROM playbacks p
                 LEFT JOIN tracks t ON t.id = p.track_id
                 ORDER BY p.finished DESC, p.started DESC;
-            "#,
+            ",
         )
         .fetch_all(&self.db_pool)
         .await?;
@@ -145,12 +145,12 @@ impl AdsProvider {
 
     pub async fn playbacks_by_id(&self, id: AdId) -> anyhow::Result<Vec<PlaybackRecord>> {
         let records = sqlx::query_as::<_, PlaybackRecord>(
-            r#"
+            r"
                 SELECT p.client_id, p.track_id, t.name, p.started, p.finished FROM playbacks p
                 LEFT JOIN tracks t ON t.id = p.track_id
                 WHERE p.track_id = ?
                 ORDER BY p.finished DESC, p.started DESC;
-            "#,
+            ",
         )
         .bind(id)
         .fetch_all(&self.db_pool)
@@ -161,12 +161,12 @@ impl AdsProvider {
 
     pub async fn tracks(&self) -> anyhow::Result<Vec<TrackRecord>> {
         let records = sqlx::query_as::<_, TrackRecord>(
-            r#"
+            r"
                 SELECT t.id, t.name, t.duration, t.added,
                     (SELECT count(*) FROM playbacks p WHERE p.track_id = t.id) as played
                 FROM tracks t
                 ORDER BY t.added DESC;
-            "#,
+            ",
         )
         .fetch_all(&self.db_pool)
         .await?;
@@ -182,7 +182,7 @@ impl AdsProvider {
         let id = AdId::new();
 
         sqlx::query(
-            r#"INSERT INTO tracks (id, name, content, added, duration) VALUES (?, ?, ?, ?, ?)"#,
+            "INSERT INTO tracks (id, name, content, added, duration) VALUES (?, ?, ?, ?, ?)",
         )
         .bind(id)
         .bind(name)
@@ -232,7 +232,7 @@ impl AdsProvider {
         init_db(&db_pool).await.unwrap();
 
         let id = AdId::new();
-        sqlx::query(r#"INSERT INTO tracks (id, name, content, added, duration) VALUES(?,?,?,?,?)"#)
+        sqlx::query("INSERT INTO tracks (id, name, content, added, duration) VALUES(?,?,?,?,?)")
             .bind(id)
             .bind("Test track")
             .bind(&[0, 1, 2][..])
