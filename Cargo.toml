@@ -1,6 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["analyzer", "classifier", "codec", "restreamer", "unstreamer"]
+members = [
+    "analyzer",
+    "classifier",
+    "codec",
+    "restreamer",
+    "tools",
+    "unstreamer",
+]
 
 [workspace.package]
 authors = ["Andrey Khranovsky <andrey.khranovsky@gmail.com>"]
