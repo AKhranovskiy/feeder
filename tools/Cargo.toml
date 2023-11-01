@@ -7,7 +7,10 @@ edition = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+bytemuck = { workspace = true }
 clap = { workspace = true }
+classifier = { workspace = true }
+codec = { workspace = true }
 flume = { workspace = true }
 kdam = { workspace = true }
 seahash = "4.1.0"

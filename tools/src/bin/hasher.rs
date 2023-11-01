@@ -8,7 +8,10 @@ use std::{
 
 use clap::Parser;
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePool, types::chrono::Utc, Sqlite};
-use tokio::try_join;
+use tokio::task::JoinSet;
+
+const WORKERS: usize = 10;
+const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MiB
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,7 +21,32 @@ async fn main() -> anyhow::Result<()> {
 
     let input = Path::new(&cli.input);
 
-    let mut buf = Vec::with_capacity(150 * 1024 * 1014); // 150MiB
+    let (sender, receiver) = flume::bounded::<Task>(WORKERS);
+
+    let mut workers = JoinSet::new();
+    for i in 0..WORKERS {
+        let receiver = receiver.clone();
+        let db = db.clone();
+        workers.spawn(async move {
+            let yamnet = classifier::Yamnet::load("./models").unwrap();
+
+            while let Ok(task) = receiver.recv() {
+                println!(
+                    "Worker {i}: processing '{}' {} {}",
+                    task.name,
+                    task.hash,
+                    task.content.len()
+                );
+                let instant = Instant::now();
+                process(&db, &yamnet, task).await;
+                println!(
+                    "Worker {i}: finished in {}ms",
+                    instant.elapsed().as_millis()
+                );
+            }
+            println!("Worker {i} completed");
+        });
+    }
 
     if input.is_file() && input.extension() == Some(OsStr::new("tar")) {
         println!("Processing tar-archive '{}'", input.display());
@@ -33,37 +61,48 @@ async fn main() -> anyhow::Result<()> {
                 // Directory root
                 continue;
             }
-            if size as usize > buf.capacity() {
+
+            if size as usize > MAX_FILE_SIZE {
                 eprintln!(
-                    "File '{}' is too large, skipping, size: {}",
+                    "File '{}' is too large, skipping, size: {}, max: {}",
                     path.display(),
-                    size
+                    size,
+                    MAX_FILE_SIZE
                 );
                 continue;
             }
 
-            let start = Instant::now();
+            let mut content = Vec::with_capacity(size as usize);
+            entry.take(size).read_to_end(&mut content)?;
 
-            entry.take(buf.capacity() as u64).read_to_end(&mut buf)?;
-            let hash = seahash::hash(&buf);
-
-            println!(
-                "{}, size: {}, hash: 0x{hash:x}, elapsed: {}µs",
-                path.display(),
-                size,
-                start.elapsed().as_micros()
-            );
+            let hash = seahash::hash(&content);
 
             if check_if_file_present(&db, hash).await? {
                 println!("File already present in dataset, file='{}'", path.display());
                 continue;
             }
 
-            // TODO transcode to 16-bit mono wav, calculate  embedding, get duration,
-            insert_file(&db, hash, cli.kind, &buf).await?;
+            sender.send(Task {
+                name: path.display().to_string(),
+                hash,
+                content,
+                kind: cli.kind,
+            })?;
         }
     } else {
         eprintln!("Input '{}' is not a tar-archive", input.display());
+    }
+
+    while !sender.is_empty() {
+        tokio::task::yield_now().await;
+    }
+
+    // Close the channel.
+    drop(sender);
+
+    // Join all workers
+    while let Some(item) = workers.join_next().await {
+        let () = item.unwrap();
     }
 
     Ok(())
@@ -117,43 +156,6 @@ async fn init_db(path: &str) -> anyhow::Result<SqlitePool> {
     .execute(&pool)
     .await?;
 
-    sqlx::query(
-        r"CREATE TABLE IF NOT EXISTS dataset_old (
-        hash INTEGER PRIMARY KEY,
-        content BLOB NOT NULL,
-        kind TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        embedding BLOB NOT NULL,
-        added TEXT NOT NULL
-    )",
-    )
-    .execute(&pool)
-    .await?;
-
-    sqlx::query(
-        r"CREATE TABLE IF NOT EXISTS dataset_new (
-        hash INTEGER PRIMARY KEY,
-        content BLOB NOT NULL,
-        kind TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        embedding BLOB NOT NULL,
-        added TEXT NOT NULL
-    )",
-    )
-    .execute(&pool)
-    .await?;
-
-    let ((old_count,), (new_count,)): ((i64,), (i64,)) = try_join!(
-        sqlx::query_as(r"SELECT COUNT(*) FROM dataset_old").fetch_one(&pool),
-        sqlx::query_as(r"SELECT COUNT(*) FROM dataset_new").fetch_one(&pool),
-    )?;
-    if old_count > 0 {
-        println!("dataset_old has {old_count} rows");
-    }
-    if new_count > 0 {
-        println!("dataset_new has {new_count} rows");
-    }
-
     Ok(pool)
 }
 
@@ -161,53 +163,42 @@ async fn check_if_file_present(db: &SqlitePool, hash: u64) -> anyhow::Result<boo
     #[allow(clippy::cast_possible_wrap)]
     let hash = hash as i64;
 
-    // First, check dataset_new and dataset_old, in case the previous run failed.
-    // If the hash is present in these tables, then the file has been processed
-    // but not yet persisted in the dataset table.
-    // If not present, then check in the main dataset table.
-    // If present in the main dataset table, copy it to dataset_old.
-
-    let ((in_old,), (in_new,)): ((i64,), (i64,)) = try_join!(
-        sqlx::query_as("SELECT COUNT(*) FROM dataset_old WHERE hash = ?")
-            .bind(hash)
-            .fetch_one(db),
-        sqlx::query_as("SELECT COUNT(*) FROM dataset_new WHERE hash = ?")
-            .bind(hash)
-            .fetch_one(db),
-    )?;
-
-    if in_old > 0 || in_new > 0 {
-        return Ok(true);
-    }
-
-    let res = sqlx::query(r"INSERT INTO dataset_old SELECT * FROM dataset WHERE hash = ?")
+    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM dataset WHERE hash = ?")
         .bind(hash)
-        .execute(db)
+        .fetch_one(db)
         .await?;
 
-    Ok(res.rows_affected() > 0)
+    Ok(count > 0)
 }
 
-async fn insert_file(
-    db: &SqlitePool,
+#[derive(Debug, Clone)]
+struct Task {
+    name: String,
     hash: u64,
+    content: Vec<u8>,
     kind: DatasetKind,
-    content: &[u8],
-) -> anyhow::Result<()> {
+}
+
+async fn process(db: &SqlitePool, yamnet: &classifier::Yamnet, task: Task) {
+    let wav = codec::resample_16k_mono_s16_stream(task.content.as_slice()).unwrap();
+    let samples = wav.into_iter().map(f32::from).collect::<Vec<_>>();
+
+    let data = classifier::Data::from_shape_vec((samples.len(),), samples).unwrap();
+    // Normalize data to [-1., 1.]
+    let data = data / 32768.0;
+
+    let embedding = yamnet.embedding(&data).unwrap();
+
+    let duration = codec::track_duration(task.content.as_slice()).unwrap();
+
     #[allow(clippy::cast_possible_wrap)]
-    let hash = hash as i64;
-
-    let duration = 175;
-
     sqlx::query(
-        r"INSERT INTO dataset_new (hash, content, kind, duration, embedding, added) VALUES(?,?,?,?,?,?)"
-    ).bind(hash)
-    .bind(content)
-    .bind(kind.as_ref())
-    .bind(duration)
-    .bind(&[3,4,5][..])
-    .bind(Utc::now())
-    .execute(db).await?;
-
-    Ok(())
+            r"INSERT INTO dataset (hash, content, kind, duration, embedding, added) VALUES(?,?,?,?,?,?)"
+        ).bind(task.hash  as i64)
+        .bind(&task.content)
+        .bind(task.kind.as_ref())
+        .bind(duration.as_millis() as i64)
+        .bind(bytemuck::cast_slice(&embedding))
+        .bind(Utc::now())
+        .execute(db).await.unwrap();
 }

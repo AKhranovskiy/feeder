@@ -131,3 +131,19 @@ impl Classify for MoatClassifier {
         )?)
     }
 }
+
+pub struct Yamnet {
+    yamnet: TfModel,
+}
+
+impl Yamnet {
+    pub fn load<P: AsRef<Path>>(dir: P) -> anyhow::Result<Self> {
+        Ok(Self {
+            yamnet: TfModel::yamnet(&dir)?,
+        })
+    }
+
+    pub fn embedding(&self, data: &Data) -> anyhow::Result<Vec<f32>> {
+        Ok(self.yamnet.run(&Tensor::from(data))?.to_vec())
+    }
+}
