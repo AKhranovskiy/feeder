@@ -8,6 +8,7 @@ edition = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 classifier = { workspace = true }
 codec = { workspace = true }
@@ -18,3 +19,4 @@ sqlx = { workspace = true }
 strum = { version = "0.25.0", features = ["strum_macros", "derive"] }
 tar = "0.4.40"
 tokio = { workspace = true }
+yew = { version = "0.21.0", features = ["csr"] }

@@ -4,14 +4,14 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 
 use anyhow::anyhow;
+use chrono::{Duration, Utc};
 use clap::Parser;
 use kdam::BarExt;
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePool, types::chrono::Utc, Sqlite};
 use tokio::{sync::Mutex, task::JoinSet};
+use tools::Database;
 
 const WORKERS: usize = 10;
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MiB
@@ -21,106 +21,17 @@ const QUEUE_LIMIT: usize = 10;
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    let db = init_db(&cli.sqlite).await?;
-
     let input = Path::new(&cli.input);
+
+    let db = Database::init(&cli.sqlite).await?;
+    let pb = progress_bar()?;
 
     let (task_sender, task_receiver) = flume::bounded::<Task>(QUEUE_LIMIT);
 
-    let pb = Arc::new(Mutex::new(
-        kdam::BarBuilder::default()
-            .unit("files")
-            .desc("Processed")
-            .force_refresh(true)
-            .build()
-            .map_err(|s| anyhow!(s))?,
-    ));
-
-    let mut workers = JoinSet::new();
-
-    for _ in 0..WORKERS {
-        let receiver = task_receiver.clone();
-        let db = db.clone();
-        let pb = pb.clone();
-
-        workers.spawn(async move {
-            let yamnet = match classifier::Yamnet::load("./models") {
-                Ok(yamnet) => yamnet,
-                Err(err) => {
-                    panic!("Failed to load yamnet: {err}");
-                }
-            };
-
-            while let Ok(task) = receiver.recv_async().await {
-                let name = task.name.clone();
-
-                match process(&yamnet, task) {
-                    Ok(task) => match store(&db, task).await {
-                        Ok(()) => {
-                            if let Err(err) = pb.lock().await.update(1) {
-                                eprintln!(
-                                    "Failed to update progress bar for task={name}, err={err}",
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            eprintln!("Failed to store task={name}: {err}");
-                        }
-                    },
-                    Err(error) => {
-                        eprintln!("Failed to process task={name}: {error}");
-                    }
-                }
-            }
-
-            anyhow::Ok(())
-        });
-    }
+    let mut workers = spawn_workers(&task_receiver, &db, &pb);
 
     if input.is_file() && input.extension() == Some(OsStr::new("tar")) {
-        println!("Processing tar-archive '{}'", input.display());
-
-        let mut archive = tar::Archive::new(File::open(input)?);
-        for entry in archive.entries()? {
-            let entry = entry?;
-            let path = entry.path()?.into_owned();
-            let size = entry.size();
-
-            if size == 0 {
-                // Directory root
-                continue;
-            }
-
-            if size as usize > MAX_FILE_SIZE {
-                println!(
-                    "File '{}' is too large, skipping, size: {}, max: {}",
-                    path.display(),
-                    size,
-                    MAX_FILE_SIZE
-                );
-
-                continue;
-            }
-
-            let mut content = Vec::with_capacity(size as usize);
-            entry.take(size).read_to_end(&mut content)?;
-
-            let hash = seahash::hash(&content);
-
-            if check_if_file_present(&db, hash).await? {
-                // println!("File already present in dataset, file='{}'", path.display());
-                continue;
-            }
-
-            task_sender.send(Task {
-                name: path.display().to_string(),
-                hash,
-                content,
-                kind: cli.kind,
-                embedding: vec![],
-                duration: Duration::default(),
-            })?;
-        }
+        process_tar(input, cli.kind, &task_sender)?;
     } else {
         eprintln!("Input '{}' is not a tar-archive", input.display());
     }
@@ -137,17 +48,6 @@ async fn main() -> anyhow::Result<()> {
     while let Some(item) = workers.join_next().await {
         item??;
     }
-
-    // println!("Finishing storing queue: {}", store_sender.len());
-    // while !store_sender.is_empty() {
-    //     tokio::task::yield_now().await;
-    // }
-
-    // println!("Drop the store sender");
-    // drop(store_sender);
-
-    // println!("Join storing worker");
-    // store_worker.await??;
 
     Ok(())
 }
@@ -175,61 +75,110 @@ enum DatasetKind {
     Other,
 }
 
-async fn init_db(path: &str) -> anyhow::Result<SqlitePool> {
-    println!("Initializing Sqlite DB at '{path}'");
-
-    let url = format!("sqlite://{path}");
-
-    if !Sqlite::database_exists(&url).await? {
-        println!("Creating database '{path}'");
-        Sqlite::create_database(&url).await?;
+impl From<DatasetKind> for tools::model::DatasetKind {
+    fn from(kind: DatasetKind) -> Self {
+        match kind {
+            DatasetKind::Advert => Self::Advert,
+            DatasetKind::Music => Self::Music,
+            DatasetKind::Other => Self::Other,
+        }
     }
-
-    let pool = SqlitePool::connect(&url).await?;
-
-    sqlx::query(
-        r"CREATE TABLE IF NOT EXISTS dataset (
-        hash INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        content BLOB NOT NULL,
-        kind TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        embedding BLOB NOT NULL,
-        added TEXT NOT NULL
-    )",
-    )
-    .execute(&pool)
-    .await?;
-
-    Ok(pool)
-}
-
-async fn check_if_file_present(db: &SqlitePool, hash: u64) -> anyhow::Result<bool> {
-    #[allow(clippy::cast_possible_wrap)]
-    let hash = hash as i64;
-
-    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM dataset WHERE hash = ?")
-        .bind(hash)
-        .fetch_one(db)
-        .await?;
-
-    Ok(count > 0)
 }
 
 #[derive(Debug, Clone)]
 struct Task {
     name: String,
-    hash: u64,
+    hash: i64,
     content: Vec<u8>,
-    kind: DatasetKind,
+    kind: tools::model::DatasetKind,
     embedding: Vec<f32>,
-    duration: std::time::Duration,
+    duration: chrono::Duration,
+}
+
+impl From<Task> for tools::entities::DatasetEntity {
+    fn from(task: Task) -> Self {
+        Self {
+            hash: task.hash,
+            name: task.name,
+            content: task.content,
+            kind: task.kind,
+            duration: task.duration,
+            embedding: task.embedding,
+            added_at: Utc::now(),
+        }
+    }
+}
+
+fn spawn_workers(
+    task_receiver: &flume::Receiver<Task>,
+    db: &Database,
+    pb: &Arc<Mutex<kdam::Bar>>,
+) -> JoinSet<anyhow::Result<()>> {
+    let mut workers = JoinSet::new();
+
+    for _ in 0..WORKERS {
+        let receiver = task_receiver.clone();
+        let db = db.clone();
+        let pb = pb.clone();
+
+        workers.spawn(async move { worker(receiver, db, pb).await });
+    }
+    workers
+}
+
+async fn worker(
+    task_receiver: flume::Receiver<Task>,
+    db: Database,
+    pb: Arc<Mutex<kdam::Bar>>,
+) -> anyhow::Result<()> {
+    let yamnet = match classifier::Yamnet::load("./models") {
+        Ok(yamnet) => yamnet,
+        Err(err) => {
+            panic!("Failed to load yamnet: {err}");
+        }
+    };
+
+    while let Ok(task) = task_receiver.recv_async().await {
+        let name = task.name.clone();
+
+        if db.has(task.hash).await? {
+            if let Err(error) = pb.lock().await.update(1) {
+                eprintln!("Failed to update progress bar for task={name}, err={error}");
+            }
+
+            let _ = pb
+                .lock()
+                .await
+                .write(format!("File already present in dataset, file='{name}'"));
+
+            continue;
+        }
+
+        match process(&yamnet, task) {
+            Ok(task) => match db.insert(task.into()).await {
+                Ok(()) => {
+                    if let Err(err) = pb.lock().await.update(1) {
+                        eprintln!("Failed to update progress bar for task={name}, err={err}",);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Failed to store task={name}: {err}");
+                }
+            },
+            Err(error) => {
+                eprintln!("Failed to process task={name}: {error}");
+            }
+        }
+    }
+
+    anyhow::Ok(())
 }
 
 fn process(yamnet: &classifier::Yamnet, task: Task) -> anyhow::Result<Task> {
     let wav = codec::resample_16k_mono_s16_stream(task.content.as_slice())?;
 
-    let duration = std::time::Duration::from_secs_f32(wav.len() as f32 / 16_000.0);
+    let duration =
+        chrono::Duration::milliseconds((wav.len() as f32 / 16_000.0 * 1_000.0).trunc() as i64);
 
     let samples = wav.into_iter().map(f32::from).collect::<Vec<_>>();
 
@@ -246,19 +195,62 @@ fn process(yamnet: &classifier::Yamnet, task: Task) -> anyhow::Result<Task> {
     })
 }
 
-async fn store(db: &SqlitePool, task: Task) -> anyhow::Result<()> {
-    #[allow(clippy::cast_possible_wrap)]
-    sqlx::query(
-        r"INSERT INTO dataset (hash, name, content, kind, duration, embedding, added) VALUES(?,?,?,?,?,?,?)",
-    )
-    .bind(task.hash as i64)
-    .bind(&task.name)
-    .bind(&task.content)
-    .bind(task.kind.as_ref())
-    .bind(task.duration.as_millis() as i64)
-    .bind(bytemuck::cast_slice(&task.embedding))
-    .bind(Utc::now())
-    .execute(db)
-    .await?;
+fn progress_bar() -> anyhow::Result<Arc<Mutex<kdam::Bar>>> {
+    kdam::BarBuilder::default()
+        .unit("files")
+        .desc("Processed")
+        .force_refresh(true)
+        .build()
+        .map_err(|s| anyhow!(s))
+        .map(Mutex::new)
+        .map(Arc::new)
+}
+
+fn process_tar(
+    input: &Path,
+    kind: DatasetKind,
+    task_sender: &flume::Sender<Task>,
+) -> anyhow::Result<()> {
+    println!("Processing tar-archive '{}'", input.display());
+
+    let mut archive = tar::Archive::new(File::open(input)?);
+
+    for entry in archive.entries()? {
+        let entry = entry?;
+        let path = entry.path()?.into_owned();
+        let size = entry.size();
+
+        if size == 0 {
+            // Directory root
+            continue;
+        }
+
+        if size as usize > MAX_FILE_SIZE {
+            println!(
+                "File '{}' is too large, skipping, size: {}, max: {}",
+                path.display(),
+                size,
+                MAX_FILE_SIZE
+            );
+
+            continue;
+        }
+
+        let mut content = Vec::with_capacity(size as usize);
+        entry.take(size).read_to_end(&mut content)?;
+
+        #[allow(clippy::cast_possible_wrap)]
+        let hash = seahash::hash(&content) as i64;
+
+        task_sender.send(Task {
+            name: path.display().to_string(),
+            hash,
+            content,
+            kind: kind.into(),
+            embedding: vec![],
+            duration: Duration::zero(),
+        })?;
+    }
+
     Ok(())
 }
