@@ -1,4 +1,6 @@
-use sqlx::{migrate::MigrateDatabase, Sqlite, SqlitePool};
+use anyhow::bail;
+use chrono::Utc;
+use sqlx::{migrate::MigrateDatabase, sqlite::SqliteRow, Row, Sqlite, SqlitePool};
 
 pub mod entities {
 
@@ -55,11 +57,31 @@ pub mod entities {
 }
 
 pub mod model {
+    use chrono::{DateTime, Utc};
+
     #[derive(Debug, Clone, Copy, sqlx::Type)]
     pub enum DatasetKind {
         Advert,
         Music,
         Other,
+    }
+
+    #[derive(Debug, Clone, sqlx::FromRow)]
+    pub struct ModelInfo {
+        pub hash: i64,
+        pub name: String,
+        pub timestamp: DateTime<Utc>,
+        pub size: i64,
+    }
+
+    #[derive(Debug, Clone, sqlx::FromRow)]
+    pub struct ModelRun {
+        pub id: i64,
+        pub model_hash: i64,
+        pub model_name: String,
+        pub started: DateTime<Utc>,
+        pub finished: Option<DateTime<Utc>>,
+        pub files_count: i64,
     }
 }
 
@@ -102,6 +124,35 @@ impl Database {
             content BLOB NOT NULL,
             timestamp INTEGER NOT NULL
         )",
+        )
+        .execute(&pool)
+        .await?;
+
+        sqlx::query(
+            r"CREATE TABLE IF NOT EXISTS model_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_hash INTEGER NOT NULL,
+                started TEXT NOT NULL,
+                finished TEXT,
+
+                FOREIGN KEY(model_hash) REFERENCES models(hash)
+            )",
+        )
+        .execute(&pool)
+        .await?;
+
+        sqlx::query(
+            r"CREATE TABLE IF NOT EXISTS model_run_file_score (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id INTEGER NOT NULL,
+                file_hash INTEGER NOT NULL,
+                score_advert REAL NOT NULL,
+                score_music REAL NOT NULL,
+                score_other REAL NOT NULL,
+
+                FOREIGN KEY(run_id) REFERENCES model_runs(id),
+                FOREIGN KEY(file_hash) REFERENCES dataset(hash)
+            )",
         )
         .execute(&pool)
         .await?;
@@ -151,10 +202,86 @@ impl Database {
         .bind(seahash::hash(content) as i64)
         .bind(name)
         .bind(content)
-        .bind(chrono::Utc::now())
+        .bind(Utc::now())
         .execute(&self.pool)
         .await?;
 
         Ok(())
+    }
+
+    pub async fn list_models(&self) -> anyhow::Result<Vec<model::ModelInfo>> {
+        sqlx::query_as(
+            "SELECT hash, name, timestamp, length(content) as size FROM models ORDER BY name ASC, timestamp DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn insert_model_run(&self, model_hash: i64) -> anyhow::Result<i64> {
+        let res = sqlx::query("INSERT INTO model_runs (model_hash, started) VALUES(?,?)")
+            .bind(model_hash)
+            .bind(Utc::now())
+            .execute(&self.pool)
+            .await?;
+
+        Ok(res.last_insert_rowid())
+    }
+
+    pub async fn complete_model_run(&self, id: i64) -> anyhow::Result<()> {
+        let res = sqlx::query("UPDATE model_runs SET finished = ? WHERE id = ?")
+            .bind(Utc::now())
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        if res.rows_affected() != 1 {
+            bail!("Model run not found");
+        }
+        Ok(())
+    }
+
+    pub async fn list_model_runs(&self) -> anyhow::Result<Vec<model::ModelRun>> {
+        sqlx::query_as(
+            r"SELECT
+                id,
+                model_hash,
+                (SELECT name FROM models WHERE hash = model_hash) as model_name,
+                started,
+                finished,
+                (SELECT COUNT(*) FROM model_run_file_score WHERE run_id = id) as files_count
+                FROM model_runs ORDER BY started DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn find_model(
+        &self,
+        name: Option<&str>,
+        hash: Option<&i64>,
+    ) -> anyhow::Result<Option<model::ModelInfo>> {
+        sqlx::query_as(
+            r"SELECT hash, name, timestamp, length(content) as size
+                FROM models
+                WHERE name = ? OR hash = ?
+                ORDER BY timestamp DESC
+                LIMIT 1",
+        )
+        .bind(name)
+        .bind(hash)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn get_model_content(&self, hash: i64) -> anyhow::Result<Option<Vec<u8>>> {
+        sqlx::query("SELECT content FROM models WHERE hash = ?")
+            .bind(hash)
+            .map(|row: SqliteRow| row.get("content"))
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(Into::into)
     }
 }

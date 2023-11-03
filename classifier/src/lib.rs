@@ -6,7 +6,7 @@ mod tfmodel;
 mod types;
 
 pub use self::types::{Data, Labels, PredictedLabels};
-use tfmodel::TfModel;
+pub use tfmodel::TfModel;
 
 pub trait Classify: Send + Sync {
     fn classify(&self, data: &Data) -> anyhow::Result<PredictedLabels>;
