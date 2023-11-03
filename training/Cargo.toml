@@ -1,5 +1,5 @@
 [package]
-name = "tools"
+name = "training"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -14,9 +14,8 @@ classifier = { workspace = true }
 codec = { workspace = true }
 flume = { workspace = true }
 kdam = { workspace = true }
-seahash = "4.1.0"
+seahash = { workspace = true }
 sqlx = { workspace = true }
-strum = { version = "0.25.0", features = ["strum_macros", "derive"] }
-tar = "0.4.40"
+strum = { workspace = true }
+tar = { workspace = true }
 tokio = { workspace = true }
-yew = { version = "0.21.0", features = ["csr"] }

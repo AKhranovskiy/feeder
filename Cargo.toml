@@ -5,7 +5,7 @@ members = [
     "classifier",
     "codec",
     "restreamer",
-    "tools",
+    "training",
     "unstreamer",
 ]
 
@@ -59,6 +59,10 @@ tower-http = { version = "0.4.4", features = ["full"] }
 ureq = { version = "2.8.0", features = ["json"] }
 url = { version = "2.4.1", features = ["serde"] }
 uuid = { version = "1.5.0", features = ["v4", "serde"] }
+seahash = "4.1.0"
+strum = { version = "0.25.0", features = ["strum_macros", "derive"] }
+tar = "0.4.40"
+yew = { version = "0.21.0", features = ["csr"] }
 
 analyzer = { version = "*", path = "./analyzer" }
 classifier = { version = "*", path = "./classifier" }

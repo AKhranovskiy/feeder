@@ -1,5 +1,5 @@
 use clap::Parser;
-use tools::Database;
+use training::Database;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

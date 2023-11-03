@@ -11,7 +11,8 @@ use chrono::{Duration, Utc};
 use clap::Parser;
 use kdam::BarExt;
 use tokio::{sync::Mutex, task::JoinSet};
-use tools::Database;
+
+use training::Database;
 
 const WORKERS: usize = 10;
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MiB
@@ -75,7 +76,7 @@ enum DatasetKind {
     Other,
 }
 
-impl From<DatasetKind> for tools::model::DatasetKind {
+impl From<DatasetKind> for training::model::DatasetKind {
     fn from(kind: DatasetKind) -> Self {
         match kind {
             DatasetKind::Advert => Self::Advert,
@@ -90,12 +91,12 @@ struct Task {
     name: String,
     hash: i64,
     content: Vec<u8>,
-    kind: tools::model::DatasetKind,
+    kind: training::model::DatasetKind,
     embedding: Vec<f32>,
     duration: chrono::Duration,
 }
 
-impl From<Task> for tools::entities::DatasetEntity {
+impl From<Task> for training::entities::DatasetEntity {
     fn from(task: Task) -> Self {
         Self {
             hash: task.hash,
