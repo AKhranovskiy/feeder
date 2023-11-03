@@ -142,7 +142,7 @@ async fn worker(
     while let Ok(task) = task_receiver.recv_async().await {
         let name = task.name.clone();
 
-        if db.has(task.hash).await? {
+        if db.has_in_dataset(task.hash).await? {
             if let Err(error) = pb.lock().await.update(1) {
                 eprintln!("Failed to update progress bar for task={name}, err={error}");
             }
@@ -156,7 +156,7 @@ async fn worker(
         }
 
         match process(&yamnet, task) {
-            Ok(task) => match db.insert(task.into()).await {
+            Ok(task) => match db.insert_into_dataset(task.into()).await {
                 Ok(()) => {
                     if let Err(err) = pb.lock().await.update(1) {
                         eprintln!("Failed to update progress bar for task={name}, err={err}",);

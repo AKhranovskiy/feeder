@@ -7,7 +7,7 @@ async fn main() -> anyhow::Result<()> {
 
     let db = Database::init(&cli.db).await?;
 
-    if let Some(entity) = db.get_any().await? {
+    if let Some(entity) = db.get_any_from_dataset().await? {
         println!("Found entity: {} {}", entity.hash, entity.duration);
     }
 
