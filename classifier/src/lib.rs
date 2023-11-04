@@ -147,3 +147,19 @@ impl Yamnet {
         Ok(self.yamnet.run(&Tensor::from(data))?.to_vec())
     }
 }
+
+pub struct AdbandaModel {
+    model: TfModel,
+}
+
+impl AdbandaModel {
+    pub fn load<P: AsRef<Path>>(dir: P, name: &str) -> anyhow::Result<Self> {
+        Ok(Self {
+            model: TfModel::adbanda(&dir, name)?,
+        })
+    }
+
+    pub fn run(&self, data: &Data) -> anyhow::Result<Vec<f32>> {
+        Ok(self.model.run(&Tensor::from(data))?.to_vec())
+    }
+}

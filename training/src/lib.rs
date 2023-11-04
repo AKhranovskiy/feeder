@@ -57,6 +57,8 @@ pub mod entities {
 }
 
 pub mod model {
+    use std::fmt::Display;
+
     use chrono::{DateTime, Utc};
 
     #[derive(Debug, Clone, Copy, sqlx::Type)]
@@ -82,6 +84,33 @@ pub mod model {
         pub started: DateTime<Utc>,
         pub finished: Option<DateTime<Utc>>,
         pub files_count: i64,
+    }
+
+    impl Display for ModelInfo {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_fmt(format_args!(
+                "{:<15} {:>16x} {} {:>10}",
+                self.name,
+                self.hash,
+                self.timestamp.to_rfc3339(),
+                self.size
+            ))
+        }
+    }
+
+    impl Display for ModelRun {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_fmt(format_args!(
+                "{:<2} {:<15} {:>16x} {} {} {:>10}",
+                self.id,
+                self.model_name,
+                self.model_hash,
+                self.started.to_rfc3339(),
+                self.finished
+                    .map_or_else(|| "N/A".to_string(), |f| f.to_rfc3339()),
+                self.files_count
+            ))
+        }
     }
 }
 
@@ -218,7 +247,7 @@ impl Database {
         .map_err(Into::into)
     }
 
-    pub async fn insert_model_run(&self, model_hash: i64) -> anyhow::Result<i64> {
+    pub async fn start_model_run(&self, model_hash: i64) -> anyhow::Result<i64> {
         let res = sqlx::query("INSERT INTO model_runs (model_hash, started) VALUES(?,?)")
             .bind(model_hash)
             .bind(Utc::now())
@@ -260,17 +289,17 @@ impl Database {
     pub async fn find_model(
         &self,
         name: Option<&str>,
-        hash: Option<&i64>,
+        hash: Option<i64>,
     ) -> anyhow::Result<Option<model::ModelInfo>> {
         sqlx::query_as(
             r"SELECT hash, name, timestamp, length(content) as size
                 FROM models
-                WHERE name = ? OR hash = ?
+                WHERE hash = ? OR name = ?
                 ORDER BY timestamp DESC
                 LIMIT 1",
         )
-        .bind(name)
         .bind(hash)
+        .bind(name)
         .fetch_optional(&self.pool)
         .await
         .map_err(Into::into)
@@ -283,5 +312,36 @@ impl Database {
             .fetch_optional(&self.pool)
             .await
             .map_err(Into::into)
+    }
+
+    pub async fn select_file_indices_for_run(&self, run_id: i64) -> anyhow::Result<Vec<i64>> {
+        sqlx::query(
+            r"SELECT hash FROM dataset d
+                LEFT JOIN model_run_file_score s
+                ON d.hash = s.file_hash AND s.run_id = ? WHERE s.file_hash IS NULL",
+        )
+        .bind(run_id)
+        .map(|row: SqliteRow| row.get("hash"))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn find_model_run(&self, run_id: i64) -> anyhow::Result<Option<model::ModelRun>> {
+        sqlx::query_as(
+            r"SELECT
+                id,
+                model_hash,
+                (SELECT name FROM models WHERE hash = model_hash) as model_name,
+                started,
+                finished,
+                (SELECT COUNT(*) FROM model_run_file_score WHERE run_id = id) as files_count
+                FROM model_runs
+                WHERE id = ?",
+        )
+        .bind(run_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(Into::into)
     }
 }

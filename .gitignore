@@ -3,7 +3,10 @@
 .vscode/
 __pycache__/
 artifacts/
+
 models/
+!training/src/bin/models
+
 recordings/
 target/
 
