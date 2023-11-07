@@ -1,0 +1,3 @@
+- Export embeddings. Select per kind with highest score from the last run.
+- Train model from Rust.
+- web-interface.
