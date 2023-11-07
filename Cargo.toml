@@ -38,7 +38,7 @@ numpy = "0.20.0"
 os_pipe = "1.1.4"
 rand = { version = "0.8.5", features = ["small_rng"] }
 ringbuf = "0.3.3"
-serde = { version = "1.0.190", features = ["derive"] }
+serde = { version = "1.0.192", features = ["derive"] }
 sqlx = { version = "0.7.2", features = [
     "runtime-tokio-native-tls",
     "sqlite",

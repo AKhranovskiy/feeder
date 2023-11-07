@@ -175,9 +175,8 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id INTEGER NOT NULL,
                 file_hash INTEGER NOT NULL,
-                score_advert REAL NOT NULL,
-                score_music REAL NOT NULL,
-                score_other REAL NOT NULL,
+                predictions BLOB NOT NULL,
+                shape BLOB NOT NULL,
 
                 FOREIGN KEY(run_id) REFERENCES model_runs(id),
                 FOREIGN KEY(file_hash) REFERENCES dataset(hash)
@@ -343,5 +342,32 @@ impl Database {
         .fetch_optional(&self.pool)
         .await
         .map_err(Into::into)
+    }
+
+    pub async fn get_embedding(&self, hash: i64) -> anyhow::Result<Option<Vec<f32>>> {
+        sqlx::query("SELECT embedding FROM dataset WHERE hash = ?")
+            .bind(hash)
+            .map(|row: SqliteRow| bytemuck::cast_slice(row.get("embedding")).to_vec())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn insert_file_score(
+        &self,
+        run_id: i64,
+        file_hash: i64,
+        predictions: &[f32],
+        shape: &[usize],
+    ) -> anyhow::Result<()> {
+        sqlx::query("INSERT INTO model_run_file_score (run_id, file_hash, predictions, shape) VALUES(?,?,?,?)")
+            .bind(run_id)
+            .bind(file_hash)
+            .bind(bytemuck::cast_slice(predictions))
+            .bind(bytemuck::cast_slice(shape))
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 }

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use ndarray::Array2;
 use tensorflow::Tensor;
 
 mod tfmodel;
@@ -159,7 +160,16 @@ impl AdbandaModel {
         })
     }
 
-    pub fn run(&self, data: &Data) -> anyhow::Result<Vec<f32>> {
-        Ok(self.model.run(&Tensor::from(data))?.to_vec())
+    pub fn run(&self, data: Vec<f32>) -> anyhow::Result<PredictedLabels> {
+        let ar = Array2::from_shape_vec((data.len() / 1024, 1024), data)?;
+
+        let predictions = self.model.run(&Tensor::from(&ar))?;
+
+        let dims = predictions.dims();
+
+        Ok(PredictedLabels::from_shape_vec(
+            (dims[0] as usize, dims[1] as usize),
+            predictions.to_vec(),
+        )?)
     }
 }
