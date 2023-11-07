@@ -45,10 +45,10 @@ impl ResumeArgs {
         let dir = Path::new("/run/user/1000/");
 
         let name = format!(
-            "adbanda-model-{}-{:x}-{}",
+            "adbanda-model-{}-{}-{:x}",
+            Utc::now().format("%Y%m%d-%H%M%S"),
             model.name,
             model.hash,
-            Utc::now().timestamp()
         );
 
         tar::Archive::new(content.as_slice()).unpack(dir.join(&name))?;
@@ -64,7 +64,7 @@ impl ResumeArgs {
         }
 
         let mut workers = JoinSet::new();
-        for _ in 0..10 {
+        for _ in 0..6 {
             let db = db.clone();
             let model = model.clone();
             let pb = pb.clone();
@@ -117,11 +117,18 @@ async fn process_embedding(
                 .run(embedding)
                 .tap_err(|e| println!("Error running model: {e}"))?;
 
+            let dist = analyzer::dist(&predictions)
+                .tap_err(|err| println!("Error computing distance: {err}"))?;
+
+            let confidence = analyzer::confidence(&dist);
+            assert!(confidence.shape() == [3]);
+
             db.insert_file_score(
                 run_id,
                 hash,
                 predictions.as_slice().unwrap(),
                 predictions.shape(),
+                confidence.as_slice().unwrap().try_into().unwrap(),
             )
             .await
             .tap_err(|e| println!("Error inserting score: {e}"))?;

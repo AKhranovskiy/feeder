@@ -4,6 +4,7 @@ use training::Database;
 
 mod add;
 mod commands;
+mod get;
 mod list;
 mod resume;
 mod run;

@@ -6,6 +6,7 @@ edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+analyzer = { workspace = true }
 anyhow = { workspace = true }
 bytemuck = { workspace = true }
 chrono = { workspace = true }
@@ -13,7 +14,6 @@ clap = { workspace = true }
 classifier = { workspace = true }
 codec = { workspace = true }
 flume = { workspace = true }
-futures = { workspace = true }
 kdam = { workspace = true }
 seahash = { workspace = true }
 sqlx = { workspace = true }

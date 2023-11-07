@@ -10,7 +10,7 @@ mod smooth;
 
 pub use analyzer::BufferedAnalyzer;
 pub use content_kind::ContentKind;
-pub use smooth::LabelSmoother;
+pub use smooth::{confidence, dist, LabelSmoother};
 
 #[bitflags]
 #[repr(u8)]

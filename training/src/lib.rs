@@ -177,6 +177,9 @@ impl Database {
                 file_hash INTEGER NOT NULL,
                 predictions BLOB NOT NULL,
                 shape BLOB NOT NULL,
+                confidence_advert REAL NOT NULL,
+                confidence_music REAL NOT NULL,
+                confidence_other REAL NOT NULL,
 
                 FOREIGN KEY(run_id) REFERENCES model_runs(id),
                 FOREIGN KEY(file_hash) REFERENCES dataset(hash)
@@ -359,15 +362,32 @@ impl Database {
         file_hash: i64,
         predictions: &[f32],
         shape: &[usize],
+        confidence: [f32; 3],
     ) -> anyhow::Result<()> {
-        sqlx::query("INSERT INTO model_run_file_score (run_id, file_hash, predictions, shape) VALUES(?,?,?,?)")
+        sqlx::query(
+            r"INSERT INTO model_run_file_score
+                (run_id, file_hash, predictions, shape, confidence_advert, confidence_music, confidence_other)
+                VALUES(?,?,?,?,?,?,?)"
+            )
             .bind(run_id)
             .bind(file_hash)
             .bind(bytemuck::cast_slice(predictions))
             .bind(bytemuck::cast_slice(shape))
+            .bind(confidence[0])
+            .bind(confidence[1])
+            .bind(confidence[2])
             .execute(&self.pool)
             .await?;
 
         Ok(())
+    }
+
+    pub async fn get_file(&self, hash: i64) -> anyhow::Result<Option<(String, Vec<u8>)>> {
+        sqlx::query("SELECT name, content FROM dataset WHERE hash = ?")
+            .bind(hash)
+            .map(|row: SqliteRow| (row.get("name"), row.get("content")))
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(Into::into)
     }
 }

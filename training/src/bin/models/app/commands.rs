@@ -13,15 +13,18 @@ pub enum Commands {
     Run(super::run::RunArgs),
     /// Resume an incomplete model run.
     Resume(super::resume::ResumeArgs),
+    /// Get object from DB
+    Get(super::get::GetArgs),
 }
 
 impl Commands {
     pub async fn run(&self, db: &Database) -> anyhow::Result<()> {
         match self {
-            Self::List(args) => args.run(db).await,
             Self::Add(args) => args.run(db).await,
-            Self::Run(args) => args.run(db).await,
+            Self::Get(args) => args.run(db).await,
+            Self::List(args) => args.run(db).await,
             Self::Resume(args) => args.run(db).await,
+            Self::Run(args) => args.run(db).await,
         }
     }
 }

@@ -1,20 +1,27 @@
 use std::time::Duration;
 
 use classifier::PredictedLabels;
+use lazy_static::lazy_static;
 use log::info;
 use ndarray::{array, Array1, Array2, Axis, Slice};
 use ndarray_stats::{DeviationExt, QuantileExt};
 
 use crate::analyzer::DRAIN_DURATION;
 
+lazy_static! {
+    static ref ADVERT: PredictedLabels =
+        PredictedLabels::from_shape_vec((1, 3), vec![1.0, 0.0, 0.0]).unwrap();
+    static ref MUSIC: PredictedLabels =
+        PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap();
+    static ref OTHER: PredictedLabels =
+        PredictedLabels::from_shape_vec((1, 3), vec![0.0, 0.0, 1.0]).unwrap();
+}
+
 #[allow(dead_code)]
 pub struct LabelSmoother {
     ahead: usize,
     buffer: PredictedLabels,
     max_size: usize,
-    ads_label: PredictedLabels,
-    music_label: PredictedLabels,
-    talk_label: PredictedLabels,
     last: PredictedLabels,
 }
 
@@ -36,9 +43,6 @@ impl LabelSmoother {
             ahead: ahead_size,
             buffer: PredictedLabels::zeros((0, 3)),
             max_size: behind_size + ahead_size + 1,
-            ads_label: PredictedLabels::from_shape_vec((1, 3), vec![1.0, 0.0, 0.0]).unwrap(),
-            music_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
-            talk_label: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 0.0, 1.0]).unwrap(),
             last: PredictedLabels::from_shape_vec((1, 3), vec![0.0, 1.0, 0.0]).unwrap(),
         }
     }
@@ -52,8 +56,7 @@ impl LabelSmoother {
     }
 
     pub fn push(&mut self, labels: &PredictedLabels) -> anyhow::Result<Option<Array1<f32>>> {
-        let dist = self.dist(labels)?;
-        self.buffer.append(Axis(0), dist.view())?;
+        self.buffer.append(Axis(0), dist(labels)?.view())?;
 
         let len = self.buffer.shape()[0];
 
@@ -66,9 +69,7 @@ impl LabelSmoother {
                 .slice_axis_inplace(Axis(0), Slice::from(start..));
         }
 
-        let mean = self.buffer.mean_axis(Axis(0)).map(|v| 1.0 / v).unwrap();
-        let total = mean.sum();
-        let confidence = mean.mapv(|v| (v / (total - v) - 2.0).max(0.0));
+        let confidence = confidence(&self.buffer);
         if confidence == array![0.0, 0.0, 0.0] {
             return Ok(None);
         }
@@ -77,16 +78,22 @@ impl LabelSmoother {
         // Second buffer on confidence? ATA -> A, MMMMAAMM -> MMMMMMMMMMM
         Ok(Some(confidence))
     }
+}
 
-    fn dist(&self, labels: &PredictedLabels) -> anyhow::Result<Array2<f32>> {
-        let repeat = |a: &PredictedLabels| {
-            ndarray::concatenate(Axis(0), &[a.view()].repeat(labels.shape()[0]))
-        };
+pub fn dist(labels: &PredictedLabels) -> anyhow::Result<Array2<f32>> {
+    let repeat =
+        |a: &PredictedLabels| ndarray::concatenate(Axis(0), &[a.view()].repeat(labels.shape()[0]));
 
-        let ads = labels.sq_l2_dist(&repeat(&self.ads_label)?)?;
-        let music = labels.sq_l2_dist(&repeat(&self.music_label)?)?;
-        let talk = labels.sq_l2_dist(&repeat(&self.talk_label)?)?;
+    let ads = labels.sq_l2_dist(&repeat(&ADVERT)?)?;
+    let music = labels.sq_l2_dist(&repeat(&MUSIC)?)?;
+    let other = labels.sq_l2_dist(&repeat(&OTHER)?)?;
 
-        Ok(array![[ads, music, talk]])
-    }
+    Ok(array![[ads, music, other]])
+}
+
+#[must_use]
+pub fn confidence(input: &PredictedLabels) -> Array1<f32> {
+    let mean = input.mean_axis(Axis(0)).map(|v| 1.0 / v).unwrap();
+    let total = mean.sum();
+    mean.mapv(|v| (v / (total - v) - 2.0).max(0.0))
 }
