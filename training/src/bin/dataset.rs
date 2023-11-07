@@ -12,7 +12,7 @@ use clap::Parser;
 use kdam::BarExt;
 use tokio::{sync::Mutex, task::JoinSet};
 
-use training::Database;
+use training::database::Database;
 
 const WORKERS: usize = 10;
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024; // 10MiB

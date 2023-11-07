@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use training::Database;
+use training::database::Database;
 
 mod add;
 mod commands;

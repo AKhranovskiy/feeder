@@ -1,6 +1,6 @@
 use clap::{Args, Subcommand};
 
-use training::Database;
+use training::database::Database;
 
 #[derive(Args)]
 pub struct ListArgs {

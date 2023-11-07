@@ -1,6 +1,6 @@
 use clap::Subcommand;
 
-use training::Database;
+use training::database::Database;
 
 #[derive(Subcommand)]
 pub enum Commands {

@@ -6,7 +6,8 @@ use classifier::AdbandaModel;
 use kdam::BarExt;
 use tap::TapFallible;
 use tokio::{sync::Mutex, task::JoinSet};
-use training::Database;
+
+use training::database::Database;
 
 #[derive(Args)]
 pub struct ResumeArgs {

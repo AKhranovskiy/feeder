@@ -1,5 +1,6 @@
 use clap::Args;
-use training::Database;
+
+use training::database::Database;
 
 #[derive(Args)]
 #[group(required = true, multiple = false)]

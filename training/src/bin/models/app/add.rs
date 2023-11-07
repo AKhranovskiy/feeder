@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use training::Database;
+use training::database::Database;
 
 #[derive(Args)]
 pub struct AddArgs {
