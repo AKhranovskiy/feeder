@@ -1,9 +1,8 @@
-
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, Clone, Copy, sqlx::Type)]
+#[derive(Debug, Clone, Copy, sqlx::Type, clap::ValueEnum, strum::AsRefStr)]
 pub enum DatasetKind {
     Advert,
     Music,
